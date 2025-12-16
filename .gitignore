@@ -18,6 +18,12 @@ bld/
 .vs/
 .vscode/
 
+# JetBrains Rider
+.idea/
+
+# Claude Code
+.claude/
+
 # NuGet Packages
 *.nupkg
 *.snupkg
@@ -40,3 +46,14 @@ bld/
 *.log
 *.tmp
 .DS_Store
+
+# AppSettings (keep only appsettings.json, ignore environment-specific ones)
+appsettings.*.json
+appsettings.Development.json
+appsettings.Production.json
+appsettings.Staging.json
+appsettings.Local.json
+
+# Documentation and samples (if you don't want to commit these)
+docs/
+samples/
