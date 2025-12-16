@@ -1,0 +1,33 @@
+<Project>
+    <PropertyGroup>
+        <Authors>CydoEntis</Authors>
+        <Company>CydoEntis</Company>
+        <Product>Pawthorize</Product>
+        <Copyright>Copyright © 2025 CydoEntis</Copyright>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageProjectUrl>https://github.com/CydoEntis/Pawthorize</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/CydoEntis/Pawthorize</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PackageTags>authentication;jwt;oauth;aspnetcore;security</PackageTags>
+        <Description>Pawthorize - A flexible authentication package for ASP.NET Core</Description>
+
+        <!-- Build Configuration -->
+        <LangVersion>latest</LangVersion>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+
+        <!-- Versioning -->
+        <VersionPrefix>0.1.0</VersionPrefix>
+        <VersionSuffix>preview</VersionSuffix>
+
+        <!-- NuGet Package Settings -->
+        <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+        <IncludeSymbols>true</IncludeSymbols>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+
+        <!-- Central Package Management -->
+        <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    </PropertyGroup>
+</Project>

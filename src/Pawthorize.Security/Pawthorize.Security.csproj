@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <PackageId>Pawthorize.Security</PackageId>
+        <Description>Password hashing and encryption services for Pawthorize</Description>
+        <PackageTags>security;password;hashing;encryption</PackageTags>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="BCrypt.Net-Next" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Pawthorize.Core\Pawthorize.Core.csproj" />
+    </ItemGroup>
+</Project>

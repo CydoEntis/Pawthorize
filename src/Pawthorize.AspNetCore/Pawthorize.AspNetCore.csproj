@@ -1,0 +1,24 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <PackageId>Pawthorize.AspNetCore</PackageId>
+        <Description>ASP.NET Core integration for Pawthorize authentication</Description>
+        <PackageTags>aspnetcore;minimal-api;authentication;handlers</PackageTags>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="FluentValidation" />
+        <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+        <PackageReference Include="ErrorHound" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\Pawthorize.Core\Pawthorize.Core.csproj" />
+        <ProjectReference Include="..\Pawthorize.Jwt\Pawthorize.Jwt.csproj" />
+        <ProjectReference Include="..\Pawthorize.Security\Pawthorize.Security.csproj" />
+    </ItemGroup>
+</Project>
