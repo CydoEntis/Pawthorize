@@ -1,4 +1,6 @@
-﻿namespace Pawthorize.Core.Models;
+﻿using Pawthorize.Core.Abstractions;
+
+namespace Pawthorize.Core.Models;
 
 /// <summary>
 /// Result of successful authentication containing tokens and user info.
