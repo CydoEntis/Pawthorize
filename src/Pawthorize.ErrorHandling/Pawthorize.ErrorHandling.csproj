@@ -4,6 +4,10 @@
     <ProjectReference Include="..\Pawthorize.Core\Pawthorize.Core.csproj" />
   </ItemGroup>
 
+    <ItemGroup>
+        <PackageReference Include="ErrorHound" />
+    </ItemGroup>
+    
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
