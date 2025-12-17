@@ -6,9 +6,29 @@
 /// </summary>
 public interface IUserRepository<TUser> where TUser : IAuthenticatedUser
 {
-    Task<TUser?> FindByEmailAsync(string email, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// Find a user by identifier (email, username, phone, etc.)
+    /// The identifier type is determined by consumer's implementation.
+    /// </summary>
+    Task<TUser?> FindByIdentifierAsync(string identifier, CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// Find a user by ID.
+    /// </summary>
     Task<TUser?> FindByIdAsync(string id, CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// Create a new user.
+    /// </summary>
     Task<TUser> CreateAsync(TUser user, CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// Update an existing user.
+    /// </summary>
     Task<TUser> UpdateAsync(TUser user, CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// Check if an email address is already registered.
+    /// </summary>
     Task<bool> EmailExistsAsync(string email, CancellationToken cancellationToken = default);
 }

@@ -25,4 +25,25 @@ public class PawthorizeOptions
     /// Platform-specific settings (only used in Platform mode)
     /// </summary>
     public PlatformOptions? Platform { get; set; }
+
+    /// <summary>
+    /// Login identifier configuration (Email or Username)
+    /// </summary>
+    public LoginIdentifierType LoginIdentifier { get; set; } = LoginIdentifierType.Email;
+}
+
+/// <summary>
+/// Type of identifier used for login
+/// </summary>
+public enum LoginIdentifierType
+{
+    /// <summary>
+    /// Users log in with email address (default)
+    /// </summary>
+    Email,
+
+    /// <summary>
+    /// Users log in with username
+    /// </summary>
+    Username
 }
