@@ -1,4 +1,6 @@
-﻿namespace Pawthorize.AspNetCore.DTOs;
+﻿using System.Text.Json.Serialization;
+
+namespace Pawthorize.AspNetCore.DTOs;
 
 /// <summary>
 /// Request model for user login.
@@ -6,12 +8,19 @@
 public class LoginRequest
 {
     /// <summary>
-    /// User's email address
+    /// Login identifier.
+    /// The type of identifier depends on your Pawthorize configuration:
+    /// - Email login (default): provide email address
+    /// - Username login: provide username
+    /// - Phone login: provide phone number
     /// </summary>
-    public string Email { get; set; } = string.Empty;
+    /// <example>john@example.com</example>
+    /// <example>johndoe</example>
+    [JsonPropertyName("identifier")]
+    public string Identifier { get; set; } = string.Empty;
 
     /// <summary>
-    /// User's password (plaintext - will be hashed)
+    /// User's password
     /// </summary>
     public string Password { get; set; } = string.Empty;
 }

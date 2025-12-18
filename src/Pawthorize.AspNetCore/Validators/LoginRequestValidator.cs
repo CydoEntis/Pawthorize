@@ -10,11 +10,11 @@ public class LoginRequestValidator : AbstractValidator<LoginRequest>
 {
     public LoginRequestValidator()
     {
-        RuleFor(x => x.Email)
+        RuleFor(x => x.Identifier)
             .NotEmpty()
-            .WithMessage("Email is required")
+            .WithMessage("Identifier is required")
             .MaximumLength(255)
-            .WithMessage("Email must not exceed 255 characters");
+            .WithMessage("Identifier must not exceed 255 characters");
 
         RuleFor(x => x.Password)
             .NotEmpty()

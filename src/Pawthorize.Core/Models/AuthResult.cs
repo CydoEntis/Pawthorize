@@ -1,45 +1,34 @@
-﻿using Pawthorize.Core.Abstractions;
-
-namespace Pawthorize.Core.Models;
+﻿namespace Pawthorize.Core.Models;
 
 /// <summary>
-/// Result of successful authentication containing tokens and user info.
-/// Returned by login, register, and refresh operations.
+/// Result of successful authentication (login or registration).
+/// Contains tokens but no user data (fetch user via /me endpoint).
 /// </summary>
-/// <typeparam name="TUser">User type implementing IAuthenticatedUser</typeparam>
-public class AuthResult<TUser> where TUser : IAuthenticatedUser
+public class AuthResult
 {
     /// <summary>
-    /// JWT access token (short-lived, stateless)
-    /// Include this in Authorization header: "Bearer {AccessToken}"
+    /// JWT access token (short-lived, use for API requests)
     /// </summary>
     public string AccessToken { get; set; } = string.Empty;
     
     /// <summary>
-    /// Refresh token (long-lived, stored in database)
-    /// Use this to get new access tokens without re-authenticating
+    /// Refresh token (long-lived, use to get new access tokens)
+    /// Note: May be null if using HttpOnlyCookies strategy (token is in cookie)
     /// </summary>
-    public string RefreshToken { get; set; } = string.Empty;
-    
-    /// <summary>
-    /// The authenticated user's information
-    /// </summary>
-    public TUser User { get; set; } = default!;
+    public string? RefreshToken { get; set; }
     
     /// <summary>
     /// When the access token expires (UTC)
-    /// Frontend should refresh before this time
     /// </summary>
     public DateTime AccessTokenExpiresAt { get; set; }
     
     /// <summary>
     /// When the refresh token expires (UTC)
-    /// User must re-login after this time
     /// </summary>
     public DateTime RefreshTokenExpiresAt { get; set; }
     
     /// <summary>
-    /// Token type (typically "Bearer")
+    /// Token type (always "Bearer" for JWT)
     /// </summary>
     public string TokenType { get; set; } = "Bearer";
 }
