@@ -43,6 +43,12 @@ public class PawthorizeOptions
     /// Default: false
     /// </summary>
     public bool RequireEmailVerification { get; set; } = false;
+
+    /// <summary>
+    /// Email verification configuration (optional).
+    /// Only used if RequireEmailVerification is true.
+    /// </summary>
+    public EmailVerificationOptions EmailVerification { get; set; } = new();
 }
 
 /// <summary>
