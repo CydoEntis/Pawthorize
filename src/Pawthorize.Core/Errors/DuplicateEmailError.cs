@@ -1,7 +1,7 @@
 ﻿using System.Net;
 using ErrorHound.Core;
 
-namespace Pawthorize.ErrorHandling.Errors;
+namespace Pawthorize.Core.Errors;
 
 /// <summary>
 /// Error thrown when attempting to register with an email that already exists.
