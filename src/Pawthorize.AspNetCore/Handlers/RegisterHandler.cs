@@ -1,13 +1,12 @@
-﻿using ErrorHound.BuiltIn;
-using FluentValidation;
+﻿using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Options;
 using Pawthorize.AspNetCore.DTOs;
+using Pawthorize.AspNetCore.Services;
 using Pawthorize.AspNetCore.Utilities;
 using Pawthorize.Core.Abstractions;
 using Pawthorize.Core.Errors;
 using Pawthorize.Core.Models;
-using Pawthorize.Jwt.Services;
 using SuccessHound.AspNetExtensions;
 
 namespace Pawthorize.AspNetCore.Handlers;
@@ -26,8 +25,7 @@ public class RegisterHandler<TUser, TRegisterRequest>
     private readonly IUserRepository<TUser> _userRepository;
     private readonly IUserFactory<TUser, TRegisterRequest> _userFactory;
     private readonly IPasswordHasher _passwordHasher;
-    private readonly JwtService<TUser> _jwtService;
-    private readonly IRefreshTokenRepository _refreshTokenRepository;
+    private readonly AuthenticationService<TUser> _authService;
     private readonly IEmailVerificationService? _emailVerificationService;
     private readonly IValidator<TRegisterRequest> _validator;
     private readonly PawthorizeOptions _options;
@@ -36,8 +34,7 @@ public class RegisterHandler<TUser, TRegisterRequest>
         IUserRepository<TUser> userRepository,
         IUserFactory<TUser, TRegisterRequest> userFactory,
         IPasswordHasher passwordHasher,
-        JwtService<TUser> jwtService,
-        IRefreshTokenRepository refreshTokenRepository,
+        AuthenticationService<TUser> authService,
         IValidator<TRegisterRequest> validator,
         IOptions<PawthorizeOptions> options,
         IEmailVerificationService? emailVerificationService = null)
@@ -45,8 +42,7 @@ public class RegisterHandler<TUser, TRegisterRequest>
         _userRepository = userRepository;
         _userFactory = userFactory;
         _passwordHasher = passwordHasher;
-        _jwtService = jwtService;
-        _refreshTokenRepository = refreshTokenRepository;
+        _authService = authService;
         _emailVerificationService = emailVerificationService;
         _validator = validator;
         _options = options.Value;
@@ -60,7 +56,7 @@ public class RegisterHandler<TUser, TRegisterRequest>
         HttpContext httpContext,
         CancellationToken cancellationToken = default)
     {
-        await ValidateRequestAsync(request, cancellationToken);
+        await ValidationHelper.ValidateAndThrowAsync(request, _validator, cancellationToken);
 
         if (await _userRepository.EmailExistsAsync(request.Email, cancellationToken))
         {
@@ -78,26 +74,8 @@ public class RegisterHandler<TUser, TRegisterRequest>
             return await HandleEmailVerificationRequiredAsync(createdUser, cancellationToken);
         }
 
-        return await AutoLoginAsync(createdUser, httpContext, cancellationToken);
-    }
-
-    /// <summary>
-    /// Validate registration request using FluentValidation.
-    /// </summary>
-    private async Task ValidateRequestAsync(TRegisterRequest request, CancellationToken cancellationToken)
-    {
-        var validationResult = await _validator.ValidateAsync(request, cancellationToken);
-
-        if (!validationResult.IsValid)
-        {
-            var validationError = new ValidationError();
-            foreach (var error in validationResult.Errors)
-            {
-                validationError.AddFieldError(error.PropertyName, error.ErrorMessage);
-            }
-
-            throw validationError;
-        }
+        var authResult = await _authService.GenerateTokensAsync(createdUser, cancellationToken);
+        return TokenDeliveryHelper.DeliverTokens(authResult, httpContext, _options.TokenDelivery);
     }
 
     /// <summary>
@@ -127,46 +105,5 @@ public class RegisterHandler<TUser, TRegisterRequest>
         };
 
         return response.Ok();
-    }
-
-    /// <summary>
-    /// Auto-login after registration (email verification not required).
-    /// Generates and returns tokens.
-    /// </summary>
-    private async Task<IResult> AutoLoginAsync(
-        TUser user,
-        HttpContext httpContext,
-        CancellationToken cancellationToken)
-    {
-        var authResult = await GenerateTokensAsync(user, cancellationToken);
-
-        return TokenDeliveryHelper.DeliverTokens(authResult, httpContext, _options.TokenDelivery);
-    }
-
-    /// <summary>
-    /// Generate access and refresh tokens.
-    /// </summary>
-    private async Task<AuthResult> GenerateTokensAsync(TUser user, CancellationToken cancellationToken)
-    {
-        var accessToken = _jwtService.GenerateAccessToken(user);
-        var accessTokenExpiresAt = DateTime.UtcNow.Add(_options.Jwt.AccessTokenLifetime);
-
-        var refreshToken = _jwtService.GenerateRefreshToken();
-        var refreshTokenExpiresAt = DateTime.UtcNow.Add(_options.Jwt.RefreshTokenLifetime);
-
-        await _refreshTokenRepository.StoreAsync(
-            refreshToken,
-            user.Id,
-            refreshTokenExpiresAt,
-            cancellationToken);
-
-        return new AuthResult
-        {
-            AccessToken = accessToken,
-            RefreshToken = refreshToken,
-            AccessTokenExpiresAt = accessTokenExpiresAt,
-            RefreshTokenExpiresAt = refreshTokenExpiresAt,
-            TokenType = "Bearer"
-        };
     }
 }
