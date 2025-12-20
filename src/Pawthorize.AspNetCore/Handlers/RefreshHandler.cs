@@ -1,5 +1,6 @@
 ﻿using FluentValidation;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Pawthorize.AspNetCore.DTOs;
 using Pawthorize.AspNetCore.Services;
@@ -21,19 +22,22 @@ public class RefreshHandler<TUser> where TUser : IAuthenticatedUser
     private readonly AuthenticationService<TUser> _authService;
     private readonly IValidator<RefreshTokenRequest> _validator;
     private readonly PawthorizeOptions _options;
+    private readonly ILogger<RefreshHandler<TUser>> _logger;
 
     public RefreshHandler(
         IUserRepository<TUser> userRepository,
         IRefreshTokenRepository refreshTokenRepository,
         AuthenticationService<TUser> authService,
         IValidator<RefreshTokenRequest> validator,
-        IOptions<PawthorizeOptions> options)
+        IOptions<PawthorizeOptions> options,
+        ILogger<RefreshHandler<TUser>> logger)
     {
         _userRepository = userRepository;
         _refreshTokenRepository = refreshTokenRepository;
         _authService = authService;
         _validator = validator;
         _options = options.Value;
+        _logger = logger;
     }
 
     /// <summary>
@@ -44,31 +48,78 @@ public class RefreshHandler<TUser> where TUser : IAuthenticatedUser
         HttpContext httpContext,
         CancellationToken cancellationToken = default)
     {
-        await ValidationHelper.ValidateAndThrowAsync(request, _validator, cancellationToken);
+        _logger.LogInformation("Token refresh attempt initiated");
 
-        var refreshToken = ExtractRefreshToken(request, httpContext);
-
-        var tokenInfo = await _refreshTokenRepository.ValidateAsync(refreshToken, cancellationToken);
-
-        if (tokenInfo == null || tokenInfo.IsExpired)
+        try
         {
-            throw new InvalidRefreshTokenError();
+            await ValidationHelper.ValidateAndThrowAsync(request, _validator, cancellationToken, _logger);
+            _logger.LogDebug("Refresh token request validation passed");
+
+            var refreshToken = ExtractRefreshToken(request, httpContext);
+            _logger.LogDebug("Refresh token extracted from request");
+
+            var tokenInfo = await _refreshTokenRepository.ValidateAsync(refreshToken, cancellationToken);
+
+            if (tokenInfo == null)
+            {
+                _logger.LogWarning("Token refresh failed: Invalid or non-existent refresh token");
+                throw new InvalidRefreshTokenError();
+            }
+
+            if (tokenInfo.IsExpired)
+            {
+                _logger.LogWarning("Token refresh failed: Refresh token expired for UserId: {UserId}",
+                    tokenInfo.UserId);
+                throw new InvalidRefreshTokenError();
+            }
+
+            _logger.LogDebug("Refresh token validated successfully for UserId: {UserId}", tokenInfo.UserId);
+
+            var user = await _userRepository.FindByIdAsync(tokenInfo.UserId, cancellationToken);
+
+            if (user == null)
+            {
+                _logger.LogError("Token refresh failed: User not found for UserId: {UserId}", tokenInfo.UserId);
+                throw new InvalidRefreshTokenError();
+            }
+
+            _logger.LogDebug("User found for refresh token, UserId: {UserId}", user.Id);
+
+            _authService.ValidateAccountStatus(user);
+            _logger.LogDebug("Account status validation passed for UserId: {UserId}", user.Id);
+
+            await _refreshTokenRepository.RevokeAsync(refreshToken, cancellationToken);
+            _logger.LogDebug("Old refresh token revoked for UserId: {UserId}", user.Id);
+
+            var authResult = await _authService.GenerateTokensAsync(user, cancellationToken);
+            _logger.LogDebug("New tokens generated successfully for UserId: {UserId}", user.Id);
+
+            var result = TokenDeliveryHelper.DeliverTokens(authResult, httpContext, _options.TokenDelivery, _logger);
+
+            _logger.LogInformation("Token refresh completed successfully for UserId: {UserId}", user.Id);
+
+            return result;
         }
-
-        var user = await _userRepository.FindByIdAsync(tokenInfo.UserId, cancellationToken);
-
-        if (user == null)
+        catch (InvalidRefreshTokenError)
         {
-            throw new InvalidRefreshTokenError();
+            _logger.LogError("Token refresh failed: Invalid refresh token");
+            throw;
         }
-
-        _authService.ValidateAccountStatus(user);
-
-        await _refreshTokenRepository.RevokeAsync(refreshToken, cancellationToken);
-
-        var authResult = await _authService.GenerateTokensAsync(user, cancellationToken);
-
-        return TokenDeliveryHelper.DeliverTokens(authResult, httpContext, _options.TokenDelivery);
+        catch (EmailNotVerifiedError)
+        {
+            _logger.LogWarning("Token refresh failed: Email not verified");
+            throw;
+        }
+        catch (AccountLockedError)
+        {
+            _logger.LogWarning("Token refresh failed: Account locked");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error during token refresh");
+            throw;
+        }
     }
 
     /// <summary>
@@ -82,15 +133,19 @@ public class RefreshHandler<TUser> where TUser : IAuthenticatedUser
             var cookieToken = httpContext.Request.Cookies["refresh_token"];
             if (!string.IsNullOrEmpty(cookieToken))
             {
+                _logger.LogDebug("Refresh token extracted from cookie");
                 return cookieToken;
             }
+            _logger.LogDebug("No refresh token found in cookie, checking request body");
         }
 
         if (!string.IsNullOrEmpty(request.RefreshToken))
         {
+            _logger.LogDebug("Refresh token extracted from request body");
             return request.RefreshToken;
         }
 
+        _logger.LogWarning("No refresh token found in cookie or request body");
         throw new InvalidRefreshTokenError();
     }
 }

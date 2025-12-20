@@ -1,5 +1,6 @@
 ﻿using FluentValidation;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Pawthorize.AspNetCore.DTOs;
 using Pawthorize.AspNetCore.Services;
@@ -29,6 +30,7 @@ public class RegisterHandler<TUser, TRegisterRequest>
     private readonly IEmailVerificationService? _emailVerificationService;
     private readonly IValidator<TRegisterRequest> _validator;
     private readonly PawthorizeOptions _options;
+    private readonly ILogger<RegisterHandler<TUser, TRegisterRequest>> _logger;
 
     public RegisterHandler(
         IUserRepository<TUser> userRepository,
@@ -37,6 +39,7 @@ public class RegisterHandler<TUser, TRegisterRequest>
         AuthenticationService<TUser> authService,
         IValidator<TRegisterRequest> validator,
         IOptions<PawthorizeOptions> options,
+        ILogger<RegisterHandler<TUser, TRegisterRequest>> logger,
         IEmailVerificationService? emailVerificationService = null)
     {
         _userRepository = userRepository;
@@ -46,6 +49,7 @@ public class RegisterHandler<TUser, TRegisterRequest>
         _emailVerificationService = emailVerificationService;
         _validator = validator;
         _options = options.Value;
+        _logger = logger;
     }
 
     /// <summary>
@@ -56,26 +60,59 @@ public class RegisterHandler<TUser, TRegisterRequest>
         HttpContext httpContext,
         CancellationToken cancellationToken = default)
     {
-        await ValidationHelper.ValidateAndThrowAsync(request, _validator, cancellationToken);
+        _logger.LogInformation("Registration attempt initiated for email: {Email}", request.Email);
 
-        if (await _userRepository.EmailExistsAsync(request.Email, cancellationToken))
+        try
         {
-            throw new DuplicateEmailError(request.Email);
+            await ValidationHelper.ValidateAndThrowAsync(request, _validator, cancellationToken, _logger);
+            _logger.LogDebug("Registration request validation passed for email: {Email}", request.Email);
+
+            if (await _userRepository.EmailExistsAsync(request.Email, cancellationToken))
+            {
+                _logger.LogWarning("Registration failed: Duplicate email attempted: {Email}", request.Email);
+                throw new DuplicateEmailError(request.Email);
+            }
+
+            _logger.LogDebug("Email uniqueness check passed for email: {Email}", request.Email);
+
+            var passwordHash = _passwordHasher.HashPassword(request.Password);
+            _logger.LogDebug("Password hashed successfully for email: {Email}", request.Email);
+
+            var user = _userFactory.CreateUser(request, passwordHash);
+            _logger.LogDebug("User entity created for email: {Email}", request.Email);
+
+            var createdUser = await _userRepository.CreateAsync(user, cancellationToken);
+            _logger.LogInformation("User created successfully with UserId: {UserId}, Email: {Email}",
+                createdUser.Id, createdUser.Email);
+
+            if (_options.RequireEmailVerification)
+            {
+                _logger.LogDebug("Email verification required, processing verification flow for UserId: {UserId}",
+                    createdUser.Id);
+                return await HandleEmailVerificationRequiredAsync(createdUser, cancellationToken);
+            }
+
+            _logger.LogDebug("Email verification not required, generating tokens for UserId: {UserId}",
+                createdUser.Id);
+
+            var authResult = await _authService.GenerateTokensAsync(createdUser, cancellationToken);
+            var result = TokenDeliveryHelper.DeliverTokens(authResult, httpContext, _options.TokenDelivery, _logger);
+
+            _logger.LogInformation("Registration completed successfully for UserId: {UserId}, Email: {Email}",
+                createdUser.Id, createdUser.Email);
+
+            return result;
         }
-
-        var passwordHash = _passwordHasher.HashPassword(request.Password);
-
-        var user = _userFactory.CreateUser(request, passwordHash);
-
-        var createdUser = await _userRepository.CreateAsync(user, cancellationToken);
-
-        if (_options.RequireEmailVerification)
+        catch (DuplicateEmailError)
         {
-            return await HandleEmailVerificationRequiredAsync(createdUser, cancellationToken);
+            _logger.LogError("Registration failed: Duplicate email for {Email}", request.Email);
+            throw;
         }
-
-        var authResult = await _authService.GenerateTokensAsync(createdUser, cancellationToken);
-        return TokenDeliveryHelper.DeliverTokens(authResult, httpContext, _options.TokenDelivery);
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error during registration for email: {Email}", request.Email);
+            throw;
+        }
     }
 
     /// <summary>
@@ -88,15 +125,29 @@ public class RegisterHandler<TUser, TRegisterRequest>
     {
         if (_emailVerificationService == null)
         {
+            _logger.LogError("Email verification service not configured but RequireEmailVerification is enabled for UserId: {UserId}",
+                user.Id);
             throw new InvalidOperationException(
                 "Email verification is required but IEmailVerificationService is not registered. " +
                 "Register IEmailVerificationService in your DI container.");
         }
 
-        await _emailVerificationService.SendVerificationEmailAsync(
-            user.Id,
-            user.Email,
-            cancellationToken);
+        try
+        {
+            await _emailVerificationService.SendVerificationEmailAsync(
+                user.Id,
+                user.Email,
+                cancellationToken);
+
+            _logger.LogInformation("Email verification email sent successfully to {Email}, UserId: {UserId}",
+                user.Email, user.Id);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send email verification email to {Email}, UserId: {UserId}",
+                user.Email, user.Id);
+            throw;
+        }
 
         var response = new
         {

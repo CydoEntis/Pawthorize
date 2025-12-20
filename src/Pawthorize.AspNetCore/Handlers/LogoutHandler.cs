@@ -1,5 +1,6 @@
 ﻿using FluentValidation;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Pawthorize.AspNetCore.DTOs;
 using Pawthorize.AspNetCore.Utilities;
@@ -19,15 +20,18 @@ public class LogoutHandler<TUser> where TUser : IAuthenticatedUser
     private readonly IRefreshTokenRepository _refreshTokenRepository;
     private readonly IValidator<LogoutRequest> _validator;
     private readonly PawthorizeOptions _options;
+    private readonly ILogger<LogoutHandler<TUser>> _logger;
 
     public LogoutHandler(
         IRefreshTokenRepository refreshTokenRepository,
         IValidator<LogoutRequest> validator,
-        IOptions<PawthorizeOptions> options)
+        IOptions<PawthorizeOptions> options,
+        ILogger<LogoutHandler<TUser>> logger)
     {
         _refreshTokenRepository = refreshTokenRepository;
         _validator = validator;
         _options = options.Value;
+        _logger = logger;
     }
 
     /// <summary>
@@ -38,15 +42,36 @@ public class LogoutHandler<TUser> where TUser : IAuthenticatedUser
         HttpContext httpContext,
         CancellationToken cancellationToken = default)
     {
-        await ValidationHelper.ValidateAndThrowAsync(request, _validator, cancellationToken);
+        _logger.LogInformation("Logout attempt initiated");
 
-        var refreshToken = ExtractRefreshToken(request, httpContext);
+        try
+        {
+            await ValidationHelper.ValidateAndThrowAsync(request, _validator, cancellationToken, _logger);
+            _logger.LogDebug("Logout request validation passed");
 
-        await _refreshTokenRepository.RevokeAsync(refreshToken, cancellationToken);
+            var refreshToken = ExtractRefreshToken(request, httpContext);
+            _logger.LogDebug("Refresh token extracted from request");
 
-        TokenDeliveryHelper.ClearAuthCookies(httpContext, _options.TokenDelivery);
+            await _refreshTokenRepository.RevokeAsync(refreshToken, cancellationToken);
+            _logger.LogDebug("Refresh token revoked successfully");
 
-        return new { Message = "Logged out successfully" }.Ok();
+            TokenDeliveryHelper.ClearAuthCookies(httpContext, _options.TokenDelivery, _logger);
+            _logger.LogDebug("Authentication cookies cleared");
+
+            _logger.LogInformation("Logout completed successfully");
+
+            return new { Message = "Logged out successfully" }.Ok();
+        }
+        catch (InvalidRefreshTokenError)
+        {
+            _logger.LogWarning("Logout failed: Invalid refresh token");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error during logout");
+            throw;
+        }
     }
 
     /// <summary>
@@ -60,15 +85,19 @@ public class LogoutHandler<TUser> where TUser : IAuthenticatedUser
             var cookieToken = httpContext.Request.Cookies["refresh_token"];
             if (!string.IsNullOrEmpty(cookieToken))
             {
+                _logger.LogDebug("Refresh token extracted from cookie for logout");
                 return cookieToken;
             }
+            _logger.LogDebug("No refresh token found in cookie, checking request body");
         }
 
         if (!string.IsNullOrEmpty(request.RefreshToken))
         {
+            _logger.LogDebug("Refresh token extracted from request body for logout");
             return request.RefreshToken;
         }
 
+        _logger.LogWarning("No refresh token found in cookie or request body for logout");
         throw new InvalidRefreshTokenError();
     }
 }

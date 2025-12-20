@@ -1,7 +1,9 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
+using System.Linq;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Pawthorize.Core.Abstractions;
@@ -18,18 +20,28 @@ public class JwtService<TUser> where TUser : IAuthenticatedUser
 {
     private readonly JwtSettings _settings;
     private readonly ITenantProvider? _tenantProvider;
+    private readonly ILogger<JwtService<TUser>>? _logger;
 
     public JwtService(IOptions<JwtSettings> settings)
-        : this(settings, null)
+        : this(settings, null, null)
     {
     }
 
     public JwtService(
         IOptions<JwtSettings> settings,
         ITenantProvider? tenantProvider)
+        : this(settings, tenantProvider, null)
+    {
+    }
+
+    public JwtService(
+        IOptions<JwtSettings> settings,
+        ITenantProvider? tenantProvider,
+        ILogger<JwtService<TUser>>? logger)
     {
         _settings = settings.Value;
         _tenantProvider = tenantProvider;
+        _logger = logger;
     }
 
     /// <summary>
@@ -37,21 +49,40 @@ public class JwtService<TUser> where TUser : IAuthenticatedUser
     /// </summary>
     public string GenerateAccessToken(TUser user)
     {
-        var claims = BuildClaims(user);
-        var secret = GetSecret();
-        
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
-        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+        _logger?.LogDebug("Generating access token for UserId: {UserId}", user.Id);
 
-        var token = new JwtSecurityToken(
-            issuer: _settings.Issuer,
-            audience: _settings.Audience,
-            claims: claims,
-            expires: DateTime.UtcNow.AddMinutes(_settings.AccessTokenLifetimeMinutes),
-            signingCredentials: credentials
-        );
+        try
+        {
+            var claims = BuildClaims(user);
+            _logger?.LogDebug("Built {ClaimCount} claims for access token for UserId: {UserId}",
+                claims.Count, user.Id);
 
-        return new JwtSecurityTokenHandler().WriteToken(token);
+            var secret = GetSecret();
+
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
+            var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+            var expiresAt = DateTime.UtcNow.AddMinutes(_settings.AccessTokenLifetimeMinutes);
+            var token = new JwtSecurityToken(
+                issuer: _settings.Issuer,
+                audience: _settings.Audience,
+                claims: claims,
+                expires: expiresAt,
+                signingCredentials: credentials
+            );
+
+            var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
+
+            _logger?.LogInformation("Access token generated successfully for UserId: {UserId}, ExpiresAt: {ExpiresAt}",
+                user.Id, expiresAt);
+
+            return tokenString;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to generate access token for UserId: {UserId}", user.Id);
+            throw;
+        }
     }
 
     /// <summary>
@@ -59,10 +90,24 @@ public class JwtService<TUser> where TUser : IAuthenticatedUser
     /// </summary>
     public string GenerateRefreshToken()
     {
-        var randomBytes = new byte[64];
-        using var rng = RandomNumberGenerator.Create();
-        rng.GetBytes(randomBytes);
-        return Convert.ToBase64String(randomBytes);
+        _logger?.LogDebug("Generating cryptographically secure refresh token");
+
+        try
+        {
+            var randomBytes = new byte[64];
+            using var rng = RandomNumberGenerator.Create();
+            rng.GetBytes(randomBytes);
+            var token = Convert.ToBase64String(randomBytes);
+
+            _logger?.LogDebug("Refresh token generated successfully");
+
+            return token;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Failed to generate refresh token");
+            throw;
+        }
     }
 
     /// <summary>
@@ -70,29 +115,51 @@ public class JwtService<TUser> where TUser : IAuthenticatedUser
     /// </summary>
     public ClaimsPrincipal? ValidateToken(string token)
     {
-        var secret = GetSecret();
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
-
-        var tokenHandler = new JwtSecurityTokenHandler();
-        var validationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidateAudience = true,
-            ValidateLifetime = true,
-            ValidateIssuerSigningKey = true,
-            ValidIssuer = _settings.Issuer,
-            ValidAudience = _settings.Audience,
-            IssuerSigningKey = key,
-            ClockSkew = TimeSpan.Zero
-        };
+        _logger?.LogDebug("Validating JWT access token");
 
         try
         {
-            var principal = tokenHandler.ValidateToken(token, validationParameters, out _);
+            var secret = GetSecret();
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
+
+            var tokenHandler = new JwtSecurityTokenHandler();
+            var validationParameters = new TokenValidationParameters
+            {
+                ValidateIssuer = true,
+                ValidateAudience = true,
+                ValidateLifetime = true,
+                ValidateIssuerSigningKey = true,
+                ValidIssuer = _settings.Issuer,
+                ValidAudience = _settings.Audience,
+                IssuerSigningKey = key,
+                ClockSkew = TimeSpan.Zero
+            };
+
+            var principal = tokenHandler.ValidateToken(token, validationParameters, out var validatedToken);
+
+            var userId = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            _logger?.LogInformation("JWT token validated successfully for UserId: {UserId}", userId ?? "Unknown");
+
             return principal;
         }
-        catch
+        catch (SecurityTokenExpiredException ex)
         {
+            _logger?.LogWarning("Token validation failed: Token expired - {Message}", ex.Message);
+            return null;
+        }
+        catch (SecurityTokenInvalidSignatureException ex)
+        {
+            _logger?.LogWarning("Token validation failed: Invalid signature - {Message}", ex.Message);
+            return null;
+        }
+        catch (SecurityTokenException ex)
+        {
+            _logger?.LogWarning("Token validation failed: {Message}", ex.Message);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogError(ex, "Unexpected error during token validation");
             return null;
         }
     }
@@ -111,46 +178,71 @@ public class JwtService<TUser> where TUser : IAuthenticatedUser
 
     private List<Claim> BuildClaims(TUser user)
     {
+        _logger?.LogDebug("Building claims for UserId: {UserId}", user.Id);
+
         var claims = new List<Claim>
         {
-            new(ClaimTypes.NameIdentifier, user.Id),
-            new(ClaimTypes.Email, user.Email),
-            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+            new Claim(ClaimTypes.NameIdentifier, user.Id),
+            new Claim(ClaimTypes.Email, user.Email),
+            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 
         if (!string.IsNullOrEmpty(user.Name))
+        {
             claims.Add(new Claim(ClaimTypes.Name, user.Name));
+            _logger?.LogDebug("Added name claim for UserId: {UserId}", user.Id);
+        }
 
-        foreach (var role in user.Roles)
-            claims.Add(new Claim(ClaimTypes.Role, role));
+        var rolesList = user.Roles.ToList();
+        if (rolesList.Count > 0)
+        {
+            foreach (var role in rolesList)
+                claims.Add(new Claim(ClaimTypes.Role, role));
+            _logger?.LogDebug("Added {RoleCount} role claims for UserId: {UserId}", rolesList.Count, user.Id);
+        }
 
-        if (user.AdditionalClaims != null)
+        if (user.AdditionalClaims != null && user.AdditionalClaims.Count > 0)
         {
             foreach (var (key, value) in user.AdditionalClaims)
                 claims.Add(new Claim(key, value));
+            _logger?.LogDebug("Added {AdditionalClaimCount} additional claims for UserId: {UserId}",
+                user.AdditionalClaims.Count, user.Id);
         }
 
         if (_tenantProvider != null)
         {
             var tenantId = _tenantProvider.GetCurrentTenantId();
             if (!string.IsNullOrEmpty(tenantId))
+            {
                 claims.Add(new Claim("tenant_id", tenantId));
+                _logger?.LogDebug("Added tenant claim for UserId: {UserId}, TenantId: {TenantId}",
+                    user.Id, tenantId);
+            }
         }
+
+        _logger?.LogDebug("Built {TotalClaimCount} total claims for UserId: {UserId}", claims.Count, user.Id);
 
         return claims;
     }
 
     private string GetSecret()
     {
+        _logger?.LogDebug("Retrieving JWT signing secret");
+
         if (_tenantProvider != null)
         {
             var tenantSecret = _tenantProvider.GetTenantSecret();
             if (!string.IsNullOrEmpty(tenantSecret))
+            {
+                _logger?.LogDebug("Using tenant-specific JWT secret");
                 return tenantSecret;
+            }
+            _logger?.LogDebug("No tenant-specific secret found, falling back to default secret");
         }
 
         if (string.IsNullOrEmpty(_settings.Secret))
         {
+            _logger?.LogError("JWT Secret is not configured in settings");
             throw new InvalidOperationException(
                 "JWT Secret is not configured. " +
                 "Set 'Jwt:Secret' in appsettings.json or provide ITenantProvider for multi-tenant.");
@@ -158,9 +250,14 @@ public class JwtService<TUser> where TUser : IAuthenticatedUser
 
         if (_settings.Secret.Length < 32)
         {
+            _logger?.LogError("JWT Secret length is insufficient: {Length} characters (minimum 32 required)",
+                _settings.Secret.Length);
             throw new InvalidOperationException(
                 $"JWT Secret must be at least 32 characters. Current length: {_settings.Secret.Length}");
         }
+
+        _logger?.LogDebug("Using default JWT secret from settings (length: {Length} characters)",
+            _settings.Secret.Length);
 
         return _settings.Secret;
     }
