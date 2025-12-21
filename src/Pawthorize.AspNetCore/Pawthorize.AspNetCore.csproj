@@ -15,6 +15,7 @@
         <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
         <PackageReference Include="ErrorHound" />
         <PackageReference Include="SuccessHound.AspNetExtensions" />
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
     </ItemGroup>
 
     <ItemGroup>
