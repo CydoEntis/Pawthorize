@@ -9,6 +9,9 @@ namespace Pawthorize.Core.Errors;
 /// </summary>
 public sealed class EmailNotVerifiedError : ApiError
 {
+    /// <summary>
+    /// Creates a generic email not verified error.
+    /// </summary>
     public EmailNotVerifiedError()
         : base(
             code: "EMAIL_NOT_VERIFIED",
@@ -18,6 +21,10 @@ public sealed class EmailNotVerifiedError : ApiError
     {
     }
 
+    /// <summary>
+    /// Creates an email not verified error with the email address.
+    /// </summary>
+    /// <param name="email">The unverified email address.</param>
     public EmailNotVerifiedError(string email)
         : base(
             code: "EMAIL_NOT_VERIFIED",

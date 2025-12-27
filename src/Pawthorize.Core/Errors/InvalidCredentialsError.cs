@@ -9,6 +9,9 @@ namespace Pawthorize.Core.Errors;
 /// </summary>
 public sealed class InvalidCredentialsError : ApiError
 {
+    /// <summary>
+    /// Creates a generic invalid credentials error.
+    /// </summary>
     public InvalidCredentialsError()
         : base(
             code: "INVALID_CREDENTIALS",

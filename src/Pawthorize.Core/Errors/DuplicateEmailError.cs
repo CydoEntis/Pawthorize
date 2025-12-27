@@ -9,6 +9,10 @@ namespace Pawthorize.Core.Errors;
 /// </summary>
 public sealed class DuplicateEmailError : ApiError
 {
+    /// <summary>
+    /// Creates a duplicate email error with the email address.
+    /// </summary>
+    /// <param name="email">The duplicate email address.</param>
     public DuplicateEmailError(string email)
         : base(
             code: "DUPLICATE_EMAIL",

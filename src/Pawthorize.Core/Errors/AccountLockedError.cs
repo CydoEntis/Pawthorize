@@ -9,6 +9,9 @@ namespace Pawthorize.Core.Errors;
 /// </summary>
 public sealed class AccountLockedError : ApiError
 {
+    /// <summary>
+    /// Creates a generic account locked error.
+    /// </summary>
     public AccountLockedError()
         : base(
             code: "ACCOUNT_LOCKED",

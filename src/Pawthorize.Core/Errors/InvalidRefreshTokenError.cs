@@ -9,6 +9,9 @@ namespace Pawthorize.Core.Errors;
 /// </summary>
 public sealed class InvalidRefreshTokenError : ApiError
 {
+    /// <summary>
+    /// Creates a generic invalid refresh token error.
+    /// </summary>
     public InvalidRefreshTokenError()
         : base(
             code: "INVALID_REFRESH_TOKEN",
@@ -18,6 +21,10 @@ public sealed class InvalidRefreshTokenError : ApiError
     {
     }
 
+    /// <summary>
+    /// Creates an invalid refresh token error with custom details.
+    /// </summary>
+    /// <param name="details">Additional error details.</param>
     public InvalidRefreshTokenError(string details)
         : base(
             code: "INVALID_REFRESH_TOKEN",
