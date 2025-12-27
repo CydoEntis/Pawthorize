@@ -49,6 +49,12 @@ public class PawthorizeOptions
     /// Only used if RequireEmailVerification is true.
     /// </summary>
     public EmailVerificationOptions EmailVerification { get; set; } = new();
+
+    /// <summary>
+    /// Password reset configuration (optional).
+    /// Used for forgot password / reset password flows.
+    /// </summary>
+    public PasswordResetOptions PasswordReset { get; set; } = new();
 }
 
 /// <summary>
