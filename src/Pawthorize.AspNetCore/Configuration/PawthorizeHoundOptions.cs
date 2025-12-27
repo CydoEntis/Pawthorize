@@ -1,3 +1,5 @@
+using Pawthorize.AspNetCore.Formatters;
+
 namespace Pawthorize.AspNetCore.Configuration;
 
 /// <summary>
@@ -12,12 +14,13 @@ public sealed class PawthorizeResponseOptions
 
     /// <summary>
     /// Use default formatters for success and error responses.
-    /// This is the recommended approach for most applications.
+    /// This ensures consistent API response format across success and error cases.
     /// </summary>
     public void UseDefaultFormatters()
     {
         EnableSuccessHound = true;
         EnableErrorHound = true;
+        ErrorFormatterType = typeof(PawthorizeErrorFormatter);
     }
 
     /// <summary>
