@@ -1,15 +1,20 @@
-﻿using FluentValidation;
+﻿using ErrorHound.Extensions;
+using FluentValidation;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Pawthorize.AspNetCore.Configuration;
 using Pawthorize.AspNetCore.DTOs;
 using Pawthorize.AspNetCore.Handlers;
 using Pawthorize.AspNetCore.Services;
 using Pawthorize.AspNetCore.Validators;
 using Pawthorize.Core.Abstractions;
 using Pawthorize.Core.Models;
+using Pawthorize.Core.Services;
 using Pawthorize.Jwt.Services;
 using Pawthorize.Security.Services;
+using SuccessHound.Abstractions;
+using SuccessHound.Extensions;
 
 namespace Pawthorize.AspNetCore.Extensions;
 
@@ -25,16 +30,30 @@ public static class ServiceCollectionExtensions
     /// <typeparam name="TRegisterRequest">Registration request type (can be extended)</typeparam>
     /// <param name="services">Service collection</param>
     /// <param name="configuration">Configuration root (optional - reads from "Pawthorize" section)</param>
-    /// <param name="configureOptions">Optional action to configure PawthorizeOptions</param>
+    /// <param name="configure">Optional action to configure response formatting</param>
     /// <returns>Service collection for chaining</returns>
     public static IServiceCollection AddPawthorize<TUser, TRegisterRequest>(
         this IServiceCollection services,
         IConfiguration? configuration = null,
-        Action<PawthorizeOptions>? configureOptions = null)
+        Action<PawthorizeResponseOptions>? configure = null)
         where TUser : class, IAuthenticatedUser
         where TRegisterRequest : RegisterRequest
     {
-        RegisterConfiguration(services, configuration, configureOptions);
+        // Configure response formatting options
+        var responseOptions = new PawthorizeResponseOptions();
+        configure?.Invoke(responseOptions);
+
+        if (responseOptions.EnableSuccessHound)
+        {
+            ConfigureSuccessHound(services, responseOptions.SuccessFormatterType);
+        }
+
+        if (responseOptions.EnableErrorHound)
+        {
+            ConfigureErrorHound(services, responseOptions.ErrorFormatterType);
+        }
+
+        RegisterConfiguration(services, configuration);
         RegisterCoreServices<TUser>(services);
         RegisterHandlers<TUser, TRegisterRequest>(services);
         RegisterValidators<TRegisterRequest>(services);
@@ -48,18 +67,12 @@ public static class ServiceCollectionExtensions
     /// </summary>
     private static void RegisterConfiguration(
         IServiceCollection services,
-        IConfiguration? configuration,
-        Action<PawthorizeOptions>? configureOptions)
+        IConfiguration? configuration)
     {
         if (configuration != null)
         {
             services.Configure<PawthorizeOptions>(configuration.GetSection("Pawthorize"));
             services.Configure<JwtSettings>(configuration.GetSection("Jwt"));
-        }
-
-        if (configureOptions != null)
-        {
-            services.Configure(configureOptions);
         }
 
         services.AddOptions<PawthorizeOptions>()
@@ -80,6 +93,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IPasswordHasher, PasswordHasher>();
         services.AddScoped<JwtService<TUser>>();
         services.AddScoped<AuthenticationService<TUser>>();
+        services.AddScoped<IPasswordResetService, PasswordResetService>();
     }
 
     /// <summary>
@@ -93,6 +107,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<RegisterHandler<TUser, TRegisterRequest>>();
         services.AddScoped<RefreshHandler<TUser>>();
         services.AddScoped<LogoutHandler<TUser>>();
+        services.AddScoped<ForgotPasswordHandler<TUser>>();
+        services.AddScoped<ResetPasswordHandler<TUser>>();
+        services.AddScoped<ChangePasswordHandler<TUser>>();
     }
 
     /// <summary>
@@ -105,6 +122,9 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IValidator<RefreshTokenRequest>, RefreshTokenRequestValidator>();
         services.AddScoped<IValidator<LogoutRequest>, LogoutRequestValidator>();
         services.AddScoped<IValidator<RegisterRequest>, RegisterRequestValidator>();
+        services.AddScoped<IValidator<ForgotPasswordRequest>, ForgotPasswordRequestValidator>();
+        services.AddScoped<IValidator<ResetPasswordRequest>, ResetPasswordRequestValidator>();
+        services.AddScoped<IValidator<ChangePasswordRequest>, ChangePasswordRequestValidator>();
 
 
         if (typeof(TRegisterRequest) != typeof(RegisterRequest))
@@ -170,5 +190,145 @@ public static class ServiceCollectionExtensions
                 disposable.Dispose();
             }
         }
+    }
+
+    /// <summary>
+    /// Configure SuccessHound with optional custom formatter.
+    /// </summary>
+    private static void ConfigureSuccessHound(IServiceCollection services, Type? formatterType)
+    {
+        var targetFormatterType = formatterType;
+
+        if (targetFormatterType == null)
+        {
+            Type? defaultFormatterType = null;
+
+            var possibleTypes = new[]
+            {
+                "SuccessHound.Defaults.DefaultSuccessFormatter, SuccessHound",
+                "SuccessHound.Formatters.DefaultSuccessFormatter, SuccessHound",
+                "SuccessHound.DefaultSuccessFormatter, SuccessHound"
+            };
+
+            foreach (var typeName in possibleTypes)
+            {
+                defaultFormatterType = Type.GetType(typeName);
+                if (defaultFormatterType != null)
+                    break;
+            }
+
+            if (defaultFormatterType != null)
+            {
+                targetFormatterType = defaultFormatterType;
+            }
+            else
+            {
+                throw new InvalidOperationException(
+                    "Could not find SuccessHound's DefaultSuccessFormatter. " +
+                    "Please specify a custom formatter using options.UseSuccessFormatter<T>(). " +
+                    "Make sure SuccessHound package is installed.");
+            }
+        }
+
+        var addSuccessHoundMethod = typeof(SuccessHoundExtensions)
+            .GetMethods()
+            .FirstOrDefault(m => m.Name == "AddSuccessHound" && m.GetParameters().Length == 2);
+
+        if (addSuccessHoundMethod != null)
+        {
+            var optionsParam = System.Linq.Expressions.Expression.Parameter(
+                addSuccessHoundMethod.GetParameters()[1].ParameterType.GetGenericArguments()[0], "options");
+
+            var useFormatterMethod = optionsParam.Type
+                .GetMethod("UseFormatter")
+                ?.MakeGenericMethod(targetFormatterType);
+
+            if (useFormatterMethod != null)
+            {
+                var callExpression = System.Linq.Expressions.Expression.Call(
+                    optionsParam, useFormatterMethod);
+
+                var lambda = System.Linq.Expressions.Expression.Lambda(
+                    callExpression, optionsParam);
+
+                var configAction = lambda.Compile();
+
+                addSuccessHoundMethod.Invoke(null, new object[] { services, configAction });
+                return;
+            }
+        }
+
+        throw new InvalidOperationException(
+            "Could not configure SuccessHound. Please ensure SuccessHound is properly installed.");
+    }
+
+    /// <summary>
+    /// Configure ErrorHound with optional custom formatter.
+    /// </summary>
+    private static void ConfigureErrorHound(IServiceCollection services, Type? formatterType)
+    {
+        var targetFormatterType = formatterType;
+
+        if (targetFormatterType == null)
+        {
+            Type? defaultFormatterType = null;
+
+            var possibleTypes = new[]
+            {
+                "ErrorHound.Defaults.DefaultErrorFormatter, ErrorHound",
+                "ErrorHound.Formatters.DefaultErrorFormatter, ErrorHound",
+                "ErrorHound.DefaultErrorFormatter, ErrorHound"
+            };
+
+            foreach (var typeName in possibleTypes)
+            {
+                defaultFormatterType = Type.GetType(typeName);
+                if (defaultFormatterType != null)
+                    break;
+            }
+
+            if (defaultFormatterType != null)
+            {
+                targetFormatterType = defaultFormatterType;
+            }
+            else
+            {
+                throw new InvalidOperationException(
+                    "Could not find ErrorHound's DefaultErrorFormatter. " +
+                    "Please specify a custom formatter using options.UseErrorFormatter<T>(). " +
+                    "Make sure ErrorHound package is installed.");
+            }
+        }
+
+        var addErrorHoundMethod = typeof(ErrorHoundExtensions)
+            .GetMethods()
+            .FirstOrDefault(m => m.Name == "AddErrorHound" && m.GetParameters().Length == 2);
+
+        if (addErrorHoundMethod != null)
+        {
+            var optionsParam = System.Linq.Expressions.Expression.Parameter(
+                addErrorHoundMethod.GetParameters()[1].ParameterType.GetGenericArguments()[0], "options");
+
+            var useFormatterMethod = optionsParam.Type
+                .GetMethod("UseFormatter")
+                ?.MakeGenericMethod(targetFormatterType);
+
+            if (useFormatterMethod != null)
+            {
+                var callExpression = System.Linq.Expressions.Expression.Call(
+                    optionsParam, useFormatterMethod);
+
+                var lambda = System.Linq.Expressions.Expression.Lambda(
+                    callExpression, optionsParam);
+
+                var configAction = lambda.Compile();
+
+                addErrorHoundMethod.Invoke(null, new object[] { services, configAction });
+                return;
+            }
+        }
+
+        throw new InvalidOperationException(
+            "Could not configure ErrorHound. Please ensure ErrorHound is properly installed.");
     }
 }

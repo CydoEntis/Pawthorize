@@ -1,9 +1,11 @@
-﻿using Microsoft.AspNetCore.Builder;
+﻿using ErrorHound.Extensions;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Pawthorize.AspNetCore.DTOs;
 using Pawthorize.AspNetCore.Handlers;
 using Pawthorize.Core.Abstractions;
+using SuccessHound.Extensions;
 
 namespace Pawthorize.AspNetCore.Extensions;
 
@@ -12,6 +14,23 @@ namespace Pawthorize.AspNetCore.Extensions;
 /// </summary>
 public static class WebApplicationExtensions
 {
+    /// <summary>
+    /// Wire Pawthorize middleware in the correct order.
+    /// This sets up ErrorHound, Authentication, and Authorization.
+    /// Must be called before MapPawthorizeEndpoints.
+    /// Note: SuccessHound formatting happens automatically via extension methods, no middleware needed.
+    /// </summary>
+    /// <param name="app">Web application</param>
+    /// <returns>Web application for chaining</returns>
+    public static IApplicationBuilder UsePawthorize(this IApplicationBuilder app)
+    {
+        app.UseErrorHound();
+
+        app.UseAuthentication();
+        app.UseAuthorization();
+
+        return app;
+    }
     /// <summary>
     /// Map all Pawthorize authentication endpoints with configurable paths.
     /// </summary>
@@ -74,6 +93,40 @@ public static class WebApplicationExtensions
                 return await handler.HandleAsync(request, context, ct);
             })
             .WithName("Logout")
+            .WithOpenApi();
+
+        group.MapPost(options.ForgotPasswordPath, async (
+                ForgotPasswordRequest request,
+                ForgotPasswordHandler<TUser> handler,
+                HttpContext context,
+                CancellationToken ct) =>
+            {
+                return await handler.HandleAsync(request, context, ct);
+            })
+            .WithName("ForgotPassword")
+            .WithOpenApi();
+
+        group.MapPost(options.ResetPasswordPath, async (
+                ResetPasswordRequest request,
+                ResetPasswordHandler<TUser> handler,
+                HttpContext context,
+                CancellationToken ct) =>
+            {
+                return await handler.HandleAsync(request, context, ct);
+            })
+            .WithName("ResetPassword")
+            .WithOpenApi();
+
+        group.MapPost(options.ChangePasswordPath, async (
+                ChangePasswordRequest request,
+                ChangePasswordHandler<TUser> handler,
+                HttpContext context,
+                CancellationToken ct) =>
+            {
+                return await handler.HandleAsync(request, context, ct);
+            })
+            .WithName("ChangePassword")
+            .RequireAuthorization()
             .WithOpenApi();
 
         return group;
@@ -203,4 +256,25 @@ public class PawthorizeEndpointOptions
     /// Full path: {BasePath}/logout
     /// </summary>
     public string LogoutPath { get; set; } = "/logout";
+
+    /// <summary>
+    /// Path for forgot password endpoint (relative to BasePath).
+    /// Default: "/forgot-password"
+    /// Full path: {BasePath}/forgot-password
+    /// </summary>
+    public string ForgotPasswordPath { get; set; } = "/forgot-password";
+
+    /// <summary>
+    /// Path for reset password endpoint (relative to BasePath).
+    /// Default: "/reset-password"
+    /// Full path: {BasePath}/reset-password
+    /// </summary>
+    public string ResetPasswordPath { get; set; } = "/reset-password";
+
+    /// <summary>
+    /// Path for change password endpoint (relative to BasePath).
+    /// Default: "/change-password"
+    /// Full path: {BasePath}/change-password
+    /// </summary>
+    public string ChangePasswordPath { get; set; } = "/change-password";
 }
