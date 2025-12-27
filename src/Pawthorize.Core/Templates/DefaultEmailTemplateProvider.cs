@@ -13,11 +13,21 @@ public class DefaultEmailTemplateProvider : IEmailTemplateProvider
     private readonly string _appName;
     private static readonly Assembly _assembly = typeof(DefaultEmailTemplateProvider).Assembly;
 
+    /// <summary>
+    /// Initializes a new instance of the DefaultEmailTemplateProvider.
+    /// </summary>
+    /// <param name="appName">The application name to use in email templates.</param>
     public DefaultEmailTemplateProvider(string appName = "Our Application")
     {
         _appName = appName;
     }
 
+    /// <summary>
+    /// Gets the email verification template with populated variables.
+    /// </summary>
+    /// <param name="verificationUrl">The verification URL to include in the email.</param>
+    /// <param name="userEmail">The user's email address.</param>
+    /// <returns>HTML email body.</returns>
     public string GetEmailVerificationTemplate(string verificationUrl, string userEmail)
     {
         var template = LoadEmbeddedTemplate("EmailVerification.html");
@@ -28,6 +38,12 @@ public class DefaultEmailTemplateProvider : IEmailTemplateProvider
             .Replace("{{UserEmail}}", userEmail);
     }
 
+    /// <summary>
+    /// Gets the password reset template with populated variables.
+    /// </summary>
+    /// <param name="resetUrl">The password reset URL to include in the email.</param>
+    /// <param name="userEmail">The user's email address.</param>
+    /// <returns>HTML email body.</returns>
     public string GetPasswordResetTemplate(string resetUrl, string userEmail)
     {
         var template = LoadEmbeddedTemplate("PasswordReset.html");
