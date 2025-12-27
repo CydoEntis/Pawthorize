@@ -89,7 +89,7 @@ public class RegisterHandler<TUser, TRegisterRequest>
             {
                 _logger.LogDebug("Email verification required, processing verification flow for UserId: {UserId}",
                     createdUser.Id);
-                return await HandleEmailVerificationRequiredAsync(createdUser, cancellationToken);
+                return await HandleEmailVerificationRequiredAsync(createdUser, httpContext, cancellationToken);
             }
 
             _logger.LogDebug("Email verification not required, generating tokens for UserId: {UserId}",
@@ -121,6 +121,7 @@ public class RegisterHandler<TUser, TRegisterRequest>
     /// </summary>
     private async Task<IResult> HandleEmailVerificationRequiredAsync(
         TUser user,
+        HttpContext httpContext,
         CancellationToken cancellationToken)
     {
         if (_emailVerificationService == null)
@@ -155,6 +156,6 @@ public class RegisterHandler<TUser, TRegisterRequest>
             Email = user.Email
         };
 
-        return response.Ok();
+        return response.Ok(httpContext);
     }
 }

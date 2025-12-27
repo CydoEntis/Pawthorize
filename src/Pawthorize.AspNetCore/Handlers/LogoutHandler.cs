@@ -60,7 +60,7 @@ public class LogoutHandler<TUser> where TUser : IAuthenticatedUser
 
             _logger.LogInformation("Logout completed successfully");
 
-            return new { Message = "Logged out successfully" }.Ok();
+            return new { Message = "Logged out successfully" }.Ok(httpContext);
         }
         catch (InvalidRefreshTokenError)
         {
