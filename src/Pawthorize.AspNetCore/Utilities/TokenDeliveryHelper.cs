@@ -18,7 +18,7 @@ public static class TokenDeliveryHelper
     /// <param name="httpContext">HTTP context for setting cookies</param>
     /// <param name="strategy">Token delivery strategy</param>
     /// <param name="logger">Optional logger for debugging and monitoring</param>
-    /// <returns>IResult wrapped with SuccessHound</returns>
+    /// <returns>IResult that will be wrapped by SuccessHound middleware</returns>
     public static IResult DeliverTokens(
         AuthResult authResult,
         HttpContext httpContext,
@@ -31,7 +31,7 @@ public static class TokenDeliveryHelper
         {
             var result = strategy switch
             {
-                TokenDeliveryStrategy.ResponseBody => DeliverInBody(authResult, logger),
+                TokenDeliveryStrategy.ResponseBody => DeliverInBody(authResult, httpContext, logger),
                 TokenDeliveryStrategy.HttpOnlyCookies => DeliverInCookies(authResult, httpContext, logger),
                 TokenDeliveryStrategy.Hybrid => DeliverHybrid(authResult, httpContext, logger),
                 _ => throw new InvalidOperationException($"Unknown token delivery strategy: {strategy}")
@@ -49,15 +49,17 @@ public static class TokenDeliveryHelper
 
     /// <summary>
     /// Deliver both tokens in response body (JSON).
+    /// Uses SuccessHound extension method to wrap the response.
     /// </summary>
-    private static IResult DeliverInBody(AuthResult authResult, ILogger? logger)
+    private static IResult DeliverInBody(AuthResult authResult, HttpContext httpContext, ILogger? logger)
     {
         logger?.LogDebug("Delivering access and refresh tokens in response body");
-        return authResult.Ok();
+        return authResult.Ok(httpContext);
     }
 
     /// <summary>
     /// Deliver both tokens in HttpOnly cookies.
+    /// Uses SuccessHound extension method to wrap the empty response.
     /// </summary>
     private static IResult DeliverInCookies(AuthResult authResult, HttpContext httpContext, ILogger? logger)
     {
@@ -68,11 +70,12 @@ public static class TokenDeliveryHelper
 
         logger?.LogDebug("Both tokens set in HttpOnly cookies");
 
-        return new { }.Ok();
+        return new { }.Ok(httpContext);
     }
 
     /// <summary>
     /// Deliver access token in body, refresh token in HttpOnly cookie (recommended).
+    /// Uses SuccessHound extension method to wrap the response.
     /// </summary>
     private static IResult DeliverHybrid(AuthResult authResult, HttpContext httpContext, ILogger? logger)
     {
@@ -91,7 +94,7 @@ public static class TokenDeliveryHelper
 
         logger?.LogDebug("Hybrid token delivery completed");
 
-        return hybridResult.Ok();
+        return hybridResult.Ok(httpContext);
     }
 
     /// <summary>

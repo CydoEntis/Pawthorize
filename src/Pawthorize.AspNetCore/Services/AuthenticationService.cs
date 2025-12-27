@@ -34,7 +34,7 @@ public class AuthenticationService<TUser> where TUser : IAuthenticatedUser
     /// Generate access and refresh tokens for a user.
     /// Stores refresh token in database.
     /// </summary>
-    public async Task<AuthResult> GenerateTokensAsync(
+    public virtual async Task<AuthResult> GenerateTokensAsync(
         TUser user,
         CancellationToken cancellationToken = default)
     {
@@ -81,7 +81,7 @@ public class AuthenticationService<TUser> where TUser : IAuthenticatedUser
     /// Validate user account status (locked, email verified).
     /// Throws appropriate errors if account cannot be accessed.
     /// </summary>
-    public void ValidateAccountStatus(TUser user)
+    public virtual void ValidateAccountStatus(TUser user)
     {
         _logger.LogDebug("Validating account status for UserId: {UserId}", user.Id);
 
