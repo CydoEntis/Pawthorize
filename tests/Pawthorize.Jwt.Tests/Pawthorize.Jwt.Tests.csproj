@@ -24,6 +24,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Pawthorize.Jwt\Pawthorize.Jwt.csproj" />
+    <ProjectReference Include="..\..\src\Pawthorize.Core\Pawthorize.Core.csproj" />
   </ItemGroup>
 
 </Project>

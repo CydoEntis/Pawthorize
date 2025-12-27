@@ -18,5 +18,6 @@
 
     <ItemGroup>
         <ProjectReference Include="..\..\src\Pawthorize.Core\Pawthorize.Core.csproj" />
+        <ProjectReference Include="..\..\src\Pawthorize.Security\Pawthorize.Security.csproj" />
     </ItemGroup>
 </Project>
