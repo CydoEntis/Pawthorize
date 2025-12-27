@@ -74,14 +74,14 @@ public class PasswordHasher : IPasswordHasher
 
         if (string.IsNullOrEmpty(password))
         {
-            _logger?.LogError("Password verification failed: Password is null or empty");
-            throw new ArgumentNullException(nameof(password), "Password cannot be null or empty.");
+            _logger?.LogWarning("Password verification failed: Password is null or empty");
+            return false;
         }
 
         if (string.IsNullOrEmpty(hash))
         {
-            _logger?.LogError("Password verification failed: Hash is null or empty");
-            throw new ArgumentNullException(nameof(hash), "Hash cannot be null or empty.");
+            _logger?.LogWarning("Password verification failed: Hash is null or empty");
+            return false;
         }
 
         try

@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Options;
 using Pawthorize.Core.Abstractions;
 using Pawthorize.Core.Models;
 using Pawthorize.Security.Utilities;
@@ -6,24 +6,24 @@ using Pawthorize.Security.Utilities;
 namespace Pawthorize.Core.Services;
 
 /// <summary>
-/// Implementation of email verification service.
+/// Implementation of password reset service.
 /// Handles token generation, storage, and email sending.
 /// </summary>
-public class EmailVerificationService : IEmailVerificationService
+public class PasswordResetService : IPasswordResetService
 {
     private readonly ITokenRepository _tokenRepository;
     private readonly IEmailSender _emailSender;
     private readonly IEmailTemplateProvider _templateProvider;
-    private readonly EmailVerificationOptions _options;
+    private readonly PasswordResetOptions _options;
 
     /// <summary>
-    /// Initializes a new instance of the EmailVerificationService.
+    /// Initializes a new instance of the PasswordResetService.
     /// </summary>
-    /// <param name="tokenRepository">Repository for storing verification tokens.</param>
+    /// <param name="tokenRepository">Repository for storing reset tokens.</param>
     /// <param name="emailSender">Service for sending emails.</param>
     /// <param name="templateProvider">Provider for email templates.</param>
     /// <param name="options">Pawthorize configuration options.</param>
-    public EmailVerificationService(
+    public PasswordResetService(
         ITokenRepository tokenRepository,
         IEmailSender emailSender,
         IEmailTemplateProvider templateProvider,
@@ -32,17 +32,17 @@ public class EmailVerificationService : IEmailVerificationService
         _tokenRepository = tokenRepository;
         _emailSender = emailSender;
         _templateProvider = templateProvider;
-        _options = options.Value.EmailVerification;
+        _options = options.Value.PasswordReset;
     }
 
     /// <summary>
-    /// Sends a verification email to the user.
+    /// Sends a password reset email to the user.
     /// </summary>
     /// <param name="userId">The user's unique identifier.</param>
-    /// <param name="email">The email address to send verification to.</param>
+    /// <param name="email">The email address to send the reset link to.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The verification token.</returns>
-    public async Task<string> SendVerificationEmailAsync(
+    /// <returns>The password reset token.</returns>
+    public async Task<string> SendPasswordResetEmailAsync(
         string userId,
         string email,
         CancellationToken cancellationToken = default)
@@ -51,19 +51,19 @@ public class EmailVerificationService : IEmailVerificationService
         var expiresAt = DateTime.UtcNow.Add(_options.TokenLifetime);
 
         await _tokenRepository.StoreTokenAsync(
-            userId, 
-            token, 
-            TokenType.EmailVerification, 
-            expiresAt, 
+            userId,
+            token,
+            TokenType.PasswordReset,
+            expiresAt,
             cancellationToken);
 
-        var verificationUrl = BuildVerificationUrl(token);
+        var resetUrl = BuildResetUrl(token);
 
-        var htmlBody = _templateProvider.GetEmailVerificationTemplate(verificationUrl, email);
+        var htmlBody = _templateProvider.GetPasswordResetTemplate(resetUrl, email);
 
         await _emailSender.SendEmailAsync(
             to: email,
-            subject: $"Verify your email for {_options.ApplicationName}",
+            subject: $"Reset your password for {_options.ApplicationName}",
             htmlBody: htmlBody,
             cancellationToken: cancellationToken);
 
@@ -71,67 +71,58 @@ public class EmailVerificationService : IEmailVerificationService
     }
 
     /// <summary>
-    /// Verifies an email using the provided token.
+    /// Validates a password reset token.
     /// </summary>
-    /// <param name="token">The verification token.</param>
+    /// <param name="token">The reset token to validate.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The user ID if verification succeeds, null otherwise.</returns>
-    public async Task<string?> VerifyEmailAsync(
+    /// <returns>The user ID if token is valid, null otherwise.</returns>
+    public async Task<string?> ValidateResetTokenAsync(
         string token,
         CancellationToken cancellationToken = default)
     {
         var tokenInfo = await _tokenRepository.ValidateTokenAsync(
-            token, 
-            TokenType.EmailVerification, 
+            token,
+            TokenType.PasswordReset,
             cancellationToken);
 
         if (tokenInfo == null || tokenInfo.IsExpired)
         {
-            return null;  
+            return null;
         }
-
-        await _tokenRepository.InvalidateTokenAsync(
-            token, 
-            TokenType.EmailVerification, 
-            cancellationToken);
 
         return tokenInfo.UserId;
     }
 
     /// <summary>
-    /// Resends a verification email by invalidating old tokens and generating a new one.
+    /// Invalidates a password reset token after it has been used.
     /// </summary>
-    /// <param name="userId">The user's unique identifier.</param>
-    /// <param name="email">The email address to send verification to.</param>
+    /// <param name="token">The reset token to invalidate.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    public async Task ResendVerificationEmailAsync(
-        string userId,
-        string email,
+    public async Task InvalidateResetTokenAsync(
+        string token,
         CancellationToken cancellationToken = default)
     {
-        await _tokenRepository.InvalidateAllTokensForUserAsync(
-            userId, 
-            TokenType.EmailVerification, 
+        await _tokenRepository.InvalidateTokenAsync(
+            token,
+            TokenType.PasswordReset,
             cancellationToken);
-
-        await SendVerificationEmailAsync(userId, email, cancellationToken);
     }
 
     /// <summary>
-    /// Build the full verification URL with token.
+    /// Build the full password reset URL with token.
     /// </summary>
-    private string BuildVerificationUrl(string token)
+    private string BuildResetUrl(string token)
     {
         if (string.IsNullOrEmpty(_options.BaseUrl))
         {
             throw new InvalidOperationException(
-                "EmailVerification.BaseUrl is not configured. " +
-                "Set 'Pawthorize:EmailVerification:BaseUrl' in appsettings.json");
+                "PasswordReset.BaseUrl is not configured. " +
+                "Set 'Pawthorize:PasswordReset:BaseUrl' in appsettings.json");
         }
 
         var baseUrl = _options.BaseUrl.TrimEnd('/');
-        var path = _options.VerificationPath.TrimStart('/');
-        
+        var path = _options.ResetPath.TrimStart('/');
+
         return $"{baseUrl}/{path}?token={token}";
     }
 }
