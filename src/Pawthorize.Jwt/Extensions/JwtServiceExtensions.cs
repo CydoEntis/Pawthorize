@@ -45,8 +45,6 @@ public static class JwtServiceExtensions
 
         services.AddScoped<JwtService<TUser>>();
 
-        // Note: Consumer must register ITenantProvider themselves
-
         return services;
     }
 }

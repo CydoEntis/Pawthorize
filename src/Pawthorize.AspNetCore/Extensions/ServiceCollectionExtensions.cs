@@ -39,7 +39,6 @@ public static class ServiceCollectionExtensions
         where TUser : class, IAuthenticatedUser
         where TRegisterRequest : RegisterRequest
     {
-        // Configure response formatting options
         var responseOptions = new PawthorizeResponseOptions();
         configure?.Invoke(responseOptions);
 
