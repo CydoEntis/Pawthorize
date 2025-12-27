@@ -16,7 +16,12 @@ public interface IUserRepository<TUser> where TUser : IAuthenticatedUser
     /// Find a user by ID.
     /// </summary>
     Task<TUser?> FindByIdAsync(string id, CancellationToken cancellationToken = default);
-    
+
+    /// <summary>
+    /// Find a user by email address.
+    /// </summary>
+    Task<TUser?> FindByEmailAsync(string email, CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Create a new user.
     /// </summary>
@@ -31,4 +36,12 @@ public interface IUserRepository<TUser> where TUser : IAuthenticatedUser
     /// Check if an email address is already registered.
     /// </summary>
     Task<bool> EmailExistsAsync(string email, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Update a user's password.
+    /// </summary>
+    /// <param name="userId">User ID</param>
+    /// <param name="newPasswordHash">New hashed password</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    Task UpdatePasswordAsync(string userId, string newPasswordHash, CancellationToken cancellationToken = default);
 }
