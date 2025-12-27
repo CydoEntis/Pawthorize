@@ -19,8 +19,5 @@ public class LoginRequest
     [JsonPropertyName("identifier")]
     public string Identifier { get; set; } = string.Empty;
 
-    /// <summary>
-    /// User's password
-    /// </summary>
     public string Password { get; set; } = string.Empty;
 }

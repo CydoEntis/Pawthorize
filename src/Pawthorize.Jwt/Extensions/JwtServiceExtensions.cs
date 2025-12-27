@@ -19,13 +19,11 @@ public static class JwtServiceExtensions
         IConfiguration configuration)
         where TUser : IAuthenticatedUser
     {
-        // Bind JwtSettings from appsettings.json "Jwt" section
         services.Configure<JwtSettings>(options =>
         {
             configuration.GetSection(JwtSettings.SectionName).Bind(options);
         });
 
-        // Register JWT service as scoped (per-request lifetime)
         services.AddScoped<JwtService<TUser>>();
 
         return services;

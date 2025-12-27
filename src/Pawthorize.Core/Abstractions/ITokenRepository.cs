@@ -58,9 +58,6 @@ public interface ITokenRepository
         CancellationToken cancellationToken = default);
 }
 
-/// <summary>
-/// Type of token
-/// </summary>
 public enum TokenType
 {
     /// <summary>
@@ -79,24 +76,9 @@ public enum TokenType
 /// </summary>
 public class TokenInfo
 {
-    /// <summary>
-    /// User ID this token belongs to
-    /// </summary>
     public string UserId { get; set; } = string.Empty;
-    
-    /// <summary>
-    /// When the token was created
-    /// </summary>
     public DateTime CreatedAt { get; set; }
-    
-    /// <summary>
-    /// When the token expires
-    /// </summary>
     public DateTime ExpiresAt { get; set; }
-    
-    /// <summary>
-    /// Whether the token has expired
-    /// </summary>
     public bool IsExpired => DateTime.UtcNow > ExpiresAt;
 }
 
