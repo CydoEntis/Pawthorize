@@ -47,7 +47,6 @@ public class RegisterHandlerTests
         _mockOptions = new Mock<IOptions<PawthorizeOptions>>();
         _mockOptions.Setup(o => o.Value).Returns(_options);
 
-        // Create mock JwtSettings
         var jwtSettings = new JwtSettings
         {
             Secret = "this-is-a-test-secret-key-that-is-at-least-32-characters-long",

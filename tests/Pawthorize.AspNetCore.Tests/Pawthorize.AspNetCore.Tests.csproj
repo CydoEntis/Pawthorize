@@ -21,8 +21,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Pawthorize.AspNetCore\Pawthorize.AspNetCore.csproj" />
-    <ProjectReference Include="..\..\src\Pawthorize.Core\Pawthorize.Core.csproj" />
+    <ProjectReference Include="..\..\src\Pawthorize\Pawthorize.csproj" />
   </ItemGroup>
 
 </Project>

@@ -424,13 +424,8 @@ public class PasswordResetServiceTests
                 return null;
             });
 
-        // Act - Send password reset email
         var token = await _service.SendPasswordResetEmailAsync(userId, email);
-
-        // Act - Validate the token
         var validatedUserId = await _service.ValidateResetTokenAsync(token);
-
-        // Act - Invalidate the token after successful password reset
         await _service.InvalidateResetTokenAsync(token);
 
         validatedUserId.Should().Be(userId);

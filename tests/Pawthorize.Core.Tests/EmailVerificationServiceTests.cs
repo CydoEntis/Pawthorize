@@ -497,10 +497,7 @@ public class EmailVerificationServiceTests
                 return null;
             });
 
-        // Act - Send verification email
         var token = await _service.SendVerificationEmailAsync(userId, email);
-
-        // Act - Verify email with the token
         var verifiedUserId = await _service.VerifyEmailAsync(token);
 
         verifiedUserId.Should().Be(userId);

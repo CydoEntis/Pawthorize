@@ -23,7 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Pawthorize.Security\Pawthorize.Security.csproj" />
+    <ProjectReference Include="..\..\src\Pawthorize\Pawthorize.csproj" />
   </ItemGroup>
 
 </Project>

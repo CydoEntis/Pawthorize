@@ -54,5 +54,28 @@ public class InMemoryRefreshTokenRepository : IRefreshTokenRepository
         return Task.CompletedTask;
     }
 
+    public Task<IEnumerable<RefreshTokenInfo>> GetAllActiveAsync(
+        string userId,
+        CancellationToken cancellationToken = default)
+    {
+        var activeTokens = _tokens
+            .Where(t => t.UserId == userId && !t.IsRevoked && t.ExpiresAt > DateTime.UtcNow)
+            .ToList();
+
+        return Task.FromResult<IEnumerable<RefreshTokenInfo>>(activeTokens);
+    }
+
+    public Task RevokeAllExceptAsync(
+        string userId,
+        string exceptToken,
+        CancellationToken cancellationToken = default)
+    {
+        foreach (var token in _tokens.Where(t => t.UserId == userId && t.Token != exceptToken))
+        {
+            token.IsRevoked = true;
+        }
+        return Task.CompletedTask;
+    }
+
     public void Clear() => _tokens.Clear();
 }
