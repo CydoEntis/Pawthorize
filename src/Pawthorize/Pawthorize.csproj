@@ -1,0 +1,37 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <PackageId>Pawthorize</PackageId>
+        <Version>0.1.0</Version>
+        <Authors>Pawthorize Contributors</Authors>
+        <Description>Modern authentication library for ASP.NET Core - simple, secure, and powerful</Description>
+        <PackageTags>authentication;aspnetcore;jwt;minimal-api;password;security</PackageTags>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <RepositoryUrl>https://github.com/yourusername/pawthorize</RepositoryUrl>
+        <PackageProjectUrl>https://github.com/yourusername/pawthorize</PackageProjectUrl>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="FluentValidation" />
+        <PackageReference Include="FluentValidation.DependencyInjectionExtensions" />
+        <PackageReference Include="ErrorHound" />
+        <PackageReference Include="SuccessHound" />
+        <PackageReference Include="SuccessHound.AspNetExtensions" />
+        <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+        <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+        <PackageReference Include="System.IdentityModel.Tokens.Jwt" />
+        <PackageReference Include="BCrypt.Net-Next" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
+        <PackageReference Include="Microsoft.Extensions.Options" />
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <EmbeddedResource Include="Templates\EmailTemplates\*.html" />
+    </ItemGroup>
+</Project>
