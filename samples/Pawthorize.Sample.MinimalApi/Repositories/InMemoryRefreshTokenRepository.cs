@@ -78,4 +78,35 @@ public class InMemoryRefreshTokenRepository : IRefreshTokenRepository
 
         return Task.CompletedTask;
     }
+
+    /// <summary>
+    /// Gets all active (non-revoked, non-expired) refresh tokens for a specific user.
+    /// </summary>
+    /// <param name="userId">The user ID whose active tokens to retrieve.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Collection of active refresh token information.</returns>
+    public Task<IEnumerable<RefreshTokenInfo>> GetAllActiveAsync(string userId, CancellationToken cancellationToken = default)
+    {
+        var activeTokens = _tokens.Values
+            .Where(t => t.UserId == userId && !t.IsRevoked && t.ExpiresAt > DateTime.UtcNow)
+            .ToList();
+
+        return Task.FromResult<IEnumerable<RefreshTokenInfo>>(activeTokens);
+    }
+
+    /// <summary>
+    /// Revokes all refresh tokens for a user except the specified token.
+    /// </summary>
+    /// <param name="userId">The user ID whose tokens should be revoked.</param>
+    /// <param name="exceptToken">The token to keep active (current session).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    public Task RevokeAllExceptAsync(string userId, string exceptToken, CancellationToken cancellationToken = default)
+    {
+        foreach (var tokenInfo in _tokens.Values.Where(t => t.UserId == userId && t.Token != exceptToken))
+        {
+            tokenInfo.IsRevoked = true;
+        }
+
+        return Task.CompletedTask;
+    }
 }

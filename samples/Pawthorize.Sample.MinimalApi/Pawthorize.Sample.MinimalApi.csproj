@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\Pawthorize.AspNetCore\Pawthorize.AspNetCore.csproj" />
+    <ProjectReference Include="..\..\src\Pawthorize\Pawthorize.csproj" />
   </ItemGroup>
 
   <ItemGroup>

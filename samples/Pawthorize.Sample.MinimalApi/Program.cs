@@ -1,10 +1,6 @@
-using System.Text;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
 using Pawthorize.AspNetCore.DTOs;
 using Pawthorize.AspNetCore.Extensions;
 using Pawthorize.Core.Abstractions;
-using Pawthorize.Core.Models;
 using Pawthorize.Core.Services;
 using Pawthorize.Core.Templates;
 using Pawthorize.Sample.MinimalApi.Factories;
@@ -17,33 +13,12 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Configure JWT settings from appsettings
-var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()
-    ?? throw new InvalidOperationException("JWT settings are not configured in appsettings.json");
-
-// Add authentication with JWT Bearer
-builder.Services.AddAuthentication(options =>
-{
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
-})
-.AddJwtBearer(options =>
-{
-    options.TokenValidationParameters = new TokenValidationParameters
-    {
-        ValidateIssuer = true,
-        ValidateAudience = true,
-        ValidateLifetime = true,
-        ValidateIssuerSigningKey = true,
-        ValidIssuer = jwtSettings.Issuer,
-        ValidAudience = jwtSettings.Audience,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.Secret)),
-        ClockSkew = TimeSpan.Zero
-    };
-});
-
-builder.Services.AddAuthorization();
-
+// Add Pawthorize - handles JWT authentication, ErrorHound integration, and all auth endpoints
+// This single call configures:
+// - JWT Bearer authentication with automatic OnChallenge handling
+// - ErrorHound for consistent error responses
+// - SuccessHound for consistent success responses
+// - All authentication endpoints (login, register, refresh, etc.)
 builder.Services.AddPawthorize<User, RegisterRequest>(
     builder.Configuration,
     options =>
@@ -51,7 +26,7 @@ builder.Services.AddPawthorize<User, RegisterRequest>(
         options.UseDefaultFormatters();
     });
 
-// Register repositories
+// Register repository implementations (in production, use database-backed repositories)
 builder.Services.AddSingleton<IUserRepository<User>, InMemoryUserRepository>();
 builder.Services.AddSingleton<IRefreshTokenRepository, InMemoryRefreshTokenRepository>();
 builder.Services.AddSingleton<ITokenRepository, InMemoryTokenRepository>();
@@ -63,12 +38,12 @@ builder.Services.AddSingleton<IEmailTemplateProvider, DefaultEmailTemplateProvid
 // Register email verification service
 builder.Services.AddScoped<IEmailVerificationService, EmailVerificationService>();
 
-// Register user factory
+// Register user factory for creating user entities from registration requests
 builder.Services.AddScoped<IUserFactory<User, RegisterRequest>, UserFactory>();
 
 var app = builder.Build();
 
-// Add Pawthorize middleware for error handling
+// Add Pawthorize middleware - handles all error responses consistently via ErrorHound
 app.UsePawthorize();
 
 if (app.Environment.IsDevelopment())
@@ -81,8 +56,8 @@ app.MapPawthorizeEndpoints<User, RegisterRequest>();
 
 app.MapGet("/", () => new
 {
-    Message = "Pawthorize Sample API - MVP 1.0",
-    Version = "1.0.0",
+    Message = "Pawthorize Sample API",
+    Version = "0.1.0",
     Endpoints = new[]
     {
         "POST /api/auth/register - Register new user",
