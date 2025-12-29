@@ -1,9 +1,9 @@
 using Microsoft.Extensions.Options;
-using Pawthorize.Core.Abstractions;
-using Pawthorize.Core.Models;
-using Pawthorize.Security.Utilities;
+using Pawthorize.Abstractions;
+using Pawthorize.Models;
+using Pawthorize.Utilities;
 
-namespace Pawthorize.Core.Services;
+namespace Pawthorize.Services;
 
 /// <summary>
 /// Implementation of password reset service.

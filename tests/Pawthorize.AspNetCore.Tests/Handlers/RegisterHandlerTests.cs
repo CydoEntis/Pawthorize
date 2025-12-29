@@ -6,12 +6,13 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
-using Pawthorize.AspNetCore.DTOs;
+using Pawthorize.Abstractions;
 using Pawthorize.AspNetCore.Handlers;
-using Pawthorize.AspNetCore.Services;
-using Pawthorize.Core.Abstractions;
-using Pawthorize.Core.Errors;
-using Pawthorize.Core.Models;
+using Pawthorize.DTOs;
+using Pawthorize.Errors;
+using Pawthorize.Handlers;
+using Pawthorize.Models;
+using Pawthorize.Services;
 using Xunit;
 
 namespace Pawthorize.AspNetCore.Tests.Handlers;
@@ -58,7 +59,7 @@ public class RegisterHandlerTests
         var mockJwtOptions = new Mock<IOptions<JwtSettings>>();
         mockJwtOptions.Setup(o => o.Value).Returns(jwtSettings);
 
-        var mockJwtService = new Mock<Jwt.Services.JwtService<TestUser>>(
+        var mockJwtService = new Mock<JwtService<TestUser>>(
             MockBehavior.Loose,
             mockJwtOptions.Object,
             null,

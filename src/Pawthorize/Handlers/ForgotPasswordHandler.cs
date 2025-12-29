@@ -1,9 +1,9 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
-using Pawthorize.AspNetCore.DTOs;
-using Pawthorize.AspNetCore.Utilities;
-using Pawthorize.Core.Abstractions;
+using Pawthorize.Abstractions;
+using Pawthorize.DTOs;
+using Pawthorize.Utilities;
 using SuccessHound.AspNetExtensions;
 
 namespace Pawthorize.AspNetCore.Handlers;

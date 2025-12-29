@@ -1,6 +1,5 @@
-using Pawthorize.Core.Abstractions;
-using Pawthorize.Core.Models;
 using System.Collections.Concurrent;
+using Pawthorize.Abstractions;
 
 namespace Pawthorize.Sample.MinimalApi.Repositories;
 

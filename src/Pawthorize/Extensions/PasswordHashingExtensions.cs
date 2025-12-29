@@ -1,9 +1,9 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
-using Pawthorize.Core.Abstractions;
-using Pawthorize.Core.Models;
-using Pawthorize.Security.Services;
+using Pawthorize.Abstractions;
+using Pawthorize.Models;
+using Pawthorize.Services;
 
-namespace Pawthorize.Security.Extensions;
+namespace Pawthorize.Extensions;
 
 /// <summary>
 /// Extension methods for registering password hashing services.

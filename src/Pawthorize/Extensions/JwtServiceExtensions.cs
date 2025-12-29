@@ -1,10 +1,10 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Pawthorize.Core.Abstractions;
-using Pawthorize.Core.Models;
-using Pawthorize.Jwt.Services;
+using Pawthorize.Abstractions;
+using Pawthorize.Models;
+using Pawthorize.Services;
 
-namespace Pawthorize.Jwt.Extensions;
+namespace Pawthorize.Extensions;
 
 /// <summary>
 /// Extension methods for registering JWT services.

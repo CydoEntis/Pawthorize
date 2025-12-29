@@ -5,11 +5,12 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
-using Pawthorize.AspNetCore.DTOs;
+using Pawthorize.Abstractions;
 using Pawthorize.AspNetCore.Handlers;
-using Pawthorize.AspNetCore.Services;
-using Pawthorize.Core.Abstractions;
-using Pawthorize.Core.Models;
+using Pawthorize.DTOs;
+using Pawthorize.Handlers;
+using Pawthorize.Models;
+using Pawthorize.Services;
 using Xunit;
 
 namespace Pawthorize.AspNetCore.Tests;
@@ -23,7 +24,7 @@ public class TokenDeliveryTests
     private readonly Mock<IUserRepository<TestUser>> _mockUserRepository;
     private readonly Mock<IPasswordHasher> _mockPasswordHasher;
     private readonly Mock<IRefreshTokenRepository> _mockRefreshTokenRepository;
-    private readonly Mock<Jwt.Services.JwtService<TestUser>> _mockJwtService;
+    private readonly Mock<JwtService<TestUser>> _mockJwtService;
     private readonly Mock<IValidator<LoginRequest>> _mockValidator;
     private readonly Mock<ILogger<LoginHandler<TestUser>>> _mockLogger;
     private readonly Mock<ILogger<AuthenticationService<TestUser>>> _mockAuthLogger;
@@ -54,7 +55,7 @@ public class TokenDeliveryTests
         var mockJwtOptions = new Mock<IOptions<JwtSettings>>();
         mockJwtOptions.Setup(o => o.Value).Returns(jwtSettings);
 
-        _mockJwtService = new Mock<Jwt.Services.JwtService<TestUser>>(
+        _mockJwtService = new Mock<JwtService<TestUser>>(
             MockBehavior.Loose,
             mockJwtOptions.Object,
             null!,

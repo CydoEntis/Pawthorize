@@ -1,11 +1,10 @@
 ﻿using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Pawthorize.Core.Abstractions;
-using Pawthorize.Core.Errors;
-using Pawthorize.Core.Models;
-using Pawthorize.Jwt.Services;
+using Pawthorize.Abstractions;
+using Pawthorize.Errors;
+using Pawthorize.Models;
 
-namespace Pawthorize.AspNetCore.Services;
+namespace Pawthorize.Services;
 
 /// <summary>
 /// Core authentication service with reusable operations.

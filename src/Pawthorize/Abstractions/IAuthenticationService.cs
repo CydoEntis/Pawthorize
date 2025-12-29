@@ -1,7 +1,6 @@
-using Pawthorize.Core.Abstractions;
-using Pawthorize.Core.Models;
+using Pawthorize.Models;
 
-namespace Pawthorize.AspNetCore.Abstractions;
+namespace Pawthorize.Abstractions;
 
 /// <summary>
 /// Service for generating authentication tokens and validating user account status.

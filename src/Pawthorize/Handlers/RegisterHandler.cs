@@ -2,15 +2,15 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Pawthorize.AspNetCore.DTOs;
-using Pawthorize.AspNetCore.Services;
-using Pawthorize.AspNetCore.Utilities;
-using Pawthorize.Core.Abstractions;
-using Pawthorize.Core.Errors;
-using Pawthorize.Core.Models;
+using Pawthorize.Abstractions;
+using Pawthorize.DTOs;
+using Pawthorize.Errors;
+using Pawthorize.Models;
+using Pawthorize.Services;
+using Pawthorize.Utilities;
 using SuccessHound.AspNetExtensions;
 
-namespace Pawthorize.AspNetCore.Handlers;
+namespace Pawthorize.Handlers;
 
 /// <summary>
 /// Handler for user registration.

@@ -2,7 +2,7 @@
 using FluentValidation;
 using Microsoft.Extensions.Logging;
 
-namespace Pawthorize.AspNetCore.Utilities;
+namespace Pawthorize.Utilities;
 
 /// <summary>
 /// Helper for validating requests with FluentValidation.

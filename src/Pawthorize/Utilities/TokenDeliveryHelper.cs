@@ -1,9 +1,9 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
-using Pawthorize.Core.Models;
-using SuccessHound.AspNetExtensions; 
+using Pawthorize.Models;
+using SuccessHound.AspNetExtensions;
 
-namespace Pawthorize.AspNetCore.Utilities;
+namespace Pawthorize.Utilities;
 
 /// <summary>
 /// Helper for delivering authentication tokens based on configured strategy.

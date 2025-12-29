@@ -1,4 +1,4 @@
-﻿namespace Pawthorize.Core.Models;
+﻿namespace Pawthorize.Models;
 
 /// <summary>
 /// Operating mode for Pawthorize

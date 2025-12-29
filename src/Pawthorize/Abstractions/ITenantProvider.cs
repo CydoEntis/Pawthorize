@@ -1,4 +1,4 @@
-﻿namespace Pawthorize.Core.Abstractions;
+﻿namespace Pawthorize.Abstractions;
 
 /// <summary>
 /// Optional: Provides tenant context for multi-tenant applications.

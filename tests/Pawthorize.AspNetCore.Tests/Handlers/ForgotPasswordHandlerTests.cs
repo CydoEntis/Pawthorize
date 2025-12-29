@@ -5,9 +5,9 @@ using FluentValidation.Results;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Moq;
-using Pawthorize.AspNetCore.DTOs;
+using Pawthorize.Abstractions;
 using Pawthorize.AspNetCore.Handlers;
-using Pawthorize.Core.Abstractions;
+using Pawthorize.DTOs;
 using Xunit;
 
 namespace Pawthorize.AspNetCore.Tests.Handlers;

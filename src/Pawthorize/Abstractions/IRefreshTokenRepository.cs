@@ -1,6 +1,6 @@
-﻿using Pawthorize.Core.Models;
+﻿using Pawthorize.Models;
 
-namespace Pawthorize.Core.Abstractions;
+namespace Pawthorize.Abstractions;
 
 /// <summary>
 /// Repository for refresh token storage and validation.

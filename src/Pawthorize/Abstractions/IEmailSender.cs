@@ -1,4 +1,4 @@
-﻿namespace Pawthorize.Core.Abstractions;
+﻿namespace Pawthorize.Abstractions;
 
 /// <summary>
 /// Interface for sending emails.

@@ -1,4 +1,4 @@
-﻿namespace Pawthorize.Core.Models;
+﻿namespace Pawthorize.Models;
 
 /// <summary>
 /// Information about a validated refresh token.

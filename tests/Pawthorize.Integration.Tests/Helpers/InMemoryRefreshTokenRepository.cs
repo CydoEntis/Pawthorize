@@ -1,5 +1,5 @@
-using Pawthorize.Core.Abstractions;
-using Pawthorize.Core.Models;
+using Pawthorize.Abstractions;
+using Pawthorize.Models;
 
 namespace Pawthorize.Integration.Tests.Helpers;
 

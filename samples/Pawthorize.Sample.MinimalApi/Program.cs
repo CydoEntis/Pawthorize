@@ -1,12 +1,12 @@
-using Pawthorize.AspNetCore.DTOs;
-using Pawthorize.AspNetCore.Extensions;
-using Pawthorize.Core.Abstractions;
-using Pawthorize.Core.Services;
-using Pawthorize.Core.Templates;
+using Pawthorize.Abstractions;
+using Pawthorize.DTOs;
+using Pawthorize.Extensions;
 using Pawthorize.Sample.MinimalApi.Factories;
 using Pawthorize.Sample.MinimalApi.Models;
 using Pawthorize.Sample.MinimalApi.Repositories;
 using Pawthorize.Sample.MinimalApi.Services;
+using Pawthorize.Services;
+using Pawthorize.Templates;
 
 var builder = WebApplication.CreateBuilder(args);
 

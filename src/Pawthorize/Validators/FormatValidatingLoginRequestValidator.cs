@@ -1,9 +1,9 @@
 ﻿using FluentValidation;
 using Microsoft.Extensions.Options;
-using Pawthorize.AspNetCore.DTOs;
-using Pawthorize.Core.Models;
+using Pawthorize.DTOs;
+using Pawthorize.Models;
 
-namespace Pawthorize.AspNetCore.Validators;
+namespace Pawthorize.Validators;
 
 /// <summary>
 /// Optional login validator with format validation.

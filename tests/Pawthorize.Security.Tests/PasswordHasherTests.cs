@@ -1,5 +1,5 @@
 using FluentAssertions;
-using Pawthorize.Security.Services;
+using Pawthorize.Services;
 using Xunit;
 
 namespace Pawthorize.Security.Tests;

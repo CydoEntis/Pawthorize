@@ -1,5 +1,5 @@
-using Pawthorize.AspNetCore.DTOs;
-using Pawthorize.Core.Abstractions;
+using Pawthorize.Abstractions;
+using Pawthorize.DTOs;
 
 namespace Pawthorize.Integration.Tests.Helpers;
 

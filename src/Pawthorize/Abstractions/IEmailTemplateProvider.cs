@@ -1,4 +1,4 @@
-﻿namespace Pawthorize.Core.Abstractions;
+﻿namespace Pawthorize.Abstractions;
 
 /// <summary>
 /// Provider for email templates.

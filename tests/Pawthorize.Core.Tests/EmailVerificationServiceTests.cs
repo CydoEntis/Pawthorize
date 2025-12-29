@@ -1,9 +1,9 @@
 using FluentAssertions;
 using Microsoft.Extensions.Options;
 using Moq;
-using Pawthorize.Core.Abstractions;
-using Pawthorize.Core.Models;
-using Pawthorize.Core.Services;
+using Pawthorize.Abstractions;
+using Pawthorize.Models;
+using Pawthorize.Services;
 using Xunit;
 
 namespace Pawthorize.Core.Tests;

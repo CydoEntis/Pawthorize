@@ -1,4 +1,4 @@
-﻿namespace Pawthorize.Core.Abstractions;
+﻿namespace Pawthorize.Abstractions;
 
 /// <summary>
 /// Service for handling email verification flow.

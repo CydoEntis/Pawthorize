@@ -1,4 +1,4 @@
-﻿namespace Pawthorize.Core.Abstractions;
+﻿namespace Pawthorize.Abstractions;
 
 /// <summary>
 /// Abstraction for password hashing and verification.

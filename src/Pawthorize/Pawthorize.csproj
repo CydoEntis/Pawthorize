@@ -9,6 +9,7 @@
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <RepositoryUrl>https://github.com/yourusername/pawthorize</RepositoryUrl>
         <PackageProjectUrl>https://github.com/yourusername/pawthorize</PackageProjectUrl>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
     </PropertyGroup>
 
     <ItemGroup>
@@ -33,5 +34,10 @@
 
     <ItemGroup>
         <EmbeddedResource Include="Templates\EmailTemplates\*.html" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+        <None Include="..\..\assets\logo.png" Pack="true" PackagePath="\assets\" />
     </ItemGroup>
 </Project>

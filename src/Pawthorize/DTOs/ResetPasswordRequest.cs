@@ -1,4 +1,4 @@
-namespace Pawthorize.AspNetCore.DTOs;
+namespace Pawthorize.DTOs;
 
 /// <summary>
 /// Request model for resetting password with a reset token.

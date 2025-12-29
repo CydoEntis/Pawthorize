@@ -1,7 +1,6 @@
 ﻿using System.Security.Cryptography;
 
-
-namespace Pawthorize.Security.Utilities;
+namespace Pawthorize.Utilities;
 
 /// <summary>
 /// Utility for generating cryptographically secure tokens.

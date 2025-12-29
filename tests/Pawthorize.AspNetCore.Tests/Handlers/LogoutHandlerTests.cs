@@ -6,11 +6,12 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
-using Pawthorize.AspNetCore.DTOs;
+using Pawthorize.Abstractions;
 using Pawthorize.AspNetCore.Handlers;
-using Pawthorize.Core.Abstractions;
-using Pawthorize.Core.Errors;
-using Pawthorize.Core.Models;
+using Pawthorize.DTOs;
+using Pawthorize.Errors;
+using Pawthorize.Handlers;
+using Pawthorize.Models;
 using Xunit;
 
 namespace Pawthorize.AspNetCore.Tests.Handlers;

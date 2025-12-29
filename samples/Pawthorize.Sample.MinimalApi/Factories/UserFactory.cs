@@ -1,5 +1,5 @@
-﻿using Pawthorize.AspNetCore.DTOs;
-using Pawthorize.Core.Abstractions;
+﻿using Pawthorize.Abstractions;
+using Pawthorize.DTOs;
 using Pawthorize.Sample.MinimalApi.Models;
 
 namespace Pawthorize.Sample.MinimalApi.Factories;

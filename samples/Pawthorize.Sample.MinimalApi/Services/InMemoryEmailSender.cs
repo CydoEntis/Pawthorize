@@ -1,4 +1,4 @@
-using Pawthorize.Core.Abstractions;
+using Pawthorize.Abstractions;
 
 namespace Pawthorize.Sample.MinimalApi.Services;
 

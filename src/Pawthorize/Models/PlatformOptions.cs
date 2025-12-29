@@ -1,4 +1,4 @@
-﻿namespace Pawthorize.Core.Models;
+﻿namespace Pawthorize.Models;
 
 /// <summary>
 /// Configuration for Platform mode (future - Phase 4)

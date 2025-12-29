@@ -2,12 +2,9 @@ using FluentAssertions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
-using Pawthorize.AspNetCore.Services;
-using Pawthorize.Core.Models;
-using Pawthorize.Core.Services;
 using Pawthorize.Integration.Tests.Helpers;
-using Pawthorize.Jwt.Services;
-using Pawthorize.Security.Services;
+using Pawthorize.Models;
+using Pawthorize.Services;
 using Xunit;
 
 namespace Pawthorize.Integration.Tests;

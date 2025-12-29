@@ -1,4 +1,4 @@
-﻿namespace Pawthorize.Core.Models;
+﻿namespace Pawthorize.Models;
 
 /// <summary>
 /// Configuration settings for JWT token generation and validation.

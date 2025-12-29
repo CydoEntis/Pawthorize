@@ -1,10 +1,10 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
-using Pawthorize.Core.Abstractions;
+using Pawthorize.Abstractions;
 using SuccessHound.AspNetExtensions;
 
-namespace Pawthorize.AspNetCore.Handlers;
+namespace Pawthorize.Handlers;
 
 /// <summary>
 /// Handler for retrieving all active sessions (refresh tokens) for the current user.

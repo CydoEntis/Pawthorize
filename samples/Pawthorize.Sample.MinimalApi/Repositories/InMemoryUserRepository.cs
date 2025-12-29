@@ -1,4 +1,4 @@
-﻿using Pawthorize.Core.Abstractions;
+﻿using Pawthorize.Abstractions;
 using Pawthorize.Sample.MinimalApi.Models;
 
 namespace Pawthorize.Sample.MinimalApi.Repositories;

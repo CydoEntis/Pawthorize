@@ -1,8 +1,8 @@
-﻿using Pawthorize.Core.Abstractions;
-using BCrypt.Net;
+﻿using BCrypt.Net;
 using Microsoft.Extensions.Logging;
+using Pawthorize.Abstractions;
 
-namespace Pawthorize.Security.Services;
+namespace Pawthorize.Services;
 
 /// <summary>
 /// BCrypt-based password hasher.

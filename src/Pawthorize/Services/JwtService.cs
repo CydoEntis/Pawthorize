@@ -1,15 +1,14 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
-using System.Linq;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-using Pawthorize.Core.Abstractions;
-using Pawthorize.Core.Models;
+using Pawthorize.Abstractions;
+using Pawthorize.Models;
 
-namespace Pawthorize.Jwt.Services;
+namespace Pawthorize.Services;
 
 /// <summary>
 /// Service for generating and validating JWT tokens.

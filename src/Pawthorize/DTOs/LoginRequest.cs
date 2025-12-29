@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace Pawthorize.AspNetCore.DTOs;
+namespace Pawthorize.DTOs;
 
 /// <summary>
 /// Request model for user login.

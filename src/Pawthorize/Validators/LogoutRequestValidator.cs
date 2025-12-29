@@ -1,7 +1,7 @@
 ﻿using FluentValidation;
-using Pawthorize.AspNetCore.DTOs;
+using Pawthorize.DTOs;
 
-namespace Pawthorize.AspNetCore.Validators;
+namespace Pawthorize.Validators;
 
 /// <summary>
 /// Validator for logout requests.
