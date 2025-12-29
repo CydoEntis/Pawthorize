@@ -2,12 +2,12 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
-using Pawthorize.AspNetCore.DTOs;
+using Pawthorize.Abstractions;
 using Pawthorize.AspNetCore.Handlers;
-using Pawthorize.Core.Abstractions;
-using SuccessHound.Extensions;
+using Pawthorize.DTOs;
+using Pawthorize.Handlers;
 
-namespace Pawthorize.AspNetCore.Extensions;
+namespace Pawthorize.Extensions;
 
 /// <summary>
 /// Extension methods for mapping Pawthorize authentication endpoints.
@@ -129,6 +129,17 @@ public static class WebApplicationExtensions
             .RequireAuthorization()
             .WithOpenApi();
 
+        group.MapPost(options.VerifyEmailPath, async (
+                VerifyEmailRequest request,
+                VerifyEmailHandler<TUser> handler,
+                HttpContext context,
+                CancellationToken ct) =>
+            {
+                return await handler.HandleAsync(request, context, ct);
+            })
+            .WithName("VerifyEmail")
+            .WithOpenApi();
+
         group.MapGet(options.GetCurrentUserPath, async (
                 GetCurrentUserHandler<TUser> handler,
                 HttpContext context,
@@ -152,11 +163,12 @@ public static class WebApplicationExtensions
             .WithOpenApi();
 
         group.MapPost(options.RevokeAllOtherSessionsPath, async (
+                RevokeAllOtherSessionsRequest? request,
                 RevokeAllOtherSessionsHandler<TUser> handler,
                 HttpContext context,
                 CancellationToken ct) =>
             {
-                return await handler.HandleAsync(context, ct);
+                return await handler.HandleAsync(request ?? new RevokeAllOtherSessionsRequest(), context, ct);
             })
             .WithName("RevokeAllOtherSessions")
             .RequireAuthorization()
@@ -310,6 +322,13 @@ public class PawthorizeEndpointOptions
     /// Full path: {BasePath}/change-password
     /// </summary>
     public string ChangePasswordPath { get; set; } = "/change-password";
+
+    /// <summary>
+    /// Path for verify email endpoint (relative to BasePath).
+    /// Default: "/verify-email"
+    /// Full path: {BasePath}/verify-email
+    /// </summary>
+    public string VerifyEmailPath { get; set; } = "/verify-email";
 
     /// <summary>
     /// Path for get current user endpoint (relative to BasePath).

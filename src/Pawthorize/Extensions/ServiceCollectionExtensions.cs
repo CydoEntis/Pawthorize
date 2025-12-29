@@ -7,20 +7,17 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-using Pawthorize.AspNetCore.Configuration;
-using Pawthorize.AspNetCore.DTOs;
+using Pawthorize.Abstractions;
 using Pawthorize.AspNetCore.Handlers;
-using Pawthorize.AspNetCore.Services;
-using Pawthorize.AspNetCore.Validators;
-using Pawthorize.Core.Abstractions;
-using Pawthorize.Core.Models;
-using Pawthorize.Core.Services;
-using Pawthorize.Jwt.Services;
-using Pawthorize.Security.Services;
-using SuccessHound.Abstractions;
+using Pawthorize.Configuration;
+using Pawthorize.DTOs;
+using Pawthorize.Handlers;
+using Pawthorize.Models;
+using Pawthorize.Services;
+using Pawthorize.Validators;
 using SuccessHound.Extensions;
 
-namespace Pawthorize.AspNetCore.Extensions;
+namespace Pawthorize.Extensions;
 
 /// <summary>
 /// Extension methods for registering Pawthorize services.
@@ -174,6 +171,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ForgotPasswordHandler<TUser>>();
         services.AddScoped<ResetPasswordHandler<TUser>>();
         services.AddScoped<ChangePasswordHandler<TUser>>();
+        services.AddScoped<VerifyEmailHandler<TUser>>();
         services.AddScoped<GetCurrentUserHandler<TUser>>();
         services.AddScoped<GetActiveSessionsHandler<TUser>>();
         services.AddScoped<RevokeAllOtherSessionsHandler<TUser>>();
@@ -192,6 +190,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IValidator<ForgotPasswordRequest>, ForgotPasswordRequestValidator>();
         services.AddScoped<IValidator<ResetPasswordRequest>, ResetPasswordRequestValidator>();
         services.AddScoped<IValidator<ChangePasswordRequest>, ChangePasswordRequestValidator>();
+        services.AddScoped<IValidator<VerifyEmailRequest>, VerifyEmailRequestValidator>();
+        services.AddScoped<IValidator<RevokeAllOtherSessionsRequest>, RevokeAllOtherSessionsRequestValidator>();
 
 
         if (typeof(TRegisterRequest) != typeof(RegisterRequest))
