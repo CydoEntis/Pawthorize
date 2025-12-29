@@ -81,11 +81,16 @@ Creates a new user account.
 **Error Response (400 Bad Request):**
 ```json
 {
-  "type": "DuplicateEmailError",
-  "title": "Email Already Registered",
-  "status": 400,
-  "detail": "A user with email 'user@example.com' already exists.",
-  "errors": {}
+  "success": false,
+  "error": {
+    "code": "DUPLICATE_EMAIL",
+    "message": "Email Already Registered",
+    "details": "A user with email 'user@example.com' already exists."
+  },
+  "meta": {
+    "timestamp": "2025-12-28T18:03:28.6056493Z",
+    "version": "v1.0"
+  }
 }
 ```
 
@@ -119,11 +124,16 @@ Authenticate with email and password.
 **Error Response (401 Unauthorized):**
 ```json
 {
-  "type": "InvalidCredentialsError",
-  "title": "Invalid Credentials",
-  "status": 401,
-  "detail": "The email or password provided is incorrect.",
-  "errors": {}
+  "success": false,
+  "error": {
+    "code": "INVALID_CREDENTIALS",
+    "message": "Invalid Credentials",
+    "details": "The email or password provided is incorrect."
+  },
+  "meta": {
+    "timestamp": "2025-12-28T18:03:28.6056493Z",
+    "version": "v1.0"
+  }
 }
 ```
 
@@ -156,11 +166,16 @@ Get a new access token using a refresh token.
 **Error Response (401 Unauthorized):**
 ```json
 {
-  "type": "InvalidRefreshTokenError",
-  "title": "Invalid Refresh Token",
-  "status": 401,
-  "detail": "The refresh token is invalid, expired, or has been revoked.",
-  "errors": {}
+  "success": false,
+  "error": {
+    "code": "INVALID_REFRESH_TOKEN",
+    "message": "Invalid Refresh Token",
+    "details": "The refresh token is invalid, expired, or has been revoked."
+  },
+  "meta": {
+    "timestamp": "2025-12-28T18:03:28.6056493Z",
+    "version": "v1.0"
+  }
 }
 ```
 
