@@ -4,7 +4,22 @@
   # Pawthorize
 
   **Modern, secure authentication for ASP.NET Core** - batteries included.
+
+  [![NuGet](https://img.shields.io/nuget/v/Pawthorize.svg)](https://www.nuget.org/packages/Pawthorize)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 </div>
+
+> **⚠️ Alpha Release Notice**
+>
+> Pawthorize v0.1.0 is an **early alpha release**. While the library is functional and thoroughly tested (164 passing tests), the API surface may change as we gather feedback and build production applications with it.
+>
+> **Before using in production:**
+> - Test thoroughly with your specific use case
+> - Expect potential breaking changes in minor versions until v1.0
+>
+> I'm actively developing a demo application to validate real-world usage. Feedback is highly appreciated!
+
+---
 
 Pawthorize is a complete authentication library that provides secure user authentication, JWT token management, password handling, and session management out of the box. Built for ASP.NET Core Minimal APIs and designed to get you up and running in minutes.
 
