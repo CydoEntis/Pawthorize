@@ -1,14 +1,16 @@
 using System.Security.Claims;
+using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Pawthorize.AspNetCore.Configuration;
-using Pawthorize.Core.Abstractions;
-using Pawthorize.Core.Errors;
-using Pawthorize.Core.Models;
+using Pawthorize.Abstractions;
+using Pawthorize.DTOs;
+using Pawthorize.Errors;
+using Pawthorize.Models;
+using Pawthorize.Utilities;
 using SuccessHound.AspNetExtensions;
 
-namespace Pawthorize.AspNetCore.Handlers;
+namespace Pawthorize.Handlers;
 
 /// <summary>
 /// Handler for revoking all sessions (refresh tokens) except the current one.
@@ -17,15 +19,18 @@ namespace Pawthorize.AspNetCore.Handlers;
 public class RevokeAllOtherSessionsHandler<TUser> where TUser : IAuthenticatedUser
 {
     private readonly IRefreshTokenRepository _refreshTokenRepository;
+    private readonly IValidator<RevokeAllOtherSessionsRequest> _validator;
     private readonly PawthorizeOptions _options;
     private readonly ILogger<RevokeAllOtherSessionsHandler<TUser>> _logger;
 
     public RevokeAllOtherSessionsHandler(
         IRefreshTokenRepository refreshTokenRepository,
+        IValidator<RevokeAllOtherSessionsRequest> validator,
         IOptions<PawthorizeOptions> options,
         ILogger<RevokeAllOtherSessionsHandler<TUser>> logger)
     {
         _refreshTokenRepository = refreshTokenRepository;
+        _validator = validator;
         _options = options.Value;
         _logger = logger;
     }
@@ -34,6 +39,7 @@ public class RevokeAllOtherSessionsHandler<TUser> where TUser : IAuthenticatedUs
     /// Revoke all refresh tokens (sessions) except the current one for the authenticated user.
     /// </summary>
     public async Task<IResult> HandleAsync(
+        RevokeAllOtherSessionsRequest request,
         HttpContext httpContext,
         CancellationToken cancellationToken = default)
     {
@@ -49,13 +55,11 @@ public class RevokeAllOtherSessionsHandler<TUser> where TUser : IAuthenticatedUs
 
         try
         {
-            var currentRefreshToken = ExtractRefreshToken(httpContext);
+            await ValidationHelper.ValidateAndThrowAsync(request, _validator, cancellationToken, _logger);
+            _logger.LogDebug("Revoke all other sessions request validation passed");
 
-            if (string.IsNullOrEmpty(currentRefreshToken))
-            {
-                _logger.LogWarning("Revoke all other sessions failed: Current refresh token not found");
-                throw new InvalidRefreshTokenError();
-            }
+            var currentRefreshToken = ExtractRefreshToken(request, httpContext);
+            _logger.LogDebug("Refresh token extracted from request");
 
             await _refreshTokenRepository.RevokeAllExceptAsync(userId, currentRefreshToken, cancellationToken);
 
@@ -81,10 +85,10 @@ public class RevokeAllOtherSessionsHandler<TUser> where TUser : IAuthenticatedUs
     }
 
     /// <summary>
-    /// Extract refresh token from cookie or request.
-    /// Cookie takes precedence if using HttpOnlyCookies or Hybrid strategy.
+    /// Extract refresh token from request body or cookie.
+    /// Cookie takes precedence (if using HttpOnlyCookies or Hybrid strategy).
     /// </summary>
-    private string? ExtractRefreshToken(HttpContext httpContext)
+    private string ExtractRefreshToken(RevokeAllOtherSessionsRequest request, HttpContext httpContext)
     {
         if (_options.TokenDelivery != TokenDeliveryStrategy.ResponseBody)
         {
@@ -94,10 +98,16 @@ public class RevokeAllOtherSessionsHandler<TUser> where TUser : IAuthenticatedUs
                 _logger.LogDebug("Refresh token extracted from cookie");
                 return cookieToken;
             }
-            _logger.LogDebug("No refresh token found in cookie");
+            _logger.LogDebug("No refresh token found in cookie, checking request body");
         }
 
-        _logger.LogWarning("No refresh token found for revoke all other sessions");
-        return null;
+        if (!string.IsNullOrEmpty(request.RefreshToken))
+        {
+            _logger.LogDebug("Refresh token extracted from request body");
+            return request.RefreshToken;
+        }
+
+        _logger.LogWarning("No refresh token found in cookie or request body");
+        throw new InvalidRefreshTokenError();
     }
 }
