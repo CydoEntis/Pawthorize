@@ -1,7 +1,7 @@
 ﻿using System.Reflection;
-using Pawthorize.Core.Abstractions;
+using Pawthorize.Abstractions;
 
-namespace Pawthorize.Core.Templates;
+namespace Pawthorize.Templates;
 
 /// <summary>
 /// Default email template provider using embedded HTML templates.
@@ -59,7 +59,7 @@ public class DefaultEmailTemplateProvider : IEmailTemplateProvider
     /// </summary>
     private static string LoadEmbeddedTemplate(string fileName)
     {
-        var resourceName = $"Pawthorize.Core.Templates.EmailTemplates.{fileName}";
+        var resourceName = $"Pawthorize.Templates.EmailTemplates.{fileName}";
 
         using var stream = _assembly.GetManifestResourceStream(resourceName);
 

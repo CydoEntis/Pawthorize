@@ -1,6 +1,4 @@
-using Pawthorize.AspNetCore.Formatters;
-
-namespace Pawthorize.AspNetCore.Configuration;
+namespace Pawthorize.Configuration;
 
 /// <summary>
 /// Options for configuring response formatting with Pawthorize.
@@ -15,12 +13,14 @@ public sealed class PawthorizeResponseOptions
     /// <summary>
     /// Use default formatters for success and error responses.
     /// This ensures consistent API response format across success and error cases.
+    /// Uses ErrorHound's DefaultErrorFormatter which automatically handles ValidationError field errors.
     /// </summary>
     public void UseDefaultFormatters()
     {
         EnableSuccessHound = true;
         EnableErrorHound = true;
-        ErrorFormatterType = typeof(PawthorizeErrorFormatter);
+        // Use ErrorHound's built-in DefaultErrorFormatter (null = use default)
+        ErrorFormatterType = null;
     }
 
     /// <summary>

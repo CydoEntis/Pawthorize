@@ -1,7 +1,7 @@
 ﻿using FluentValidation;
-using Pawthorize.AspNetCore.DTOs;
+using Pawthorize.DTOs;
 
-namespace Pawthorize.AspNetCore.Validators;
+namespace Pawthorize.Validators;
 
 /// <summary>
 /// Validator for refresh token requests.
@@ -11,8 +11,9 @@ public class RefreshTokenRequestValidator : AbstractValidator<RefreshTokenReques
     public RefreshTokenRequestValidator()
     {
         RuleFor(x => x.RefreshToken)
+            .NotEmpty()
+            .WithMessage("Refresh token is required")
             .MinimumLength(64)
-            .When(x => !string.IsNullOrEmpty(x.RefreshToken))
             .WithMessage("Invalid refresh token format");
     }
 }
