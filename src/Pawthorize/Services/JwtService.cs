@@ -12,34 +12,23 @@ namespace Pawthorize.Services;
 
 /// <summary>
 /// Service for generating and validating JWT tokens.
-/// Supports both single-tenant (default) and multi-tenant modes.
 /// </summary>
 /// <typeparam name="TUser">User type implementing IAuthenticatedUser</typeparam>
 public class JwtService<TUser> where TUser : IAuthenticatedUser
 {
     private readonly JwtSettings _settings;
-    private readonly ITenantProvider? _tenantProvider;
     private readonly ILogger<JwtService<TUser>>? _logger;
 
     public JwtService(IOptions<JwtSettings> settings)
-        : this(settings, null, null)
+        : this(settings, null)
     {
     }
 
     public JwtService(
         IOptions<JwtSettings> settings,
-        ITenantProvider? tenantProvider)
-        : this(settings, tenantProvider, null)
-    {
-    }
-
-    public JwtService(
-        IOptions<JwtSettings> settings,
-        ITenantProvider? tenantProvider,
         ILogger<JwtService<TUser>>? logger)
     {
         _settings = settings.Value;
-        _tenantProvider = tenantProvider;
         _logger = logger;
     }
 
@@ -208,17 +197,6 @@ public class JwtService<TUser> where TUser : IAuthenticatedUser
                 user.AdditionalClaims.Count, user.Id);
         }
 
-        if (_tenantProvider != null)
-        {
-            var tenantId = _tenantProvider.GetCurrentTenantId();
-            if (!string.IsNullOrEmpty(tenantId))
-            {
-                claims.Add(new Claim("tenant_id", tenantId));
-                _logger?.LogDebug("Added tenant claim for UserId: {UserId}, TenantId: {TenantId}",
-                    user.Id, tenantId);
-            }
-        }
-
         _logger?.LogDebug("Built {TotalClaimCount} total claims for UserId: {UserId}", claims.Count, user.Id);
 
         return claims;
@@ -228,23 +206,11 @@ public class JwtService<TUser> where TUser : IAuthenticatedUser
     {
         _logger?.LogDebug("Retrieving JWT signing secret");
 
-        if (_tenantProvider != null)
-        {
-            var tenantSecret = _tenantProvider.GetTenantSecret();
-            if (!string.IsNullOrEmpty(tenantSecret))
-            {
-                _logger?.LogDebug("Using tenant-specific JWT secret");
-                return tenantSecret;
-            }
-            _logger?.LogDebug("No tenant-specific secret found, falling back to default secret");
-        }
-
         if (string.IsNullOrEmpty(_settings.Secret))
         {
             _logger?.LogError("JWT Secret is not configured in settings");
             throw new InvalidOperationException(
-                "JWT Secret is not configured. " +
-                "Set 'Jwt:Secret' in appsettings.json or provide ITenantProvider for multi-tenant.");
+                "JWT Secret is not configured. Set 'Jwt:Secret' in appsettings.json.");
         }
 
         if (_settings.Secret.Length < 32)
@@ -255,7 +221,7 @@ public class JwtService<TUser> where TUser : IAuthenticatedUser
                 $"JWT Secret must be at least 32 characters. Current length: {_settings.Secret.Length}");
         }
 
-        _logger?.LogDebug("Using default JWT secret from settings (length: {Length} characters)",
+        _logger?.LogDebug("Using JWT secret from settings (length: {Length} characters)",
             _settings.Secret.Length);
 
         return _settings.Secret;
