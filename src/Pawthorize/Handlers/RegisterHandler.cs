@@ -30,6 +30,7 @@ public class RegisterHandler<TUser, TRegisterRequest>
     private readonly IEmailVerificationService? _emailVerificationService;
     private readonly IValidator<TRegisterRequest> _validator;
     private readonly PawthorizeOptions _options;
+    private readonly CsrfTokenService _csrfService;
     private readonly ILogger<RegisterHandler<TUser, TRegisterRequest>> _logger;
 
     public RegisterHandler(
@@ -39,6 +40,7 @@ public class RegisterHandler<TUser, TRegisterRequest>
         AuthenticationService<TUser> authService,
         IValidator<TRegisterRequest> validator,
         IOptions<PawthorizeOptions> options,
+        CsrfTokenService csrfService,
         ILogger<RegisterHandler<TUser, TRegisterRequest>> logger,
         IEmailVerificationService? emailVerificationService = null)
     {
@@ -49,6 +51,7 @@ public class RegisterHandler<TUser, TRegisterRequest>
         _emailVerificationService = emailVerificationService;
         _validator = validator;
         _options = options.Value;
+        _csrfService = csrfService;
         _logger = logger;
     }
 
@@ -96,7 +99,7 @@ public class RegisterHandler<TUser, TRegisterRequest>
                 createdUser.Id);
 
             var authResult = await _authService.GenerateTokensAsync(createdUser, cancellationToken);
-            var result = TokenDeliveryHelper.DeliverTokens(authResult, httpContext, _options.TokenDelivery, _logger);
+            var result = TokenDeliveryHelper.DeliverTokens(authResult, httpContext, _options.TokenDelivery, _options, _csrfService, _logger);
 
             _logger.LogInformation("Registration completed successfully for UserId: {UserId}, Email: {Email}",
                 createdUser.Id, createdUser.Email);

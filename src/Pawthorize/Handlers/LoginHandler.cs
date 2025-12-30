@@ -22,6 +22,7 @@ public class LoginHandler<TUser> where TUser : IAuthenticatedUser
     private readonly AuthenticationService<TUser> _authService;
     private readonly IValidator<LoginRequest> _validator;
     private readonly PawthorizeOptions _options;
+    private readonly CsrfTokenService _csrfService;
     private readonly ILogger<LoginHandler<TUser>> _logger;
 
     public LoginHandler(
@@ -30,6 +31,7 @@ public class LoginHandler<TUser> where TUser : IAuthenticatedUser
         AuthenticationService<TUser> authService,
         IValidator<LoginRequest> validator,
         IOptions<PawthorizeOptions> options,
+        CsrfTokenService csrfService,
         ILogger<LoginHandler<TUser>> logger)
     {
         _userRepository = userRepository;
@@ -37,6 +39,7 @@ public class LoginHandler<TUser> where TUser : IAuthenticatedUser
         _authService = authService;
         _validator = validator;
         _options = options.Value;
+        _csrfService = csrfService;
         _logger = logger;
     }
 
@@ -80,7 +83,7 @@ public class LoginHandler<TUser> where TUser : IAuthenticatedUser
             var authResult = await _authService.GenerateTokensAsync(user, cancellationToken);
             _logger.LogDebug("Tokens generated successfully for UserId: {UserId}", user.Id);
 
-            var result = TokenDeliveryHelper.DeliverTokens(authResult, httpContext, _options.TokenDelivery, _logger);
+            var result = TokenDeliveryHelper.DeliverTokens(authResult, httpContext, _options.TokenDelivery, _options, _csrfService, _logger);
 
             _logger.LogInformation("Login successful for identifier: {Identifier}, UserId: {UserId}",
                 request.Identifier, user.Id);

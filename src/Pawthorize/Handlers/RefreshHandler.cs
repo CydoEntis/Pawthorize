@@ -22,6 +22,7 @@ public class RefreshHandler<TUser> where TUser : IAuthenticatedUser
     private readonly AuthenticationService<TUser> _authService;
     private readonly IValidator<RefreshTokenRequest> _validator;
     private readonly PawthorizeOptions _options;
+    private readonly CsrfTokenService _csrfService;
     private readonly ILogger<RefreshHandler<TUser>> _logger;
 
     public RefreshHandler(
@@ -30,6 +31,7 @@ public class RefreshHandler<TUser> where TUser : IAuthenticatedUser
         AuthenticationService<TUser> authService,
         IValidator<RefreshTokenRequest> validator,
         IOptions<PawthorizeOptions> options,
+        CsrfTokenService csrfService,
         ILogger<RefreshHandler<TUser>> logger)
     {
         _userRepository = userRepository;
@@ -37,6 +39,7 @@ public class RefreshHandler<TUser> where TUser : IAuthenticatedUser
         _authService = authService;
         _validator = validator;
         _options = options.Value;
+        _csrfService = csrfService;
         _logger = logger;
     }
 
@@ -94,7 +97,7 @@ public class RefreshHandler<TUser> where TUser : IAuthenticatedUser
             var authResult = await _authService.GenerateTokensAsync(user, cancellationToken);
             _logger.LogDebug("New tokens generated successfully for UserId: {UserId}", user.Id);
 
-            var result = TokenDeliveryHelper.DeliverTokens(authResult, httpContext, _options.TokenDelivery, _logger);
+            var result = TokenDeliveryHelper.DeliverTokens(authResult, httpContext, _options.TokenDelivery, _options, _csrfService, _logger);
 
             _logger.LogInformation("Token refresh completed successfully for UserId: {UserId}", user.Id);
 

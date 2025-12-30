@@ -55,7 +55,7 @@ public class LogoutHandler<TUser> where TUser : IAuthenticatedUser
             await _refreshTokenRepository.RevokeAsync(refreshToken, cancellationToken);
             _logger.LogDebug("Refresh token revoked successfully");
 
-            TokenDeliveryHelper.ClearAuthCookies(httpContext, _options.TokenDelivery, _logger);
+            TokenDeliveryHelper.ClearAuthCookies(httpContext, _options.TokenDelivery, _options, _logger);
             _logger.LogDebug("Authentication cookies cleared");
 
             _logger.LogInformation("Logout completed successfully");
