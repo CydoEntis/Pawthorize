@@ -26,8 +26,10 @@ public class TokenDeliveryTests
     private readonly Mock<IRefreshTokenRepository> _mockRefreshTokenRepository;
     private readonly Mock<JwtService<TestUser>> _mockJwtService;
     private readonly Mock<IValidator<LoginRequest>> _mockValidator;
+    private readonly Mock<CsrfTokenService> _mockCsrfService;
     private readonly Mock<ILogger<LoginHandler<TestUser>>> _mockLogger;
     private readonly Mock<ILogger<AuthenticationService<TestUser>>> _mockAuthLogger;
+    private readonly Mock<ILogger<CsrfTokenService>> _mockCsrfLogger;
     private readonly Mock<ILogger<RegisterHandler<TestUser, RegisterRequest>>> _mockRegisterLogger;
     private readonly Mock<IValidator<RegisterRequest>> _mockRegisterValidator;
     private readonly Mock<IUserFactory<TestUser, RegisterRequest>> _mockUserFactory;
@@ -40,6 +42,8 @@ public class TokenDeliveryTests
         _mockValidator = new Mock<IValidator<LoginRequest>>();
         _mockLogger = new Mock<ILogger<LoginHandler<TestUser>>>();
         _mockAuthLogger = new Mock<ILogger<AuthenticationService<TestUser>>>();
+        _mockCsrfLogger = new Mock<ILogger<CsrfTokenService>>();
+        _mockCsrfService = new Mock<CsrfTokenService>(_mockCsrfLogger.Object);
         _mockRegisterLogger = new Mock<ILogger<RegisterHandler<TestUser, RegisterRequest>>>();
         _mockRegisterValidator = new Mock<IValidator<RegisterRequest>>();
         _mockUserFactory = new Mock<IUserFactory<TestUser, RegisterRequest>>();
@@ -90,6 +94,7 @@ public class TokenDeliveryTests
             mockAuthService.Object,
             _mockValidator.Object,
             mockOptions.Object,
+            _mockCsrfService.Object,
             _mockLogger.Object
         );
 
@@ -168,6 +173,7 @@ public class TokenDeliveryTests
             mockAuthService.Object,
             _mockValidator.Object,
             mockOptions.Object,
+            _mockCsrfService.Object,
             _mockLogger.Object
         );
 
@@ -248,6 +254,7 @@ public class TokenDeliveryTests
             mockAuthService.Object,
             _mockValidator.Object,
             mockOptions.Object,
+            _mockCsrfService.Object,
             _mockLogger.Object
         );
 
@@ -335,6 +342,7 @@ public class TokenDeliveryTests
             mockAuthService.Object,
             _mockRegisterValidator.Object,
             mockOptions.Object,
+            _mockCsrfService.Object,
             _mockRegisterLogger.Object
         );
 
@@ -420,6 +428,7 @@ public class TokenDeliveryTests
             mockAuthService.Object,
             _mockRegisterValidator.Object,
             mockOptions.Object,
+            _mockCsrfService.Object,
             _mockRegisterLogger.Object
         );
 

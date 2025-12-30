@@ -26,8 +26,10 @@ public class LoginHandlerTests
     private readonly Mock<AuthenticationService<TestUser>> _mockAuthService;
     private readonly Mock<IValidator<LoginRequest>> _mockValidator;
     private readonly Mock<IOptions<PawthorizeOptions>> _mockOptions;
+    private readonly Mock<CsrfTokenService> _mockCsrfService;
     private readonly Mock<ILogger<LoginHandler<TestUser>>> _mockLogger;
     private readonly Mock<ILogger<AuthenticationService<TestUser>>> _mockAuthLogger;
+    private readonly Mock<ILogger<CsrfTokenService>> _mockCsrfLogger;
     private readonly LoginHandler<TestUser> _handler;
     private readonly HttpContext _httpContext;
     private readonly PawthorizeOptions _options;
@@ -40,6 +42,8 @@ public class LoginHandlerTests
         _mockValidator = new Mock<IValidator<LoginRequest>>();
         _mockLogger = new Mock<ILogger<LoginHandler<TestUser>>>();
         _mockAuthLogger = new Mock<ILogger<AuthenticationService<TestUser>>>();
+        _mockCsrfLogger = new Mock<ILogger<CsrfTokenService>>();
+        _mockCsrfService = new Mock<CsrfTokenService>(_mockCsrfLogger.Object);
 
         _options = new PawthorizeOptions
         {
@@ -81,6 +85,7 @@ public class LoginHandlerTests
             _mockAuthService.Object,
             _mockValidator.Object,
             _mockOptions.Object,
+            _mockCsrfService.Object,
             _mockLogger.Object
         );
 

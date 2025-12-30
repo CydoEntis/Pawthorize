@@ -23,6 +23,7 @@ public class RefreshHandlerTests
     private readonly Mock<AuthenticationService<TestUser>> _mockAuthService;
     private readonly Mock<IValidator<RefreshTokenRequest>> _mockValidator;
     private readonly Mock<IOptions<PawthorizeOptions>> _mockOptions;
+    private readonly Mock<CsrfTokenService> _mockCsrfService;
     private readonly Mock<ILogger<RefreshHandler<TestUser>>> _mockLogger;
     private readonly RefreshHandler<TestUser> _handler;
     private readonly HttpContext _httpContext;
@@ -34,6 +35,8 @@ public class RefreshHandlerTests
         _mockRefreshTokenRepository = new Mock<IRefreshTokenRepository>();
         _mockValidator = new Mock<IValidator<RefreshTokenRequest>>();
         _mockLogger = new Mock<ILogger<RefreshHandler<TestUser>>>();
+        var mockCsrfLogger = new Mock<ILogger<CsrfTokenService>>();
+        _mockCsrfService = new Mock<CsrfTokenService>(mockCsrfLogger.Object);
 
         _options = new PawthorizeOptions
         {
@@ -74,6 +77,7 @@ public class RefreshHandlerTests
             _mockAuthService.Object,
             _mockValidator.Object,
             _mockOptions.Object,
+            _mockCsrfService.Object,
             _mockLogger.Object
         );
 

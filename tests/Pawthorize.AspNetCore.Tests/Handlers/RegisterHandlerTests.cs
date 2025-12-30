@@ -26,6 +26,7 @@ public class RegisterHandlerTests
     private readonly Mock<IEmailVerificationService> _mockEmailVerificationService;
     private readonly Mock<IValidator<RegisterRequest>> _mockValidator;
     private readonly Mock<IOptions<PawthorizeOptions>> _mockOptions;
+    private readonly Mock<CsrfTokenService> _mockCsrfService;
     private readonly Mock<ILogger<RegisterHandler<TestUser, RegisterRequest>>> _mockLogger;
     private readonly RegisterHandler<TestUser, RegisterRequest> _handler;
     private readonly HttpContext _httpContext;
@@ -39,6 +40,8 @@ public class RegisterHandlerTests
         _mockEmailVerificationService = new Mock<IEmailVerificationService>();
         _mockValidator = new Mock<IValidator<RegisterRequest>>();
         _mockLogger = new Mock<ILogger<RegisterHandler<TestUser, RegisterRequest>>>();
+        var mockCsrfLogger = new Mock<ILogger<CsrfTokenService>>();
+        _mockCsrfService = new Mock<CsrfTokenService>(mockCsrfLogger.Object);
 
         _options = new PawthorizeOptions
         {
@@ -81,6 +84,7 @@ public class RegisterHandlerTests
             _mockAuthService.Object,
             _mockValidator.Object,
             _mockOptions.Object,
+            _mockCsrfService.Object,
             _mockLogger.Object,
             _mockEmailVerificationService.Object
         );
@@ -367,6 +371,7 @@ public class RegisterHandlerTests
             _mockAuthService.Object,
             _mockValidator.Object,
             _mockOptions.Object,
+            _mockCsrfService.Object,
             _mockLogger.Object,
             null
         );
