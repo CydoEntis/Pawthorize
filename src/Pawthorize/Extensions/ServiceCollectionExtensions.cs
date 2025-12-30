@@ -26,6 +26,24 @@ public static class ServiceCollectionExtensions
 {
     /// <summary>
     /// Register all Pawthorize services, handlers, and validators.
+    /// Uses the default RegisterRequest type.
+    /// </summary>
+    /// <typeparam name="TUser">User type implementing IAuthenticatedUser</typeparam>
+    /// <param name="services">Service collection</param>
+    /// <param name="configuration">Configuration root (optional - reads from "Pawthorize" section)</param>
+    /// <param name="configure">Optional action to configure response formatting</param>
+    /// <returns>Service collection for chaining</returns>
+    public static IServiceCollection AddPawthorize<TUser>(
+        this IServiceCollection services,
+        IConfiguration? configuration = null,
+        Action<PawthorizeResponseOptions>? configure = null)
+        where TUser : class, IAuthenticatedUser
+    {
+        return AddPawthorize<TUser, RegisterRequest>(services, configuration, configure);
+    }
+
+    /// <summary>
+    /// Register all Pawthorize services, handlers, and validators with a custom registration request type.
     /// </summary>
     /// <typeparam name="TUser">User type implementing IAuthenticatedUser</typeparam>
     /// <typeparam name="TRegisterRequest">Registration request type (can be extended)</typeparam>
@@ -40,6 +58,8 @@ public static class ServiceCollectionExtensions
         where TUser : class, IAuthenticatedUser
         where TRegisterRequest : RegisterRequest
     {
+        services.AddSingleton(new PawthorizeTypeMetadata(typeof(TUser), typeof(TRegisterRequest)));
+
         var responseOptions = new PawthorizeResponseOptions();
         configure?.Invoke(responseOptions);
 
