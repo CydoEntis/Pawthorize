@@ -9,17 +9,26 @@ namespace Pawthorize.Extensions;
 public static class ApplicationBuilderExtensions
 {
     /// <summary>
-    /// Add Pawthorize CSRF protection middleware.
+    /// Explicitly add Pawthorize CSRF protection middleware.
+    ///
+    /// NOTE: This method is OPTIONAL. CSRF protection is automatically enabled by UsePawthorize()
+    /// when TokenDelivery is set to Hybrid or HttpOnlyCookies and Csrf.Enabled is true.
+    ///
+    /// Only use this method if you need to manually control CSRF middleware registration
+    /// (e.g., custom middleware ordering scenarios).
+    ///
     /// This middleware automatically validates CSRF tokens for state-changing requests
     /// when using HttpOnlyCookies or Hybrid token delivery modes.
-    ///
-    /// IMPORTANT: Must be called AFTER UseRouting() and BEFORE UseAuthentication().
     /// </summary>
     /// <param name="app">Application builder</param>
     /// <returns>Application builder for chaining</returns>
     /// <example>
-    /// app.UseRouting();
-    /// app.UsePawthorizeCsrf(); // Add CSRF protection
+    /// // Standard usage (CSRF auto-enabled):
+    /// app.UsePawthorize();
+    ///
+    /// // Advanced usage (manual control):
+    /// app.UseErrorHound();
+    /// app.UsePawthorizeCsrf(); // Explicit CSRF
     /// app.UseAuthentication();
     /// app.UseAuthorization();
     /// </example>
