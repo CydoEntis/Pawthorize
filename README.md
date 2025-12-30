@@ -11,28 +11,29 @@
 
 > **⚠️ Alpha Release Notice**
 >
-> Pawthorize v0.1.0 is an **early alpha release**. While the library is functional and thoroughly tested (164 passing tests), the API surface may change as we gather feedback and build production applications with it.
+> Pawthorize v0.2.0 is an **early alpha release**. While the library is functional and thoroughly tested, the API surface may change as we gather feedback and build production applications with it.
 >
 > **Before using in production:**
 > - Test thoroughly with your specific use case
 > - Expect potential breaking changes in minor versions until v1.0
 >
-> I'm actively developing a demo application to validate real-world usage. Feedback is highly appreciated!
+> I'm actively developing demo applications to validate real-world usage. Feedback is highly appreciated!
 
 ---
 
-Pawthorize is a complete authentication library that provides secure user authentication, JWT token management, password handling, and session management out of the box. Built for ASP.NET Core Minimal APIs and designed to get you up and running in minutes.
+Pawthorize is a complete authentication library that provides secure user authentication, JWT token management, password handling, session management, and CSRF protection out of the box. Built for ASP.NET Core Minimal APIs and designed to get you up and running in minutes.
 
 ## Features
 
 - **Complete Authentication Flow**: Register, login, logout, token refresh
 - **Secure Password Handling**: BCrypt hashing with automatic salting
 - **JWT Token Management**: Access tokens + refresh token rotation
-- **Flexible Token Delivery**: Cookies, response body, or hybrid strategies
+- **CSRF Protection**: Built-in Double Submit Cookie pattern with automatic token rotation
+- **Flexible Token Delivery**: Cookies, response body, or hybrid strategies with automatic cookie authentication
+- **Role-Based Authorization**: Built-in role management with automatic JWT claim injection
 - **Email Verification**: Built-in email verification workflow
 - **Password Reset**: Secure password reset with token expiration
 - **Session Management**: View and revoke active sessions across devices
-- **Multi-Tenant Ready**: Optional multi-tenant support
 - **Flexible User Identification**: Login via email, username, or phone
 - **Account Security**: Account locking, email verification requirements
 - **Integrated Error Handling**: ErrorHound integration for consistent API responses
@@ -88,8 +89,14 @@ public class RefreshTokenRepository : IRefreshTokenRepository
 {
   "Pawthorize": {
     "RequireEmailVerification": false,
-    "TokenDelivery": "ResponseBody",
-    "LoginIdentifier": "Email"
+    "TokenDelivery": "Hybrid",
+    "LoginIdentifier": "Email",
+    "Csrf": {
+      "Enabled": true,
+      "CookieName": "XSRF-TOKEN",
+      "HeaderName": "X-XSRF-TOKEN",
+      "TokenLifetimeMinutes": 10080
+    }
   },
   "Jwt": {
     "Secret": "your-super-secret-key-at-least-32-characters-long",
@@ -106,30 +113,22 @@ public class RefreshTokenRepository : IRefreshTokenRepository
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
 
-// Register Pawthorize
-builder.Services.AddPawthorize<User, RegisterRequest>(
-    builder.Configuration,
-    options =>
-    {
-        options.EnableErrorHound = true;
-        options.EnableSuccessHound = true;
-    });
+builder.Services.AddPawthorize<User>(builder.Configuration, options =>
+{
+    options.UseDefaultFormatters();
+});
 
-// Register your repositories
 builder.Services.AddScoped<IUserRepository<User>, UserRepository>();
 builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 ```
 
-### 5. Map Endpoints
+### 5. Add Middleware and Map Endpoints
 
 ```csharp
 var app = builder.Build();
 
-// Wire up middleware
 app.UsePawthorize();
-
-// Map authentication endpoints
-app.MapPawthorize<User>();
+app.MapPawthorize();
 
 app.Run();
 ```
@@ -150,37 +149,306 @@ That's it! You now have 10+ authentication endpoints ready to use:
 
 ## Token Delivery Strategies
 
-Pawthorize supports three token delivery strategies:
+Pawthorize supports three token delivery strategies, each with automatic configuration:
 
 ### ResponseBody (Default)
-Tokens are returned in the response body. Client manages token storage.
+**Best for:** Mobile apps, SPAs with complete control over token storage
+
+Tokens are returned in the response body. Client manages token storage (localStorage, secure storage, etc.).
+
+```json
+// Configuration
+{
+  "Pawthorize": {
+    "TokenDelivery": "ResponseBody"
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "accessToken": "eyJhbGc...",
+    "refreshToken": "d8f7a6b5...",
+    "accessTokenExpiresAt": "2025-12-29T12:15:00Z",
+    "refreshTokenExpiresAt": "2026-01-05T12:00:00Z"
+  }
+}
+```
+
+**Frontend Usage:**
+```typescript
+// Login
+const response = await fetch('/api/auth/login', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ identifier: email, password })
+});
+
+const { accessToken, refreshToken } = response.data;
+localStorage.setItem('accessToken', accessToken);
+localStorage.setItem('refreshToken', refreshToken);
+
+// Use access token
+await fetch('/api/auth/me', {
+  headers: { 'Authorization': `Bearer ${accessToken}` }
+});
+
+// Refresh
+await fetch('/api/auth/refresh', {
+  method: 'POST',
+  body: JSON.stringify({ refreshToken })
+});
+```
+
+---
+
+### HttpOnlyCookies
+**Best for:** Server-rendered apps, maximum security for browser-based applications
+
+All tokens are set as secure, HttpOnly cookies. Provides maximum protection against XSS attacks. Includes automatic CSRF protection.
+
+```json
+// Configuration
+{
+  "Pawthorize": {
+    "TokenDelivery": "HttpOnlyCookies",
+    "Csrf": {
+      "Enabled": true
+    }
+  }
+}
+```
+
+**Backend Setup:**
+```csharp
+app.UsePawthorize();  // CSRF protection automatically enabled
+```
+
+**Frontend Usage:**
+```typescript
+// Helper to get CSRF token from cookie
+function getCsrfToken(): string | null {
+  const cookie = document.cookie
+    .split('; ')
+    .find(row => row.startsWith('XSRF-TOKEN='));
+  return cookie ? cookie.split('=')[1] : null;
+}
+
+// Login - tokens stored in cookies automatically
+await fetch('/api/auth/login', {
+  method: 'POST',
+  credentials: 'include',  // Required for cookies
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ identifier: email, password })
+});
+
+// Authenticated requests
+await fetch('/api/auth/me', {
+  credentials: 'include'  // Cookies sent automatically
+});
+
+// State-changing requests (POST, PUT, DELETE) require CSRF token
+const csrfToken = getCsrfToken();
+await fetch('/api/auth/refresh', {
+  method: 'POST',
+  credentials: 'include',
+  headers: {
+    'X-XSRF-TOKEN': csrfToken || '',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({})
+});
+```
+
+**Security Features:**
+- Access token in HttpOnly cookie (can't be read by JavaScript)
+- Refresh token in HttpOnly cookie (can't be read by JavaScript)
+- CSRF token in readable cookie (needed for header injection)
+- All cookies use `Secure` flag in production (HTTPS only)
+- All cookies use `SameSite=Strict`
+
+---
+
+### Hybrid (Recommended)
+**Best for:** Modern SPAs, mobile-friendly web apps, balanced security and flexibility
+
+Access token in response body for easy client-side use. Refresh token in HttpOnly cookie for maximum security. Includes automatic CSRF protection.
+
+```json
+// Configuration
+{
+  "Pawthorize": {
+    "TokenDelivery": "Hybrid",
+    "Csrf": {
+      "Enabled": true
+    }
+  }
+}
+```
+
+**Backend Setup:**
+```csharp
+app.UsePawthorize();  // CSRF protection automatically enabled
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "accessToken": "eyJhbGc...",
+    "accessTokenExpiresAt": "2025-12-29T12:15:00Z"
+  }
+}
+// + refresh token set in HttpOnly cookie
+// + CSRF token set in XSRF-TOKEN cookie
+```
+
+**Frontend Usage:**
+```typescript
+// Helper to get CSRF token
+function getCsrfToken(): string | null {
+  const cookie = document.cookie
+    .split('; ')
+    .find(row => row.startsWith('XSRF-TOKEN='));
+  return cookie ? cookie.split('=')[1] : null;
+}
+
+// Reusable fetch wrapper
+async function authenticatedFetch(url: string, options: RequestInit = {}) {
+  const csrfToken = getCsrfToken();
+
+  return fetch(url, {
+    ...options,
+    credentials: 'include',  // Required for cookies
+    headers: {
+      ...options.headers,
+      'X-XSRF-TOKEN': csrfToken || '',
+      'Content-Type': 'application/json'
+    }
+  });
+}
+
+// Login
+const response = await fetch('/api/auth/login', {
+  method: 'POST',
+  credentials: 'include',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ identifier: email, password })
+});
+
+const { accessToken } = response.data;
+localStorage.setItem('accessToken', accessToken);  // Store access token
+
+// Use access token for API calls
+await fetch('/api/auth/me', {
+  headers: { 'Authorization': `Bearer ${accessToken}` }
+});
+
+// Refresh token (uses cookie + CSRF)
+const refreshResponse = await authenticatedFetch('/api/auth/refresh', {
+  method: 'POST',
+  body: JSON.stringify({})
+});
+
+const { accessToken: newAccessToken } = refreshResponse.data;
+localStorage.setItem('accessToken', newAccessToken);
+
+// Logout (requires CSRF)
+await authenticatedFetch('/api/auth/logout', {
+  method: 'POST',
+  body: JSON.stringify({})
+});
+```
+
+**Benefits:**
+- ✅ Access token easily accessible for API calls
+- ✅ Refresh token protected in HttpOnly cookie (XSS protection)
+- ✅ CSRF protection for state-changing operations
+- ✅ Works seamlessly with mobile and desktop clients
+- ✅ Automatic token rotation on refresh
+
+---
+
+## CSRF Protection
+
+Pawthorize includes built-in CSRF protection using the Double Submit Cookie pattern with automatic token rotation.
+
+### Features
+
+- **256-bit Cryptographically Secure Tokens**: Generated using `RandomNumberGenerator`
+- **Constant-Time Validation**: Prevents timing attacks using `CryptographicOperations.FixedTimeEquals`
+- **Automatic Token Rotation**: CSRF tokens rotate on login, register, and refresh for enhanced security
+- **Smart Endpoint Exclusion**: Public endpoints (login, register, password reset) automatically excluded
+- **Custom Routing Support**: Works with any endpoint configuration
+
+### Configuration
 
 ```json
 {
-  "accessToken": "eyJhbGc...",
-  "refreshToken": "d8f7a6b5...",
-  "accessTokenExpiresAt": "2025-12-20T12:15:00Z",
-  "refreshTokenExpiresAt": "2025-12-27T12:00:00Z"
+  "Pawthorize": {
+    "TokenDelivery": "Hybrid",  // or HttpOnlyCookies
+    "Csrf": {
+      "Enabled": true,
+      "CookieName": "XSRF-TOKEN",
+      "HeaderName": "X-XSRF-TOKEN",
+      "TokenLifetimeMinutes": 10080,  // 7 days
+      "ExcludedPaths": []  // Optional: add custom paths to exclude
+    }
+  }
 }
 ```
 
-### HttpOnlyCookies
-Tokens are set as secure, HttpOnly cookies. Best for browser-based apps.
+### Backend Setup
+
+CSRF protection is **automatically enabled** by `app.UsePawthorize()` when using Hybrid or HttpOnlyCookies mode:
 
 ```csharp
-"Pawthorize": {
-  "TokenDelivery": "HttpOnlyCookies"
-}
+var app = builder.Build();
+
+app.UsePawthorize();
+app.MapPawthorize();
+app.Run();
 ```
 
-### Hybrid
-Access token in response body, refresh token in HttpOnly cookie. Balance of flexibility and security.
-
+**Advanced:** You can also explicitly add CSRF middleware for custom scenarios:
 ```csharp
-"Pawthorize": {
-  "TokenDelivery": "Hybrid"
-}
+app.UsePawthorize();
+app.UsePawthorizeCsrf();  // Explicit CSRF registration (optional)
 ```
+
+### When CSRF is Required
+
+CSRF protection is **only active** when using `Hybrid` or `HttpOnlyCookies` token delivery modes.
+
+**Protected Endpoints** (require CSRF token):
+- `POST /api/auth/refresh`
+- `POST /api/auth/logout`
+- `POST /api/auth/change-password`
+- `POST /api/auth/sessions/revoke-others`
+
+**Excluded Endpoints** (no CSRF required):
+- `POST /api/auth/login` - User doesn't have token yet
+- `POST /api/auth/register` - User doesn't have token yet
+- `POST /api/auth/forgot-password` - Public endpoint
+- `POST /api/auth/reset-password` - Protected by email token
+- `POST /api/auth/verify-email` - Protected by email token
+- `GET /api/auth/*` - GET requests don't modify state
+
+### Frontend Integration
+
+See the [Token Delivery Strategies](#token-delivery-strategies) section above for complete frontend examples with CSRF handling.
+
+**Key Points:**
+1. CSRF token is stored in a **readable** cookie (`XSRF-TOKEN`)
+2. Frontend must read the cookie and send it in the `X-XSRF-TOKEN` header
+3. Only required for state-changing requests (POST, PUT, DELETE)
+4. GET requests don't need CSRF tokens
+
+---
 
 ## Configuration Options
 
@@ -191,7 +459,7 @@ Access token in response body, refresh token in HttpOnly cookie. Balance of flex
   "Pawthorize": {
     "BasePath": "/api/auth",
     "RequireEmailVerification": true,
-    "TokenDelivery": "ResponseBody",
+    "TokenDelivery": "Hybrid",
     "LoginIdentifier": "Email",
     "EmailVerification": {
       "BaseUrl": "https://yourapp.com",
@@ -199,6 +467,13 @@ Access token in response body, refresh token in HttpOnly cookie. Balance of flex
     },
     "PasswordReset": {
       "TokenLifetimeMinutes": 60
+    },
+    "Csrf": {
+      "Enabled": true,
+      "CookieName": "XSRF-TOKEN",
+      "HeaderName": "X-XSRF-TOKEN",
+      "TokenLifetimeMinutes": 10080,
+      "ExcludedPaths": []
     }
   }
 }
@@ -217,6 +492,22 @@ Access token in response body, refresh token in HttpOnly cookie. Balance of flex
   }
 }
 ```
+
+### Cookie Security
+
+When using `Hybrid` or `HttpOnlyCookies` modes, cookies are automatically configured with:
+
+- **HttpOnly**: `true` for refresh tokens (prevents JavaScript access)
+- **HttpOnly**: `false` for CSRF tokens (JavaScript needs to read for header injection)
+- **Secure**: Automatically set based on `context.Request.IsHttps`
+  - Production (HTTPS): `Secure = true`
+  - Development (HTTP): `Secure = false`
+- **SameSite**: `Strict` (prevents CSRF attacks)
+- **Expiration**: Matches token lifetime from configuration
+
+**No manual cookie configuration needed** - Pawthorize handles everything automatically!
+
+---
 
 ## Email Verification
 
@@ -297,7 +588,145 @@ POST /api/auth/sessions/revoke-others
 Authorization: Bearer {accessToken}
 ```
 
-## Custom User Model
+## Role-Based Authorization
+
+Pawthorize automatically includes user roles in JWT tokens and integrates seamlessly with ASP.NET Core's built-in authorization.
+
+### Setting Up Roles
+
+**1. Assign roles in your UserFactory:**
+
+```csharp
+public class UserFactory : IUserFactory<User, RegisterRequest>
+{
+    public User CreateUser(RegisterRequest request, string passwordHash)
+    {
+        return new User
+        {
+            Id = Guid.NewGuid().ToString(),
+            Email = request.Email,
+            PasswordHash = passwordHash,
+            Name = request.Name ?? string.Empty,
+            Roles = new List<string> { "User" },  // Default role
+            IsEmailVerified = false
+        };
+    }
+}
+```
+
+**2. Use role-based authorization on your endpoints:**
+
+```csharp
+// Require any authenticated user
+app.MapGet("/api/profile", [Authorize] () =>
+{
+    return Results.Ok("Profile data");
+});
+
+// Require specific role
+app.MapGet("/api/admin/dashboard", [Authorize(Roles = "Admin")] () =>
+{
+    return Results.Ok("Admin dashboard");
+});
+
+// Require multiple roles (user must have at least one)
+app.MapGet("/api/moderator/panel", [Authorize(Roles = "Admin,Moderator")] () =>
+{
+    return Results.Ok("Moderator panel");
+});
+
+// Require specific policy
+app.MapGet("/api/reports", [Authorize(Policy = "RequireAdminRole")] () =>
+{
+    return Results.Ok("Reports");
+});
+```
+
+**3. Access user roles in your endpoints:**
+
+```csharp
+app.MapGet("/api/me", [Authorize] (ClaimsPrincipal user) =>
+{
+    var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+    var email = user.FindFirst(ClaimTypes.Email)?.Value;
+    var roles = user.FindAll(ClaimTypes.Role).Select(c => c.Value).ToList();
+
+    return Results.Ok(new { userId, email, roles });
+});
+```
+
+### Managing User Roles
+
+Create your own role management endpoints:
+
+```csharp
+// Assign roles to a user (Admin only)
+app.MapPost("/api/admin/users/{id}/roles",
+    [Authorize(Roles = "Admin")]
+    async (string id, string[] roles, IUserRepository<User> userRepo) =>
+{
+    var user = await userRepo.GetByIdAsync(id);
+    if (user == null) return Results.NotFound();
+
+    user.Roles = roles;
+    await userRepo.UpdateAsync(user);
+
+    return Results.Ok(new { message = "Roles updated successfully", roles });
+});
+
+// Get user roles
+app.MapGet("/api/admin/users/{id}/roles",
+    [Authorize(Roles = "Admin")]
+    async (string id, IUserRepository<User> userRepo) =>
+{
+    var user = await userRepo.GetByIdAsync(id);
+    if (user == null) return Results.NotFound();
+
+    return Results.Ok(user.Roles);
+});
+
+// Remove a role from a user
+app.MapDelete("/api/admin/users/{id}/roles/{role}",
+    [Authorize(Roles = "Admin")]
+    async (string id, string role, IUserRepository<User> userRepo) =>
+{
+    var user = await userRepo.GetByIdAsync(id);
+    if (user == null) return Results.NotFound();
+
+    user.Roles = user.Roles.Where(r => r != role).ToList();
+    await userRepo.UpdateAsync(user);
+
+    return Results.Ok(new { message = "Role removed successfully" });
+});
+```
+
+### Policy-Based Authorization
+
+For more complex authorization scenarios, use policies:
+
+```csharp
+// In Program.cs
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy("RequireAdminRole", policy => policy.RequireRole("Admin"))
+    .AddPolicy("RequireEmailVerified", policy =>
+        policy.RequireClaim("email_verified", "true"))
+    .AddPolicy("RequireAdminOrModerator", policy =>
+        policy.RequireRole("Admin", "Moderator"));
+
+// Use in endpoints
+app.MapGet("/api/admin/users", [Authorize(Policy = "RequireAdminRole")] () =>
+{
+    return Results.Ok("User list");
+});
+```
+
+**How it works:**
+- User roles are stored in the `Roles` property of your User entity
+- During login/registration, roles are automatically added to JWT as `ClaimTypes.Role` claims
+- ASP.NET Core's `[Authorize(Roles = "...")]` attribute validates these claims
+- Roles are available throughout the lifetime of the access token
+
+## Custom Registration Fields
 
 Extend `RegisterRequest` to capture additional user data during registration:
 
@@ -308,11 +737,14 @@ public class CustomRegisterRequest : RegisterRequest
     public string CompanyName { get; set; } = string.Empty;
 }
 
-// Register with custom request
-builder.Services.AddPawthorize<User, CustomRegisterRequest>(configuration);
+// Register with custom request type
+builder.Services.AddPawthorize<User, CustomRegisterRequest>(builder.Configuration, options =>
+{
+    options.UseDefaultFormatters();
+});
 
-// Map with custom request
-app.MapPawthorize<User, CustomRegisterRequest>();
+// MapPawthorize() automatically detects types from AddPawthorize
+app.MapPawthorize();
 ```
 
 ## Error Handling
@@ -341,6 +773,7 @@ Common error codes:
 - `EMAIL_NOT_VERIFIED` - Email verification required
 - `ACCOUNT_LOCKED` - Account temporarily locked
 - `VALIDATION_ERROR` - Request validation failed
+- `CSRF_VALIDATION_FAILED` - CSRF token missing or invalid (Hybrid/HttpOnlyCookies mode)
 
 ## Validation
 
@@ -367,8 +800,23 @@ builder.Services.AddScoped<IValidator<CustomRegisterRequest>, CustomRegisterVali
 
 Check out the [sample applications](./samples):
 
-- **MinimalApi Sample**: Complete working example with all features
-- **Postman Collection**: Pre-configured requests for testing
+- **MinimalApi Sample**: Complete working example with Hybrid mode and CSRF protection
+- **Postman Collection**: Pre-configured requests with automatic CSRF handling
+
+## Security Best Practices
+
+Pawthorize is designed with security in mind:
+
+1. **Password Security**: BCrypt hashing with automatic salting
+2. **Token Rotation**: Refresh tokens rotate on every use
+3. **HttpOnly Cookies**: Refresh tokens stored in HttpOnly cookies (Hybrid/HttpOnlyCookies mode)
+4. **CSRF Protection**: Built-in Double Submit Cookie pattern with constant-time validation
+5. **Secure Cookies**: Automatic `Secure` flag in production environments
+6. **SameSite**: All cookies use `SameSite=Strict`
+7. **Token Expiration**: Configurable lifetimes for all token types
+8. **Session Management**: Users can view and revoke sessions across devices
+9. **Account Locking**: Automatic account locking after failed attempts (optional)
+10. **Email Verification**: Require email verification before access (optional)
 
 ## Requirements
 
@@ -385,9 +833,9 @@ Check out the [sample applications](./samples):
 
 ## Documentation
 
-- [Quick Start Guide](./POSTMAN_QUICK_START.md) - Get started with Postman
-- [Release Testing](./RELEASE_TESTING_v0.1.0.md) - Testing checklist
-- [Sample README](./samples/Pawthorize.Sample.MinimalApi/README.md) - Detailed sample documentation
+- [Sample README](./samples/Pawthorize.Sample.MinimalApi/README.md) - Detailed sample with CSRF examples
+- [Publishing Guide](./PUBLISH_AND_MIGRATE.md) - Version updates and migration guide
+- [Commit Guide](./COMPLETE_COMMIT_GUIDE.md) - Contribution guidelines
 
 ## Roadmap
 
