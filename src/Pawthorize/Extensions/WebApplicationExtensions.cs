@@ -1,11 +1,16 @@
-﻿using ErrorHound.Extensions;
+﻿using System.Linq;
+using ErrorHound.Extensions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Pawthorize.Abstractions;
 using Pawthorize.AspNetCore.Handlers;
 using Pawthorize.DTOs;
 using Pawthorize.Handlers;
+using Pawthorize.Middleware;
+using Pawthorize.Models;
 
 namespace Pawthorize.Extensions;
 
@@ -15,10 +20,8 @@ namespace Pawthorize.Extensions;
 public static class WebApplicationExtensions
 {
     /// <summary>
-    /// Wire Pawthorize middleware in the correct order.
-    /// This sets up ErrorHound, Authentication, and Authorization.
-    /// Must be called before MapPawthorizeEndpoints.
-    /// Note: SuccessHound formatting happens automatically via extension methods, no middleware needed.
+    /// Configures Pawthorize middleware including ErrorHound, CSRF protection, Authentication, and Authorization.
+    /// Must be called before MapPawthorize.
     /// </summary>
     /// <param name="app">Web application</param>
     /// <returns>Web application for chaining</returns>
@@ -26,11 +29,56 @@ public static class WebApplicationExtensions
     {
         app.UseErrorHound();
 
+        var options = app.ApplicationServices.GetRequiredService<IOptions<PawthorizeOptions>>().Value;
+
+        if (options.Csrf.Enabled &&
+            (options.TokenDelivery == TokenDeliveryStrategy.Hybrid ||
+             options.TokenDelivery == TokenDeliveryStrategy.HttpOnlyCookies))
+        {
+            app.UseMiddleware<CsrfProtectionMiddleware>();
+        }
+
         app.UseAuthentication();
         app.UseAuthorization();
 
         return app;
     }
+    /// <summary>
+    /// Map all Pawthorize authentication endpoints with auto-detected types.
+    /// Types are automatically detected from the AddPawthorize call.
+    /// </summary>
+    /// <param name="app">Web application</param>
+    /// <param name="configure">Optional configuration for endpoint paths</param>
+    /// <returns>Route group builder for further configuration</returns>
+    public static RouteGroupBuilder MapPawthorize(
+        this WebApplication app,
+        Action<PawthorizeEndpointOptions>? configure = null)
+    {
+        // Retrieve type metadata registered by AddPawthorize
+        var metadata = app.Services.GetService<PawthorizeTypeMetadata>();
+        if (metadata == null)
+        {
+            throw new InvalidOperationException(
+                "PawthorizeTypeMetadata not found in DI. " +
+                "Ensure you've called AddPawthorize<TUser, TRegisterRequest>() before MapPawthorize().");
+        }
+
+        // Use reflection to call the generic MapPawthorize method with the correct types
+        var methods = typeof(WebApplicationExtensions)
+            .GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static)
+            .Where(m => m.Name == nameof(MapPawthorize) && m.IsGenericMethod && m.GetGenericArguments().Length == 2)
+            .ToList();
+
+        if (methods.Count == 0)
+        {
+            throw new InvalidOperationException(
+                "Could not find generic MapPawthorize<TUser, TRegisterRequest> method via reflection.");
+        }
+
+        var method = methods.First().MakeGenericMethod(metadata.UserType, metadata.RegisterRequestType);
+        return (RouteGroupBuilder)method.Invoke(null, new object?[] { app, configure })!;
+    }
+
     /// <summary>
     /// Map all Pawthorize authentication endpoints with configurable paths.
     /// </summary>
@@ -39,7 +87,7 @@ public static class WebApplicationExtensions
     /// <param name="app">Web application</param>
     /// <param name="configure">Optional configuration for endpoint paths</param>
     /// <returns>Route group builder for further configuration</returns>
-    public static RouteGroupBuilder MapPawthorizeEndpoints<TUser, TRegisterRequest>(
+    public static RouteGroupBuilder MapPawthorize<TUser, TRegisterRequest>(
         this WebApplication app,
         Action<PawthorizeEndpointOptions>? configure = null)
         where TUser : class, IAuthenticatedUser
@@ -260,6 +308,24 @@ public static class WebApplicationExtensions
             .WithName("Logout")
             .WithTags("Authentication")
             .WithOpenApi();
+    }
+
+    /// <summary>
+    /// Map all Pawthorize authentication endpoints with configurable paths.
+    /// </summary>
+    /// <typeparam name="TUser">User type implementing IAuthenticatedUser</typeparam>
+    /// <typeparam name="TRegisterRequest">Registration request type</typeparam>
+    /// <param name="app">Web application</param>
+    /// <param name="configure">Optional configuration for endpoint paths</param>
+    /// <returns>Route group builder for further configuration</returns>
+    [Obsolete("Use MapPawthorize() instead. The generic types are now auto-detected from AddPawthorize<TUser, TRegisterRequest>().")]
+    public static RouteGroupBuilder MapPawthorizeEndpoints<TUser, TRegisterRequest>(
+        this WebApplication app,
+        Action<PawthorizeEndpointOptions>? configure = null)
+        where TUser : class, IAuthenticatedUser
+        where TRegisterRequest : RegisterRequest
+    {
+        return MapPawthorize<TUser, TRegisterRequest>(app, configure);
     }
 }
 
