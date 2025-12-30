@@ -1,19 +1,30 @@
 ﻿using FluentValidation;
+using Microsoft.Extensions.Options;
 using Pawthorize.DTOs;
+using Pawthorize.Models;
 
 namespace Pawthorize.Validators;
 
 /// <summary>
 /// Validator for logout requests.
+/// In Hybrid/HttpOnlyCookies mode, the refresh token comes from cookies, so the body field is optional.
+/// In ResponseBody mode, the refresh token must be in the request body.
 /// </summary>
 public class LogoutRequestValidator : AbstractValidator<LogoutRequest>
 {
-    public LogoutRequestValidator()
+    public LogoutRequestValidator(IOptions<PawthorizeOptions> options)
     {
-        RuleFor(x => x.RefreshToken)
-            .NotEmpty()
-            .WithMessage("Refresh token is required")
-            .MinimumLength(64)
-            .WithMessage("Invalid refresh token format");
+        var tokenDelivery = options.Value.TokenDelivery;
+
+        // Only validate the body field if using ResponseBody mode
+        // In Hybrid/HttpOnlyCookies mode, the refresh token comes from cookies
+        if (tokenDelivery == TokenDeliveryStrategy.ResponseBody)
+        {
+            RuleFor(x => x.RefreshToken)
+                .NotEmpty()
+                .WithMessage("Refresh token is required")
+                .MinimumLength(64)
+                .WithMessage("Invalid refresh token format");
+        }
     }
 }
