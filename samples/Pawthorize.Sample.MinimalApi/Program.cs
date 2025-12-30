@@ -13,18 +13,10 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Add Pawthorize - handles JWT authentication, ErrorHound integration, and all auth endpoints
-// This single call configures:
-// - JWT Bearer authentication with automatic OnChallenge handling
-// - ErrorHound for consistent error responses
-// - SuccessHound for consistent success responses
-// - All authentication endpoints (login, register, refresh, etc.)
-builder.Services.AddPawthorize<User, RegisterRequest>(
-    builder.Configuration,
-    options =>
-    {
-        options.UseDefaultFormatters();
-    });
+builder.Services.AddPawthorize<User>(builder.Configuration, options =>
+{
+    options.UseDefaultFormatters();
+});
 
 // Register repository implementations (in production, use database-backed repositories)
 builder.Services.AddSingleton<IUserRepository<User>, InMemoryUserRepository>();
@@ -43,26 +35,20 @@ builder.Services.AddScoped<IUserFactory<User, RegisterRequest>, UserFactory>();
 
 var app = builder.Build();
 
-// Add Pawthorize middleware - handles all error responses consistently via ErrorHound
 app.UsePawthorize();
 
-// Add CSRF protection middleware (must be after routing, before authentication)
-// Automatically validates CSRF tokens for state-changing requests when using Hybrid or HttpOnlyCookies modes
-app.UsePawthorizeCsrf();
-
-if (
-    app.Environment.IsDevelopment())
+if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
-app.MapPawthorizeEndpoints<User, RegisterRequest>();
+app.MapPawthorize();
 
 app.MapGet("/", () => new
 {
     Message = "Pawthorize Sample API",
-    Version = "0.1.0",
+    Version = "0.2.0",
     Endpoints = new[]
     {
         "POST /api/auth/register - Register new user",
