@@ -65,7 +65,6 @@ public class RegisterHandlerTests
         var mockJwtService = new Mock<JwtService<TestUser>>(
             MockBehavior.Loose,
             mockJwtOptions.Object,
-            null,
             null);
         var mockRefreshTokenRepository = new Mock<IRefreshTokenRepository>();
         var mockAuthLogger = new Mock<ILogger<AuthenticationService<TestUser>>>();

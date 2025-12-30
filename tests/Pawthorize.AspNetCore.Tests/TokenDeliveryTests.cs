@@ -62,7 +62,6 @@ public class TokenDeliveryTests
         _mockJwtService = new Mock<JwtService<TestUser>>(
             MockBehavior.Loose,
             mockJwtOptions.Object,
-            null!,
             null!
         );
     }

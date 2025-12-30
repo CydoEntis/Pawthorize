@@ -67,7 +67,6 @@ public class LoginHandlerTests
         _mockJwtService = new Mock<JwtService<TestUser>>(
             MockBehavior.Loose,
             mockJwtOptions.Object,
-            null,
             null
         );
 

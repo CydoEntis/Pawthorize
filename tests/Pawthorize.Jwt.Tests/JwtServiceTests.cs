@@ -124,49 +124,6 @@ public class JwtServiceTests
     }
 
     [Fact]
-    public void GenerateAccessToken_WithMultiTenant_ShouldIncludeTenantClaim()
-    {
-        var mockTenantProvider = new Mock<ITenantProvider>();
-        mockTenantProvider.Setup(t => t.GetCurrentTenantId()).Returns("tenant-123");
-        mockTenantProvider.Setup(t => t.GetTenantSecret()).Returns("tenant-specific-secret-key-at-least-32-chars-long");
-
-        var service = new JwtService<TestUser>(_mockOptions.Object, mockTenantProvider.Object);
-        var user = new TestUser
-        {
-            Id = "user123",
-            Email = "test@example.com"
-        };
-
-        var token = service.GenerateAccessToken(user);
-
-        var handler = new JwtSecurityTokenHandler();
-        var jwtToken = handler.ReadJwtToken(token);
-
-        jwtToken.Claims.Should().Contain(c => c.Type == "tenant_id" && c.Value == "tenant-123");
-    }
-
-    [Fact]
-    public void GenerateAccessToken_WithMultiTenantButNoTenantId_ShouldNotIncludeTenantClaim()
-    {
-        var mockTenantProvider = new Mock<ITenantProvider>();
-        mockTenantProvider.Setup(t => t.GetCurrentTenantId()).Returns((string?)null);
-
-        var service = new JwtService<TestUser>(_mockOptions.Object, mockTenantProvider.Object);
-        var user = new TestUser
-        {
-            Id = "user123",
-            Email = "test@example.com"
-        };
-
-        var token = service.GenerateAccessToken(user);
-
-        var handler = new JwtSecurityTokenHandler();
-        var jwtToken = handler.ReadJwtToken(token);
-
-        jwtToken.Claims.Should().NotContain(c => c.Type == "tenant_id");
-    }
-
-    [Fact]
     public void GenerateAccessToken_ShouldSetCorrectExpiration()
     {
         var service = new JwtService<TestUser>(_mockOptions.Object);
@@ -484,105 +441,6 @@ public class JwtServiceTests
             .WithMessage("*JWT Secret must be at least 32 characters*");
     }
 
-    [Fact]
-    public void GenerateAccessToken_WithTenantSecret_ShouldUseTenantSecret()
-    {
-        var mockTenantProvider = new Mock<ITenantProvider>();
-        mockTenantProvider.Setup(t => t.GetTenantSecret())
-            .Returns("tenant-specific-secret-key-at-least-32-chars-long");
-        mockTenantProvider.Setup(t => t.GetCurrentTenantId()).Returns("tenant-123");
-
-        var service = new JwtService<TestUser>(_mockOptions.Object, mockTenantProvider.Object);
-        var user = new TestUser
-        {
-            Id = "user123",
-            Email = "test@example.com"
-        };
-
-        var token = service.GenerateAccessToken(user);
-
-        token.Should().NotBeNullOrEmpty();
-
-        var principal = service.ValidateToken(token);
-        principal.Should().NotBeNull();
-    }
-
-    [Fact]
-    public void GenerateAccessToken_WithTenantProviderButNoSecret_ShouldFallbackToDefaultSecret()
-    {
-        var mockTenantProvider = new Mock<ITenantProvider>();
-        mockTenantProvider.Setup(t => t.GetTenantSecret()).Returns((string?)null);
-        mockTenantProvider.Setup(t => t.GetCurrentTenantId()).Returns("tenant-123");
-
-        var service = new JwtService<TestUser>(_mockOptions.Object, mockTenantProvider.Object);
-        var user = new TestUser
-        {
-            Id = "user123",
-            Email = "test@example.com"
-        };
-
-        var token = service.GenerateAccessToken(user);
-
-        token.Should().NotBeNullOrEmpty();
-        var principal = service.ValidateToken(token);
-        principal.Should().NotBeNull();
-    }
-
-    #endregion
-
-    #region Multi-Tenant Scenarios
-
-    [Fact]
-    public void ValidateToken_WithTenantSecret_ShouldValidateCorrectly()
-    {
-        var mockTenantProvider = new Mock<ITenantProvider>();
-        mockTenantProvider.Setup(t => t.GetTenantSecret())
-            .Returns("tenant-specific-secret-key-at-least-32-chars-long");
-        mockTenantProvider.Setup(t => t.GetCurrentTenantId()).Returns("tenant-123");
-
-        var service = new JwtService<TestUser>(_mockOptions.Object, mockTenantProvider.Object);
-        var user = new TestUser
-        {
-            Id = "user123",
-            Email = "test@example.com"
-        };
-
-        var token = service.GenerateAccessToken(user);
-
-        var principal = service.ValidateToken(token);
-
-        principal.Should().NotBeNull();
-        principal!.FindFirst("tenant_id")?.Value.Should().Be("tenant-123");
-    }
-
-    [Fact]
-    public void ValidateToken_WithDifferentTenantSecret_ShouldFail()
-    {
-        var mockTenantProvider1 = new Mock<ITenantProvider>();
-        mockTenantProvider1.Setup(t => t.GetTenantSecret())
-            .Returns("tenant-1-secret-key-that-is-at-least-32-chars-long");
-        mockTenantProvider1.Setup(t => t.GetCurrentTenantId()).Returns("tenant-1");
-
-        var service1 = new JwtService<TestUser>(_mockOptions.Object, mockTenantProvider1.Object);
-        var user = new TestUser
-        {
-            Id = "user123",
-            Email = "test@example.com"
-        };
-        var token = service1.GenerateAccessToken(user);
-
-        var mockTenantProvider2 = new Mock<ITenantProvider>();
-        mockTenantProvider2.Setup(t => t.GetTenantSecret())
-            .Returns("tenant-2-secret-key-that-is-at-least-32-chars-long");
-        mockTenantProvider2.Setup(t => t.GetCurrentTenantId()).Returns("tenant-2");
-
-        var service2 = new JwtService<TestUser>(_mockOptions.Object, mockTenantProvider2.Object);
-
-        var principal = service2.ValidateToken(token);
-
-        principal.Should().BeNull("token was signed with a different tenant secret");
-    }
-
     #endregion
 
     #region Logging Tests
@@ -591,7 +449,7 @@ public class JwtServiceTests
     public void GenerateAccessToken_WithLogger_ShouldLogSuccessfully()
     {
         var mockLogger = new Mock<ILogger<JwtService<TestUser>>>();
-        var service = new JwtService<TestUser>(_mockOptions.Object, null, mockLogger.Object);
+        var service = new JwtService<TestUser>(_mockOptions.Object, mockLogger.Object);
         var user = new TestUser
         {
             Id = "user123",
@@ -615,7 +473,7 @@ public class JwtServiceTests
     public void ValidateToken_WithValidTokenAndLogger_ShouldLogSuccessfully()
     {
         var mockLogger = new Mock<ILogger<JwtService<TestUser>>>();
-        var service = new JwtService<TestUser>(_mockOptions.Object, null, mockLogger.Object);
+        var service = new JwtService<TestUser>(_mockOptions.Object, mockLogger.Object);
         var user = new TestUser
         {
             Id = "user123",
@@ -652,7 +510,7 @@ public class JwtServiceTests
         var mockExpiredOptions = new Mock<IOptions<JwtSettings>>();
         mockExpiredOptions.Setup(o => o.Value).Returns(expiredSettings);
 
-        var service = new JwtService<TestUser>(mockExpiredOptions.Object, null, mockLogger.Object);
+        var service = new JwtService<TestUser>(mockExpiredOptions.Object, mockLogger.Object);
         var user = new TestUser
         {
             Id = "user123",
