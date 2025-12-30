@@ -1,20 +1,37 @@
 # Pawthorize Sample - Minimal API
 
-A complete working example demonstrating **Pawthorize** authentication library with ASP.NET Core Minimal APIs.
+A complete **production-ready reference implementation** demonstrating **Pawthorize** authentication library with ASP.NET Core Minimal APIs.
 
 ## Features Demonstrated
 
-- User registration with email/password
-- User login with JWT access tokens
-- Refresh token rotation
-- Logout (token revocation)
-- In-memory user and token storage (for demo purposes)
-- Swagger UI for API exploration
+- ✅ **Hybrid Token Delivery** - Access tokens in response, refresh tokens in HttpOnly cookies
+- ✅ **Built-in CSRF Protection** - Automatic token generation and validation
+- ✅ **User Registration** - Email/password with validation
+- ✅ **User Login** - JWT access tokens with cookie-based refresh tokens
+- ✅ **Token Refresh** - Automatic refresh token rotation with CSRF token rotation
+- ✅ **Logout** - Token revocation with cookie cleanup
+- ✅ **Swagger UI** - Interactive API documentation
+- ✅ **Postman Collection** - Automatic CSRF token handling
+
+## What's New - Hybrid Mode + CSRF
+
+This sample demonstrates **best practices** for modern web applications:
+
+### Token Delivery Strategy: **Hybrid**
+- **Access Token**: Returned in JSON response (short-lived, 15 minutes)
+- **Refresh Token**: Stored in HttpOnly cookie (long-lived, 7 days)
+- **CSRF Token**: Stored in readable cookie, validated on state-changing requests
+
+### Why Hybrid Mode?
+- ✅ **Secure**: Refresh tokens protected from XSS attacks
+- ✅ **Convenient**: Access tokens available for API calls
+- ✅ **CSRF Protected**: Built-in protection against cross-site request forgery
+- ✅ **Best Practice**: Recommended for SPAs and modern web apps
 
 ## Prerequisites
 
 - .NET 8.0 SDK or later
-- Postman, curl, or any HTTP client for testing
+- Postman (for testing with the included collection)
 
 ## Getting Started
 
@@ -27,38 +44,105 @@ cd samples/Pawthorize.Sample.MinimalApi
 dotnet run
 ```
 
-The API will start on a port shown in the console output (typically `https://localhost:7086`).
-
-Check the console for the line: `Now listening on: https://localhost:XXXX`
+The API will start on `http://localhost:5022` (as configured in `appsettings.json`).
 
 ### 2. Access Swagger UI
 
-Open your browser to the Swagger UI (replace the port with your actual port):
+Open your browser to:
 ```
-https://localhost:7086/swagger
+http://localhost:5022/swagger
 ```
 
-You can test all endpoints interactively through the Swagger UI.
+You can test all endpoints interactively through Swagger UI.
+
+### 3. Import Postman Collection (Recommended)
+
+The included Postman collection **automatically handles** CSRF tokens and cookies.
+
+1. Open Postman
+2. Click **Import** → **Upload Files**
+3. Select `Pawthorize-Sample.postman_collection.json`
+4. Collection is ready to use!
+
+**Features of the Postman Collection:**
+- ✅ Automatic CSRF token extraction from cookies
+- ✅ Automatic CSRF token injection into request headers
+- ✅ Automatic access token storage and management
+- ✅ Pre-configured test scripts
+- ✅ Collection variables for easy customization
+
+## Using the Postman Collection
+
+### Automatic CSRF Handling
+
+The collection includes **pre-request scripts** that automatically:
+
+1. **Extract CSRF token** from `XSRF-TOKEN` cookie
+2. **Add it to request headers** as `X-XSRF-TOKEN`
+3. **Store access tokens** from responses
+4. **Inject access tokens** into `Authorization` headers
+
+**You don't need to do anything - it's all automatic!**
+
+### Quick Start with Postman
+
+1. **Run "1. Register"** - Creates a new user
+   - Access token saved automatically
+   - CSRF token set in cookie
+   - Refresh token set in cookie
+
+2. **Run "2. Login"** - Login with credentials
+   - New tokens issued
+   - Cookies updated
+
+3. **Run "3. Get Current User"** - Get user profile
+   - Uses stored access token
+   - No CSRF needed (GET request)
+
+4. **Run "4. Refresh Token"** - Get new access token
+   - Uses refresh token from cookie
+   - CSRF token automatically included
+   - New tokens issued
+
+5. **Run "8. Logout"** - Revoke tokens
+   - Cookies cleared
+   - Access token removed
+
+### Test CSRF Protection
+
+Run **"Test - CSRF Protection (Should Fail)"**:
+- Deliberately removes CSRF token
+- Should return **403 Forbidden**
+- Proves CSRF protection is working
+
+### Postman Collection Variables
+
+Edit these in the collection variables:
+
+- `baseUrl`: `http://localhost:5022` (default)
+- `testEmail`: `test@example.com` (default)
+- `testPassword`: `Test123!` (default)
 
 ## API Endpoints
 
 ### Base URL
 ```
-https://localhost:7086
+http://localhost:5022
 ```
-(Replace with the actual port shown when you run `dotnet run`)
 
 ### Authentication Endpoints
 
-All authentication endpoints are prefixed with `/api/auth`.
+All authentication endpoints are prefixed with `/auth`.
 
-#### 1. Register a New User
+---
 
-**POST** `/api/auth/register`
+#### 1. Register
+
+**POST** `/auth/register`
 
 Creates a new user account.
 
-**Request Body:**
+**Request:**
 ```json
 {
   "email": "user@example.com",
@@ -67,16 +151,27 @@ Creates a new user account.
 }
 ```
 
-**Success Response (200 OK):**
+**Success Response (200 OK) - Hybrid Mode:**
 ```json
 {
-  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "refreshToken": "d8f7a6b5c4e3d2c1b0a9f8e7d6c5b4a3",
-  "accessTokenExpiresAt": "2025-12-20T12:15:00Z",
-  "refreshTokenExpiresAt": "2025-12-27T12:00:00Z",
-  "tokenType": "Bearer"
+  "success": true,
+  "data": {
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "refreshToken": null,
+    "accessTokenExpiresAt": "2025-12-29T12:15:00Z",
+    "refreshTokenExpiresAt": "2026-01-05T12:00:00Z",
+    "tokenType": "Bearer"
+  },
+  "meta": {
+    "timestamp": "2025-12-29T12:00:00Z",
+    "version": "v1.0"
+  }
 }
 ```
+
+**Cookies Set:**
+- `refresh_token` (HttpOnly, Secure, SameSite=Strict)
+- `XSRF-TOKEN` (Secure, SameSite=Strict, readable by JS)
 
 **Error Response (400 Bad Request):**
 ```json
@@ -88,7 +183,7 @@ Creates a new user account.
     "details": "A user with email 'user@example.com' already exists."
   },
   "meta": {
-    "timestamp": "2025-12-28T18:03:28.6056493Z",
+    "timestamp": "2025-12-29T12:00:00Z",
     "version": "v1.0"
   }
 }
@@ -98,11 +193,11 @@ Creates a new user account.
 
 #### 2. Login
 
-**POST** `/api/auth/login`
+**POST** `/auth/login`
 
 Authenticate with email and password.
 
-**Request Body:**
+**Request:**
 ```json
 {
   "identifier": "user@example.com",
@@ -113,88 +208,162 @@ Authenticate with email and password.
 **Success Response (200 OK):**
 ```json
 {
-  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "refreshToken": "d8f7a6b5c4e3d2c1b0a9f8e7d6c5b4a3",
-  "accessTokenExpiresAt": "2025-12-20T12:15:00Z",
-  "refreshTokenExpiresAt": "2025-12-27T12:00:00Z",
-  "tokenType": "Bearer"
+  "success": true,
+  "data": {
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "refreshToken": null,
+    "accessTokenExpiresAt": "2025-12-29T12:15:00Z",
+    "refreshTokenExpiresAt": "2026-01-05T12:00:00Z",
+    "tokenType": "Bearer"
+  }
 }
 ```
 
-**Error Response (401 Unauthorized):**
+**Cookies Set:**
+- `refresh_token` (HttpOnly)
+- `XSRF-TOKEN` (readable)
+
+---
+
+#### 3. Get Current User
+
+**GET** `/auth/me`
+
+Get authenticated user profile.
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+```
+
+**Success Response:**
 ```json
 {
-  "success": false,
-  "error": {
-    "code": "INVALID_CREDENTIALS",
-    "message": "Invalid Credentials",
-    "details": "The email or password provided is incorrect."
-  },
-  "meta": {
-    "timestamp": "2025-12-28T18:03:28.6056493Z",
-    "version": "v1.0"
+  "success": true,
+  "data": {
+    "id": "user-id-123",
+    "email": "user@example.com",
+    "name": "John Doe",
+    "isEmailVerified": false
   }
+}
+```
+
+**Note:** GET requests don't require CSRF token.
+
+---
+
+#### 4. Refresh Token
+
+**POST** `/auth/refresh`
+
+Get new access token using refresh token cookie.
+
+**Headers:**
+```
+X-XSRF-TOKEN: <csrf_token>
+Cookie: refresh_token=<token>
+```
+
+**Request Body:**
+```json
+{
+  "refreshToken": ""
+}
+```
+
+**Note:** `refreshToken` in body is optional - automatically read from cookie.
+
+**Success Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "refreshToken": null,
+    "accessTokenExpiresAt": "2025-12-29T12:30:00Z",
+    "refreshTokenExpiresAt": "2026-01-05T12:15:00Z",
+    "tokenType": "Bearer"
+  }
+}
+```
+
+**Cookies Updated:**
+- New `refresh_token` (rotated)
+- New `XSRF-TOKEN` (rotated)
+
+---
+
+#### 5. Change Password
+
+**POST** `/auth/change-password`
+
+Change password for authenticated user.
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+X-XSRF-TOKEN: <csrf_token>
+```
+
+**Request:**
+```json
+{
+  "currentPassword": "SecureP@ssw0rd",
+  "newPassword": "NewSecureP@ssw0rd",
+  "confirmPassword": "NewSecureP@ssw0rd"
 }
 ```
 
 ---
 
-#### 3. Refresh Access Token
+#### 6. Get Active Sessions
 
-**POST** `/api/auth/refresh`
+**GET** `/auth/sessions`
 
-Get a new access token using a refresh token.
+List all active sessions (refresh tokens) for current user.
 
-**Request Body:**
-```json
-{
-  "refreshToken": "d8f7a6b5c4e3d2c1b0a9f8e7d6c5b4a3"
-}
+**Headers:**
 ```
-
-**Success Response (200 OK):**
-```json
-{
-  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "refreshToken": "a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8",
-  "accessTokenExpiresAt": "2025-12-20T12:30:00Z",
-  "refreshTokenExpiresAt": "2025-12-27T12:15:00Z",
-  "tokenType": "Bearer"
-}
-```
-
-**Error Response (401 Unauthorized):**
-```json
-{
-  "success": false,
-  "error": {
-    "code": "INVALID_REFRESH_TOKEN",
-    "message": "Invalid Refresh Token",
-    "details": "The refresh token is invalid, expired, or has been revoked."
-  },
-  "meta": {
-    "timestamp": "2025-12-28T18:03:28.6056493Z",
-    "version": "v1.0"
-  }
-}
+Authorization: Bearer <access_token>
 ```
 
 ---
 
-#### 4. Logout
+#### 7. Revoke Other Sessions
 
-**POST** `/api/auth/logout`
+**POST** `/auth/revoke-other-sessions`
 
-Revoke a refresh token (logout).
+Revoke all other sessions except the current one.
 
-**Request Body:**
+**Headers:**
+```
+Authorization: Bearer <access_token>
+X-XSRF-TOKEN: <csrf_token>
+```
+
+---
+
+#### 8. Logout
+
+**POST** `/auth/logout`
+
+Revoke refresh token and clear cookies.
+
+**Headers:**
+```
+X-XSRF-TOKEN: <csrf_token>
+Cookie: refresh_token=<token>
+```
+
+**Request:**
 ```json
 {
-  "refreshToken": "d8f7a6b5c4e3d2c1b0a9f8e7d6c5b4a3"
+  "refreshToken": ""
 }
 ```
 
-**Success Response (200 OK):**
+**Success Response:**
 ```json
 {
   "success": true,
@@ -202,18 +371,32 @@ Revoke a refresh token (logout).
 }
 ```
 
+**Cookies Cleared:**
+- `refresh_token`
+- `XSRF-TOKEN`
+
 ---
 
 ## Configuration
 
-Configuration is in `appsettings.json`:
+Configuration in `appsettings.json`:
 
 ```json
 {
   "Pawthorize": {
     "RequireEmailVerification": false,
     "TokenDelivery": "Hybrid",
-    "LoginIdentifier": "Email"
+    "LoginIdentifier": "Email",
+    "PasswordReset": {
+      "BaseUrl": "http://localhost:5022",
+      "ApplicationName": "Pawthorize Sample"
+    },
+    "Csrf": {
+      "Enabled": true,
+      "CookieName": "XSRF-TOKEN",
+      "HeaderName": "X-XSRF-TOKEN",
+      "TokenLifetimeMinutes": 10080
+    }
   },
   "Jwt": {
     "Secret": "this-is-a-super-secret-key-for-jwt-tokens-min-32-chars",
@@ -227,90 +410,173 @@ Configuration is in `appsettings.json`:
 
 ### Key Settings
 
-- **AccessTokenLifetimeMinutes**: How long access tokens are valid (15 minutes)
-- **RefreshTokenLifetimeDays**: How long refresh tokens are valid (7 days)
-- **RequireEmailVerification**: Whether users must verify email before login (disabled for demo)
-- **LoginIdentifier**: What users login with (Email, Username, or Phone)
+**Pawthorize:**
+- `TokenDelivery`: `"Hybrid"` - Access token in body, refresh in cookie
+- `RequireEmailVerification`: `false` - Disabled for easier testing
+- `LoginIdentifier`: `"Email"` - Login with email
 
-## Testing Scenarios
+**CSRF:**
+- `Enabled`: `true` - CSRF protection enabled
+- `CookieName`: `"XSRF-TOKEN"` - Cookie name for CSRF token
+- `HeaderName`: `"X-XSRF-TOKEN"` - Header name for CSRF token
+- `TokenLifetimeMinutes`: `10080` - 7 days
 
-### Success Scenarios
+**JWT:**
+- `AccessTokenLifetimeMinutes`: `15` - Short-lived access tokens
+- `RefreshTokenLifetimeDays`: `7` - Long-lived refresh tokens
 
-1. **Complete Authentication Flow**
-   - Register a new user
-   - Login with credentials
-   - Refresh the access token
-   - Logout
+## Testing with cURL
 
-2. **Token Refresh**
-   - Login to get tokens
-   - Wait 1 minute (or change AccessTokenLifetimeMinutes to 1)
-   - Use refresh token to get new access token
+### Register
+```bash
+curl -X POST http://localhost:5022/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "test@example.com",
+    "password": "Test123!",
+    "name": "Test User"
+  }' \
+  -c cookies.txt
+```
 
-### Failure Scenarios
+### Login
+```bash
+curl -X POST http://localhost:5022/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "identifier": "test@example.com",
+    "password": "Test123!"
+  }' \
+  -c cookies.txt
+```
 
-1. **Duplicate Registration**
-   - Register a user with email `test@example.com`
-   - Try to register again with same email
-   - Should receive `DuplicateEmailError`
+### Extract CSRF Token
+```bash
+# On Linux/Mac
+CSRF_TOKEN=$(grep XSRF-TOKEN cookies.txt | awk '{print $7}')
 
-2. **Invalid Login Credentials**
-   - Try to login with wrong password
-   - Should receive `InvalidCredentialsError`
-   - Try to login with non-existent email
-   - Should receive `InvalidCredentialsError`
+# On Windows (PowerShell)
+$CSRF_TOKEN = (Select-String -Path cookies.txt -Pattern "XSRF-TOKEN").ToString().Split()[-1]
+```
 
-3. **Invalid Refresh Token**
-   - Use a fake/random refresh token
-   - Should receive `InvalidRefreshTokenError`
-   - Use a refresh token after logout
-   - Should receive `InvalidRefreshTokenError`
+### Refresh with CSRF Token
+```bash
+curl -X POST http://localhost:5022/auth/refresh \
+  -H "Content-Type: application/json" \
+  -H "X-XSRF-TOKEN: $CSRF_TOKEN" \
+  -b cookies.txt \
+  -c cookies.txt \
+  -d '{}'
+```
 
-4. **Validation Errors**
-   - Try to register with invalid email format
-   - Try to register with empty password
-   - Should receive validation errors
+## Troubleshooting
 
-## Using the Postman Collection
+### CSRF Token Issues
 
-A Postman collection is included for easy testing:
+**Problem:** 403 Forbidden on POST/PUT/DELETE requests
 
-1. Import `Pawthorize-Sample.postman_collection.json` into Postman
-2. The collection includes all success and failure scenarios
-3. Variables are automatically set (access token, refresh token)
-4. Run the entire collection to test all scenarios
+**Solution:**
+1. Verify CSRF cookie is present: Check browser DevTools → Application → Cookies
+2. Ensure `X-XSRF-TOKEN` header is included
+3. Check cookie name matches `appsettings.json` configuration
+4. In Postman, ensure cookies are enabled (Settings → Cookies)
+
+### Postman Cookies Not Working
+
+**Problem:** Cookies not being sent/received
+
+**Solution:**
+1. Enable cookies in Postman: Settings → General → Allow cookies
+2. Check Postman console (View → Show Postman Console) for cookie logs
+3. Manually manage cookies: Cookies → Manage Cookies → Add Domain
+
+### Access Token Expired
+
+**Problem:** 401 Unauthorized after 15 minutes
+
+**Solution:**
+Use the refresh endpoint to get a new access token. The Postman collection handles this automatically.
 
 ## Architecture
 
 ### Key Components
 
-- **User Model**: Implements `IAuthenticatedUser` with required properties
-- **UserFactory**: Creates User instances from RegisterRequest
-- **InMemoryUserRepository**: Stores users in memory (not for production)
-- **InMemoryRefreshTokenRepository**: Stores refresh tokens in memory (not for production)
+**Models:**
+- `User` - Implements `IAuthenticatedUser`
+- `UserFactory` - Creates User from RegisterRequest
 
-### Production Considerations
+**Repositories (In-Memory):**
+- `InMemoryUserRepository` - User storage
+- `InMemoryRefreshTokenRepository` - Refresh token storage
+- `InMemoryTokenRepository` - Email/password reset tokens
 
-This sample uses in-memory storage for simplicity. In production:
+**Services:**
+- `InMemoryEmailSender` - Logs emails to console
 
-- Use Entity Framework with SQL Server, PostgreSQL, or MySQL
-- Implement proper user repositories with database persistence
-- Store refresh tokens in database with proper indexes
-- Add password complexity requirements
-- Enable email verification
-- Implement rate limiting
-- Add logging and monitoring
-- Use environment variables for secrets
+### How CSRF Protection Works
+
+1. **Login/Register**: Server generates CSRF token, sets it in cookie
+2. **Client**: Reads CSRF token from cookie (JavaScript can access it)
+3. **Subsequent Requests**: Client sends token in `X-XSRF-TOKEN` header
+4. **Server**: Validates header matches cookie (Double Submit Cookie pattern)
+5. **Token Refresh**: CSRF token rotated with new tokens
+
+**Security:**
+- Uses Double Submit Cookie pattern
+- 256-bit cryptographically secure tokens
+- Constant-time validation (prevents timing attacks)
+- SameSite=Strict on all cookies
+
+## Production Considerations
+
+This sample uses in-memory storage for simplicity. For production:
+
+**Database:**
+- ✅ Use Entity Framework with SQL Server/PostgreSQL/MySQL
+- ✅ Implement proper user repositories with database persistence
+- ✅ Store refresh tokens in database with indexes
+- ✅ Store password reset tokens securely
+
+**Security:**
+- ✅ Enable email verification (`RequireEmailVerification: true`)
+- ✅ Implement rate limiting (login attempts, registration)
+- ✅ Use environment variables for secrets
+- ✅ Enable HTTPS in production
+- ✅ Configure CORS properly
+
+**Monitoring:**
+- ✅ Add structured logging
+- ✅ Monitor failed login attempts
+- ✅ Track token refresh rates
+- ✅ Alert on unusual patterns
+
+**Email:**
+- ✅ Use real email provider (SendGrid, AWS SES, etc.)
+- ✅ Customize email templates
+- ✅ Add unsubscribe links
 
 ## Next Steps
 
-- Check out the Multi-Tenant sample for multi-tenant scenarios
-- Explore OAuth integration samples
-- Read the Pawthorize documentation for advanced features
-- Implement your own user repository with Entity Framework
+- ✅ Explore other token delivery modes (`ResponseBody`, `HttpOnlyCookies`)
+- ✅ Implement email verification flow
+- ✅ Add password reset functionality
+- ✅ Integrate with Entity Framework
+- ✅ Build a frontend that uses this API
+- ✅ Deploy to production
+
+## Resources
+
+- **Pawthorize Documentation**: See main README
+- **Token Delivery Guide**: `TOKEN_DELIVERY_STRATEGIES.md`
+- **Migration Guide**: `MIGRATION_GUIDE.md`
+- **Full Change Log**: `CHANGES.md`
 
 ## Support
 
 For issues or questions:
-- GitHub Issues: https://github.com/your-repo/pawthorize/issues
-- Documentation: See main README in repository root
+- **GitHub Issues**: [Create an issue](https://github.com/your-repo/pawthorize/issues)
+- **Documentation**: See repository root README
+
+---
+
+**Happy coding! 🐾**

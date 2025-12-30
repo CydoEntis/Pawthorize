@@ -46,7 +46,12 @@ var app = builder.Build();
 // Add Pawthorize middleware - handles all error responses consistently via ErrorHound
 app.UsePawthorize();
 
-if (app.Environment.IsDevelopment())
+// Add CSRF protection middleware (must be after routing, before authentication)
+// Automatically validates CSRF tokens for state-changing requests when using Hybrid or HttpOnlyCookies modes
+app.UsePawthorizeCsrf();
+
+if (
+    app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
