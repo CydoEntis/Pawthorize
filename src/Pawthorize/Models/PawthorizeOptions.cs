@@ -55,6 +55,12 @@ public class PawthorizeOptions
     /// Used for forgot password / reset password flows.
     /// </summary>
     public PasswordResetOptions PasswordReset { get; set; } = new();
+
+    /// <summary>
+    /// CSRF protection configuration.
+    /// Automatically enabled for HttpOnlyCookies and Hybrid token delivery modes.
+    /// </summary>
+    public CsrfOptions Csrf { get; set; } = new();
 }
 
 /// <summary>
@@ -105,4 +111,44 @@ public enum TokenDeliveryStrategy
     /// This is the recommended approach for most web applications.
     /// </summary>
     Hybrid
+}
+
+/// <summary>
+/// CSRF protection configuration options
+/// </summary>
+public class CsrfOptions
+{
+    /// <summary>
+    /// Enable or disable CSRF protection.
+    /// Default: Automatically enabled for HttpOnlyCookies and Hybrid modes.
+    /// Warning: Disabling CSRF protection when using cookies creates a security vulnerability.
+    /// </summary>
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>
+    /// Name of the cookie that stores the CSRF token.
+    /// This cookie is NOT HttpOnly so JavaScript can read it.
+    /// Default: "XSRF-TOKEN"
+    /// </summary>
+    public string CookieName { get; set; } = "XSRF-TOKEN";
+
+    /// <summary>
+    /// Name of the header that clients must send with the CSRF token.
+    /// Default: "X-XSRF-TOKEN"
+    /// </summary>
+    public string HeaderName { get; set; } = "X-XSRF-TOKEN";
+
+    /// <summary>
+    /// Paths that should be excluded from CSRF validation.
+    /// Login and register endpoints are always excluded automatically.
+    /// Format: "/api/public/endpoint"
+    /// </summary>
+    public List<string> ExcludedPaths { get; set; } = new();
+
+    /// <summary>
+    /// CSRF token lifetime in minutes.
+    /// Should match or exceed the refresh token lifetime.
+    /// Default: 10080 minutes (7 days)
+    /// </summary>
+    public int TokenLifetimeMinutes { get; set; } = 10080;
 }

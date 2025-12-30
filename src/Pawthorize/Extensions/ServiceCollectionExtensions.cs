@@ -88,6 +88,7 @@ public static class ServiceCollectionExtensions
     /// <summary>
     /// Register ASP.NET Core authentication with JWT Bearer.
     /// Automatically configures OnChallenge to throw UnauthorizedError for ErrorHound integration.
+    /// Configures cookie policy and token extraction based on TokenDeliveryStrategy.
     /// </summary>
     private static void RegisterAuthentication(
         IServiceCollection services,
@@ -95,6 +96,7 @@ public static class ServiceCollectionExtensions
     {
         var serviceProvider = services.BuildServiceProvider();
         var jwtSettings = serviceProvider.GetService<IOptions<JwtSettings>>()?.Value;
+        var pawthorizeOptions = serviceProvider.GetService<IOptions<PawthorizeOptions>>()?.Value;
 
         if (jwtSettings == null)
         {
@@ -106,6 +108,13 @@ public static class ServiceCollectionExtensions
         {
             throw new InvalidOperationException(
                 "JWT Secret is required but not configured.");
+        }
+
+        // Configure cookie policy if using cookies
+        if (pawthorizeOptions?.TokenDelivery == TokenDeliveryStrategy.HttpOnlyCookies ||
+            pawthorizeOptions?.TokenDelivery == TokenDeliveryStrategy.Hybrid)
+        {
+            services.AddHttpContextAccessor();
         }
 
         services.AddAuthentication(options =>
@@ -129,6 +138,29 @@ public static class ServiceCollectionExtensions
 
                 options.Events = new JwtBearerEvents
                 {
+                    OnMessageReceived = context =>
+                    {
+                        // Try to read token from Authorization header first (default behavior)
+                        // If not found and using HttpOnlyCookies mode, try to read from cookie
+                        var tokenDelivery = pawthorizeOptions?.TokenDelivery ?? TokenDeliveryStrategy.Hybrid;
+
+                        // Only read from cookie if:
+                        // 1. Using HttpOnlyCookies mode (access token is in cookie)
+                        // 2. No Authorization header is present (allow header to override cookie)
+                        if (tokenDelivery == TokenDeliveryStrategy.HttpOnlyCookies)
+                        {
+                            if (string.IsNullOrEmpty(context.Token))
+                            {
+                                var accessToken = context.Request.Cookies["access_token"];
+                                if (!string.IsNullOrEmpty(accessToken))
+                                {
+                                    context.Token = accessToken;
+                                }
+                            }
+                        }
+
+                        return Task.CompletedTask;
+                    },
                     OnChallenge = context =>
                     {
                         context.HandleResponse();
@@ -155,6 +187,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<JwtService<TUser>>();
         services.AddScoped<AuthenticationService<TUser>>();
         services.AddScoped<IPasswordResetService, PasswordResetService>();
+        services.AddScoped<CsrfTokenService>();
     }
 
     /// <summary>
