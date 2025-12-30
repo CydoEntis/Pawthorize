@@ -72,6 +72,9 @@ public static class HttpContextTestHelper
                     RequestServices = serviceProvider
                 };
 
+                // Set request as HTTPS for proper cookie security testing
+                httpContext.Request.Scheme = "https";
+
                 return httpContext;
             }
         }
