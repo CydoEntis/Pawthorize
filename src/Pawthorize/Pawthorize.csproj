@@ -2,10 +2,10 @@
     <PropertyGroup>
         <TargetFramework>net8.0</TargetFramework>
         <PackageId>Pawthorize</PackageId>
-        <Version>0.1.0</Version>
+        <Version>0.2.0</Version>
         <Authors>Pawthorize Contributors</Authors>
-        <Description>⚠️ ALPHA: Modern authentication library for ASP.NET Core - simple, secure, and powerful. Includes JWT tokens, refresh rotation, email verification, password reset, and session management. API may change before v1.0.</Description>
-        <PackageTags>authentication;aspnetcore;jwt;minimal-api;password;security;alpha;oauth;sessions</PackageTags>
+        <Description>⚠️ ALPHA: Modern authentication library for ASP.NET Core - simple, secure, and powerful. Includes JWT tokens, refresh rotation, CSRF protection, role-based authorization, email verification, password reset, and session management. API may change before v1.0.</Description>
+        <PackageTags>authentication;aspnetcore;jwt;minimal-api;password;security;alpha;oauth;sessions;csrf;roles;authorization</PackageTags>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <RepositoryUrl>https://github.com/yourusername/pawthorize</RepositoryUrl>
         <PackageProjectUrl>https://github.com/yourusername/pawthorize</PackageProjectUrl>
