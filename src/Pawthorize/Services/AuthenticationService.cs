@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using Pawthorize.Abstractions;
 using Pawthorize.Errors;
 using Pawthorize.Models;
+using Pawthorize.Utilities;
 
 namespace Pawthorize.Services;
 
@@ -47,12 +48,13 @@ public class AuthenticationService<TUser> where TUser : IAuthenticatedUser
                 user.Id, accessTokenExpiresAt);
 
             var refreshToken = _jwtService.GenerateRefreshToken();
+            var refreshTokenHash = TokenHasher.HashToken(refreshToken);
             var refreshTokenExpiresAt = DateTime.UtcNow.Add(_options.Jwt.RefreshTokenLifetime);
             _logger.LogDebug("Refresh token generated for UserId: {UserId}, ExpiresAt: {ExpiresAt}",
                 user.Id, refreshTokenExpiresAt);
 
             await _refreshTokenRepository.StoreAsync(
-                refreshToken,
+                refreshTokenHash,
                 user.Id,
                 refreshTokenExpiresAt,
                 cancellationToken);

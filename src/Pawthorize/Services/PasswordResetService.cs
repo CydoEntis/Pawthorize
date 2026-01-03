@@ -48,11 +48,12 @@ public class PasswordResetService : IPasswordResetService
         CancellationToken cancellationToken = default)
     {
         var token = TokenGenerator.GenerateToken(32);
+        var tokenHash = TokenHasher.HashToken(token);
         var expiresAt = DateTime.UtcNow.Add(_options.TokenLifetime);
 
         await _tokenRepository.StoreTokenAsync(
             userId,
-            token,
+            tokenHash,
             TokenType.PasswordReset,
             expiresAt,
             cancellationToken);
@@ -80,8 +81,9 @@ public class PasswordResetService : IPasswordResetService
         string token,
         CancellationToken cancellationToken = default)
     {
+        var tokenHash = TokenHasher.HashToken(token);
         var tokenInfo = await _tokenRepository.ValidateTokenAsync(
-            token,
+            tokenHash,
             TokenType.PasswordReset,
             cancellationToken);
 
@@ -102,8 +104,9 @@ public class PasswordResetService : IPasswordResetService
         string token,
         CancellationToken cancellationToken = default)
     {
+        var tokenHash = TokenHasher.HashToken(token);
         await _tokenRepository.InvalidateTokenAsync(
-            token,
+            tokenHash,
             TokenType.PasswordReset,
             cancellationToken);
     }

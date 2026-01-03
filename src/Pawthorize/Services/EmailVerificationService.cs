@@ -48,13 +48,14 @@ public class EmailVerificationService : IEmailVerificationService
         CancellationToken cancellationToken = default)
     {
         var token = TokenGenerator.GenerateToken(32);
+        var tokenHash = TokenHasher.HashToken(token);
         var expiresAt = DateTime.UtcNow.Add(_options.TokenLifetime);
 
         await _tokenRepository.StoreTokenAsync(
-            userId, 
-            token, 
-            TokenType.EmailVerification, 
-            expiresAt, 
+            userId,
+            tokenHash,
+            TokenType.EmailVerification,
+            expiresAt,
             cancellationToken);
 
         var verificationUrl = BuildVerificationUrl(token);
@@ -80,20 +81,16 @@ public class EmailVerificationService : IEmailVerificationService
         string token,
         CancellationToken cancellationToken = default)
     {
-        var tokenInfo = await _tokenRepository.ValidateTokenAsync(
-            token, 
-            TokenType.EmailVerification, 
+        var tokenHash = TokenHasher.HashToken(token);
+        var tokenInfo = await _tokenRepository.ConsumeTokenAsync(
+            tokenHash,
+            TokenType.EmailVerification,
             cancellationToken);
 
         if (tokenInfo == null || tokenInfo.IsExpired)
         {
-            return null;  
+            return null;
         }
-
-        await _tokenRepository.InvalidateTokenAsync(
-            token, 
-            TokenType.EmailVerification, 
-            cancellationToken);
 
         return tokenInfo.UserId;
     }
