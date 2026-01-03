@@ -17,7 +17,7 @@
 > - **Atomic Token Consumption**: New `ConsumeTokenAsync` method prevents token reuse bugs
 > - **Constant-Time Validation**: Protection against timing attacks
 >
-> **⚠️ Breaking Changes**: v0.3.0 includes breaking changes to `ITokenRepository` and `IRefreshTokenRepository`. See the [Migration Guide](#migration-from-v02-to-v10) below.
+> **⚠️ Breaking Changes**: v0.3.0 includes breaking changes to `ITokenRepository` and `IRefreshTokenRepository`. See the [Migration Guide](#migration-from-v02-to-v03) below.
 >
 > While Pawthorize is thoroughly tested with 158 passing tests, please test thoroughly with your specific use case before deploying to production.
 
@@ -842,7 +842,7 @@ public async Task<TokenInfo?> ValidateTokenAsync(string token, TokenType tokenTy
 }
 ```
 
-**After (v1.1):**
+**After (v0.3.0):**
 ```csharp
 public async Task StoreTokenAsync(string userId, string tokenHash, TokenType tokenType, DateTime expiresAt, CancellationToken cancellationToken = default)
 {
@@ -915,7 +915,7 @@ public async Task<RefreshTokenInfo?> ValidateAsync(string token, CancellationTok
 }
 ```
 
-**After (v1.1):**
+**After (v0.3.0):**
 ```csharp
 public async Task StoreAsync(string tokenHash, string userId, DateTime expiresAt, CancellationToken cancellationToken = default)
 {

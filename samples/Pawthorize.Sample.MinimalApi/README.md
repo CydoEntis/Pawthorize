@@ -164,7 +164,7 @@ Creates a new user account.
   },
   "meta": {
     "timestamp": "2025-12-29T12:00:00Z",
-    "version": "v1.0"
+    "version": "v0.3"
   }
 }
 ```
@@ -184,7 +184,7 @@ Creates a new user account.
   },
   "meta": {
     "timestamp": "2025-12-29T12:00:00Z",
-    "version": "v1.0"
+    "version": "v0.3"
   }
 }
 ```
