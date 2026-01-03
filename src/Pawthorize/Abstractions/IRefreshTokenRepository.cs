@@ -4,32 +4,36 @@ namespace Pawthorize.Abstractions;
 
 /// <summary>
 /// Repository for refresh token storage and validation.
+/// IMPORTANT: All tokens are hashed before storage for security.
 /// </summary>
 public interface IRefreshTokenRepository
 {
     /// <summary>
-    /// Stores a refresh token in the repository.
+    /// Stores a refresh token hash in the repository.
+    /// The framework hashes tokens before calling this method.
     /// </summary>
-    /// <param name="token">The refresh token to store.</param>
+    /// <param name="tokenHash">SHA256 hash of the refresh token to store.</param>
     /// <param name="userId">The user ID associated with the token.</param>
     /// <param name="expiresAt">The expiration date and time of the token.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    Task StoreAsync(string token, string userId, DateTime expiresAt, CancellationToken cancellationToken = default);
+    Task StoreAsync(string tokenHash, string userId, DateTime expiresAt, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Validates a refresh token and returns its information if valid.
+    /// Validates a refresh token hash and returns its information if valid.
+    /// The framework hashes the raw token before calling this method.
     /// </summary>
-    /// <param name="token">The refresh token to validate.</param>
+    /// <param name="tokenHash">SHA256 hash of the refresh token to validate.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Token information if valid, null otherwise.</returns>
-    Task<RefreshTokenInfo?> ValidateAsync(string token, CancellationToken cancellationToken = default);
+    Task<RefreshTokenInfo?> ValidateAsync(string tokenHash, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Revokes a specific refresh token.
+    /// Revokes a specific refresh token hash.
+    /// The framework hashes the raw token before calling this method.
     /// </summary>
-    /// <param name="token">The refresh token to revoke.</param>
+    /// <param name="tokenHash">SHA256 hash of the refresh token to revoke.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    Task RevokeAsync(string token, CancellationToken cancellationToken = default);
+    Task RevokeAsync(string tokenHash, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Revokes all refresh tokens for a specific user.
@@ -48,11 +52,12 @@ public interface IRefreshTokenRepository
     Task<IEnumerable<RefreshTokenInfo>> GetAllActiveAsync(string userId, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Revokes all refresh tokens for a user except the specified token.
+    /// Revokes all refresh tokens for a user except the specified token hash.
     /// Used for "logout all other devices" functionality.
+    /// The framework hashes the raw token before calling this method.
     /// </summary>
     /// <param name="userId">The user ID whose tokens should be revoked.</param>
-    /// <param name="exceptToken">The token to keep active (current session).</param>
+    /// <param name="exceptTokenHash">SHA256 hash of the token to keep active (current session).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    Task RevokeAllExceptAsync(string userId, string exceptToken, CancellationToken cancellationToken = default);
+    Task RevokeAllExceptAsync(string userId, string exceptTokenHash, CancellationToken cancellationToken = default);
 }
