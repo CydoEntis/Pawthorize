@@ -9,15 +9,17 @@
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 </div>
 
-> **⚠️ Alpha Release Notice**
+> **🎉 Version 1.1.0 Release**
 >
-> Pawthorize v0.2.0 is an **early alpha release**. While the library is functional and thoroughly tested, the API surface may change as we gather feedback and build production applications with it.
+> **New in v1.1.0:**
+> - **Enhanced Security**: All tokens (email verification, password reset, refresh) are now hashed using SHA256 before storage
+> - **Immutable Token Models**: TokenInfo and RefreshTokenInfo are now immutable records for better safety
+> - **Atomic Token Consumption**: New `ConsumeTokenAsync` method prevents token reuse bugs
+> - **Constant-Time Validation**: Protection against timing attacks
 >
-> **Before using in production:**
-> - Test thoroughly with your specific use case
-> - Expect potential breaking changes in minor versions until v1.0
+> **⚠️ Breaking Changes**: v1.1.0 includes breaking changes to `ITokenRepository` and `IRefreshTokenRepository`. See the [Migration Guide](#migration-from-v02-to-v11) below.
 >
-> I'm actively developing demo applications to validate real-world usage. Feedback is highly appreciated!
+> While Pawthorize is thoroughly tested with 158 passing tests, please test thoroughly with your specific use case before deploying to production.
 
 ---
 
@@ -796,6 +798,222 @@ public class CustomRegisterValidator : AbstractValidator<CustomRegisterRequest>
 builder.Services.AddScoped<IValidator<CustomRegisterRequest>, CustomRegisterValidator>();
 ```
 
+## Migration from v0.2 to v1.1
+
+Version 1.1.0 introduces important security enhancements that require changes to your repository implementations.
+
+### Breaking Changes
+
+1. **ITokenRepository** - Methods now accept/return token hashes instead of raw tokens
+2. **IRefreshTokenRepository** - Methods now accept/return token hashes instead of raw tokens
+3. **TokenInfo** - Changed from mutable class to immutable record
+4. **RefreshTokenInfo** - Changed from mutable class to immutable record with `TokenHash` property instead of `Token`
+
+### Migration Steps
+
+#### 1. Update ITokenRepository Implementation
+
+**Before (v0.2):**
+```csharp
+public async Task StoreTokenAsync(string userId, string token, TokenType tokenType, DateTime expiresAt, CancellationToken cancellationToken = default)
+{
+    await _db.Tokens.AddAsync(new TokenEntity
+    {
+        UserId = userId,
+        Token = token,  // ❌ Storing raw token
+        TokenType = tokenType,
+        ExpiresAt = expiresAt
+    });
+}
+
+public async Task<TokenInfo?> ValidateTokenAsync(string token, TokenType tokenType, CancellationToken cancellationToken = default)
+{
+    var entity = await _db.Tokens
+        .FirstOrDefaultAsync(t => t.Token == token && t.TokenType == tokenType);  // ❌ Comparing raw token
+
+    if (entity == null || entity.IsExpired) return null;
+
+    return new TokenInfo  // ❌ Mutable class
+    {
+        UserId = entity.UserId,
+        CreatedAt = entity.CreatedAt,
+        ExpiresAt = entity.ExpiresAt
+    };
+}
+```
+
+**After (v1.1):**
+```csharp
+public async Task StoreTokenAsync(string userId, string tokenHash, TokenType tokenType, DateTime expiresAt, CancellationToken cancellationToken = default)
+{
+    await _db.Tokens.AddAsync(new TokenEntity
+    {
+        UserId = userId,
+        TokenHash = tokenHash,  // ✅ Framework sends hash
+        TokenType = tokenType,
+        ExpiresAt = expiresAt
+    });
+}
+
+public async Task<TokenInfo?> ValidateTokenAsync(string tokenHash, TokenType tokenType, CancellationToken cancellationToken = default)
+{
+    var entity = await _db.Tokens
+        .FirstOrDefaultAsync(t => t.TokenHash == tokenHash && t.TokenType == tokenType);  // ✅ Compare hash
+
+    if (entity == null || entity.IsExpired) return null;
+
+    return new TokenInfo(  // ✅ Immutable record
+        entity.UserId,
+        entity.CreatedAt,
+        entity.ExpiresAt
+    );
+}
+
+// ✅ New method - atomic validate + invalidate
+public async Task<TokenInfo?> ConsumeTokenAsync(string tokenHash, TokenType tokenType, CancellationToken cancellationToken = default)
+{
+    var entity = await _db.Tokens
+        .FirstOrDefaultAsync(t => t.TokenHash == tokenHash && t.TokenType == tokenType);
+
+    if (entity == null || entity.IsExpired || entity.IsInvalidated) return null;
+
+    entity.IsInvalidated = true;  // Invalidate atomically
+    await _db.SaveChangesAsync(cancellationToken);
+
+    return new TokenInfo(entity.UserId, entity.CreatedAt, entity.ExpiresAt);
+}
+```
+
+#### 2. Update IRefreshTokenRepository Implementation
+
+**Before (v0.2):**
+```csharp
+public async Task StoreAsync(string token, string userId, DateTime expiresAt, CancellationToken cancellationToken = default)
+{
+    await _db.RefreshTokens.AddAsync(new RefreshTokenEntity
+    {
+        Token = token,  // ❌ Raw token
+        UserId = userId,
+        ExpiresAt = expiresAt
+    });
+}
+
+public async Task<RefreshTokenInfo?> ValidateAsync(string token, CancellationToken cancellationToken = default)
+{
+    var entity = await _db.RefreshTokens
+        .FirstOrDefaultAsync(t => t.Token == token);  // ❌ Compare raw token
+
+    if (entity == null) return null;
+
+    return new RefreshTokenInfo  // ❌ Mutable class
+    {
+        Token = entity.Token,
+        UserId = entity.UserId,
+        ExpiresAt = entity.ExpiresAt,
+        IsRevoked = entity.IsRevoked
+    };
+}
+```
+
+**After (v1.1):**
+```csharp
+public async Task StoreAsync(string tokenHash, string userId, DateTime expiresAt, CancellationToken cancellationToken = default)
+{
+    await _db.RefreshTokens.AddAsync(new RefreshTokenEntity
+    {
+        TokenHash = tokenHash,  // ✅ Framework sends hash
+        UserId = userId,
+        ExpiresAt = expiresAt
+    });
+}
+
+public async Task<RefreshTokenInfo?> ValidateAsync(string tokenHash, CancellationToken cancellationToken = default)
+{
+    var entity = await _db.RefreshTokens
+        .FirstOrDefaultAsync(t => t.TokenHash == tokenHash);  // ✅ Compare hash
+
+    if (entity == null) return null;
+
+    return new RefreshTokenInfo(  // ✅ Immutable record with TokenHash
+        entity.TokenHash,
+        entity.UserId,
+        entity.ExpiresAt,
+        entity.IsRevoked,
+        entity.CreatedAt
+    );
+}
+```
+
+#### 3. Update Database Schema
+
+**Add migration to rename columns:**
+
+```csharp
+// Entity Framework migration
+public partial class RenameTokenToTokenHash : Migration
+{
+    protected override void Up(MigrationBuilder migrationBuilder)
+    {
+        // Tokens table
+        migrationBuilder.RenameColumn(
+            name: "Token",
+            table: "Tokens",
+            newName: "TokenHash");
+
+        // RefreshTokens table
+        migrationBuilder.RenameColumn(
+            name: "Token",
+            table: "RefreshTokens",
+            newName: "TokenHash");
+
+        // Important: Invalidate all existing tokens (they are un-hashed)
+        migrationBuilder.Sql("UPDATE Tokens SET IsInvalidated = 1");
+        migrationBuilder.Sql("UPDATE RefreshTokens SET IsRevoked = 1");
+    }
+
+    protected override void Down(MigrationBuilder migrationBuilder)
+    {
+        migrationBuilder.RenameColumn(
+            name: "TokenHash",
+            table: "Tokens",
+            newName: "Token");
+
+        migrationBuilder.RenameColumn(
+            name: "TokenHash",
+            table: "RefreshTokens",
+            newName: "Token");
+    }
+}
+```
+
+### Key Changes Summary
+
+| Component | v0.2 | v1.1 |
+|-----------|------|------|
+| **Token Storage** | Raw tokens | SHA256 hashes |
+| **TokenInfo** | Mutable class | Immutable record |
+| **RefreshTokenInfo** | Mutable class with `Token` property | Immutable record with `TokenHash` property |
+| **ITokenRepository.StoreTokenAsync** | `(userId, token, ...)` | `(userId, tokenHash, ...)` |
+| **ITokenRepository.ValidateTokenAsync** | `(token, ...)` | `(tokenHash, ...)` |
+| **ITokenRepository** | N/A | New: `ConsumeTokenAsync(tokenHash, ...)` |
+| **IRefreshTokenRepository.StoreAsync** | `(token, userId, ...)` | `(tokenHash, userId, ...)` |
+| **IRefreshTokenRepository.ValidateAsync** | `(token)` | `(tokenHash)` |
+| **IRefreshTokenRepository.RevokeAsync** | `(token)` | `(tokenHash)` |
+
+### Security Benefits
+
+After migration, your application will benefit from:
+
+✅ **Defense in depth** - Database compromise doesn't leak usable tokens
+✅ **One-way hashing** - Tokens cannot be recovered from storage
+✅ **Timing attack protection** - Constant-time token comparison
+✅ **Token reuse prevention** - Atomic `ConsumeTokenAsync` method
+✅ **Immutability** - Token models can't be accidentally modified
+
+### Testing After Migration
+
+Run your existing tests - they should all pass with the updated repository implementations. The framework handles all token hashing internally, so no changes are needed to your application logic.
+
 ## Examples
 
 Check out the [sample applications](./samples):
@@ -808,15 +1026,19 @@ Check out the [sample applications](./samples):
 Pawthorize is designed with security in mind:
 
 1. **Password Security**: BCrypt hashing with automatic salting
-2. **Token Rotation**: Refresh tokens rotate on every use
-3. **HttpOnly Cookies**: Refresh tokens stored in HttpOnly cookies (Hybrid/HttpOnlyCookies mode)
-4. **CSRF Protection**: Built-in Double Submit Cookie pattern with constant-time validation
-5. **Secure Cookies**: Automatic `Secure` flag in production environments
-6. **SameSite**: All cookies use `SameSite=Strict`
-7. **Token Expiration**: Configurable lifetimes for all token types
-8. **Session Management**: Users can view and revoke sessions across devices
-9. **Account Locking**: Automatic account locking after failed attempts (optional)
-10. **Email Verification**: Require email verification before access (optional)
+2. **Token Hashing**: All tokens (email verification, password reset, refresh) are hashed using SHA256 before storage
+   - Database compromise doesn't leak usable tokens
+   - One-way hashing prevents token recovery
+   - Constant-time comparison prevents timing attacks
+3. **Token Rotation**: Refresh tokens rotate on every use
+4. **HttpOnly Cookies**: Refresh tokens stored in HttpOnly cookies (Hybrid/HttpOnlyCookies mode)
+5. **CSRF Protection**: Built-in Double Submit Cookie pattern with constant-time validation
+6. **Secure Cookies**: Automatic `Secure` flag in production environments
+7. **SameSite**: All cookies use `SameSite=Strict`
+8. **Token Expiration**: Configurable lifetimes for all token types
+9. **Session Management**: Users can view and revoke sessions across devices
+10. **Account Locking**: Automatic account locking after failed attempts (optional)
+11. **Email Verification**: Require email verification before access (optional)
 
 ## Requirements
 
