@@ -988,17 +988,17 @@ public partial class RenameTokenToTokenHash : Migration
 
 ### Key Changes Summary
 
-| Component | v0.2 | v1.1 |
-|-----------|------|------|
-| **Token Storage** | Raw tokens | SHA256 hashes |
-| **TokenInfo** | Mutable class | Immutable record |
+| Component | v0.2 | v0.3                                       |
+|-----------|------|--------------------------------------------|
+| **Token Storage** | Raw tokens | SHA256 hashes                              |
+| **TokenInfo** | Mutable class | Immutable record                           |
 | **RefreshTokenInfo** | Mutable class with `Token` property | Immutable record with `TokenHash` property |
-| **ITokenRepository.StoreTokenAsync** | `(userId, token, ...)` | `(userId, tokenHash, ...)` |
-| **ITokenRepository.ValidateTokenAsync** | `(token, ...)` | `(tokenHash, ...)` |
-| **ITokenRepository** | N/A | New: `ConsumeTokenAsync(tokenHash, ...)` |
-| **IRefreshTokenRepository.StoreAsync** | `(token, userId, ...)` | `(tokenHash, userId, ...)` |
-| **IRefreshTokenRepository.ValidateAsync** | `(token)` | `(tokenHash)` |
-| **IRefreshTokenRepository.RevokeAsync** | `(token)` | `(tokenHash)` |
+| **ITokenRepository.StoreTokenAsync** | `(userId, token, ...)` | `(userId, tokenHash, ...)`                 |
+| **ITokenRepository.ValidateTokenAsync** | `(token, ...)` | `(tokenHash, ...)`                         |
+| **ITokenRepository** | N/A | New: `ConsumeTokenAsync(tokenHash, ...)`   |
+| **IRefreshTokenRepository.StoreAsync** | `(token, userId, ...)` | `(tokenHash, userId, ...)`                 |
+| **IRefreshTokenRepository.ValidateAsync** | `(token)` | `(tokenHash)`                              |
+| **IRefreshTokenRepository.RevokeAsync** | `(token)` | `(tokenHash)`                              |
 
 ### Security Benefits
 
@@ -1019,7 +1019,6 @@ Run your existing tests - they should all pass with the updated repository imple
 Check out the [sample applications](./samples):
 
 - **MinimalApi Sample**: Complete working example with Hybrid mode and CSRF protection
-- **Postman Collection**: Pre-configured requests with automatic CSRF handling
 
 ## Security Best Practices
 
@@ -1056,8 +1055,7 @@ Pawthorize is designed with security in mind:
 ## Documentation
 
 - [Sample README](./samples/Pawthorize.Sample.MinimalApi/README.md) - Detailed sample with CSRF examples
-- [Publishing Guide](./PUBLISH_AND_MIGRATE.md) - Version updates and migration guide
-- [Commit Guide](./COMPLETE_COMMIT_GUIDE.md) - Contribution guidelines
+
 
 ## Roadmap
 
@@ -1068,10 +1066,6 @@ Pawthorize is designed with security in mind:
 - Rate limiting
 - Advanced session management
 - Audit logging
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
@@ -1084,4 +1078,4 @@ MIT License - see LICENSE file for details
 
 ---
 
-Built with care by the Pawthorize team
+Built by CydoEntis
