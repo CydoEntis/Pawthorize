@@ -4,6 +4,7 @@ using Moq;
 using Pawthorize.Abstractions;
 using Pawthorize.Models;
 using Pawthorize.Services;
+using Pawthorize.Utilities;
 using Xunit;
 
 namespace Pawthorize.Core.Tests;
@@ -62,10 +63,11 @@ public class EmailVerificationServiceTests
 
         token.Should().NotBeNullOrEmpty();
 
+        // The service hashes the token before storing, so we verify the hash was stored (not the raw token)
         _mockTokenRepository.Verify(
             r => r.StoreTokenAsync(
                 userId,
-                token,
+                It.IsAny<string>(),  // Token hash
                 TokenType.EmailVerification,
                 It.Is<DateTime>(dt => dt > DateTime.UtcNow && dt <= DateTime.UtcNow.AddHours(25)),
                 cancellationToken),
@@ -197,16 +199,15 @@ public class EmailVerificationServiceTests
     public async Task VerifyEmailAsync_WithValidToken_ShouldReturnUserId()
     {
         var token = "valid-token";
+        var tokenHash = TokenHasher.HashToken(token);
         var userId = "user123";
-        var tokenInfo = new TokenInfo
-        {
-            UserId = userId,
-            CreatedAt = DateTime.UtcNow.AddHours(-1),
-            ExpiresAt = DateTime.UtcNow.AddHours(23)
-        };
+        var tokenInfo = new TokenInfo(
+            userId,
+            DateTime.UtcNow.AddHours(-1),
+            DateTime.UtcNow.AddHours(23));
 
         _mockTokenRepository
-            .Setup(r => r.ValidateTokenAsync(token, TokenType.EmailVerification, It.IsAny<CancellationToken>()))
+            .Setup(r => r.ConsumeTokenAsync(tokenHash, TokenType.EmailVerification, It.IsAny<CancellationToken>()))
             .ReturnsAsync(tokenInfo);
 
         var result = await _service.VerifyEmailAsync(token);
@@ -215,26 +216,25 @@ public class EmailVerificationServiceTests
     }
 
     [Fact]
-    public async Task VerifyEmailAsync_WithValidToken_ShouldInvalidateToken()
+    public async Task VerifyEmailAsync_WithValidToken_ShouldConsumeToken()
     {
         var token = "valid-token";
+        var tokenHash = TokenHasher.HashToken(token);
         var userId = "user123";
         var cancellationToken = CancellationToken.None;
-        var tokenInfo = new TokenInfo
-        {
-            UserId = userId,
-            CreatedAt = DateTime.UtcNow.AddHours(-1),
-            ExpiresAt = DateTime.UtcNow.AddHours(23)
-        };
+        var tokenInfo = new TokenInfo(
+            userId,
+            DateTime.UtcNow.AddHours(-1),
+            DateTime.UtcNow.AddHours(23));
 
         _mockTokenRepository
-            .Setup(r => r.ValidateTokenAsync(token, TokenType.EmailVerification, cancellationToken))
+            .Setup(r => r.ConsumeTokenAsync(tokenHash, TokenType.EmailVerification, cancellationToken))
             .ReturnsAsync(tokenInfo);
 
         await _service.VerifyEmailAsync(token, cancellationToken);
 
         _mockTokenRepository.Verify(
-            r => r.InvalidateTokenAsync(token, TokenType.EmailVerification, cancellationToken),
+            r => r.ConsumeTokenAsync(tokenHash, TokenType.EmailVerification, cancellationToken),
             Times.Once);
     }
 
@@ -242,12 +242,10 @@ public class EmailVerificationServiceTests
     public async Task VerifyEmailAsync_WithExpiredToken_ShouldReturnNull()
     {
         var token = "expired-token";
-        var tokenInfo = new TokenInfo
-        {
-            UserId = "user123",
-            CreatedAt = DateTime.UtcNow.AddHours(-25),
-            ExpiresAt = DateTime.UtcNow.AddHours(-1)
-        };
+        var tokenInfo = new TokenInfo(
+            "user123",
+            DateTime.UtcNow.AddHours(-25),
+            DateTime.UtcNow.AddHours(-1));
 
         _mockTokenRepository
             .Setup(r => r.ValidateTokenAsync(token, TokenType.EmailVerification, It.IsAny<CancellationToken>()))
@@ -262,12 +260,10 @@ public class EmailVerificationServiceTests
     public async Task VerifyEmailAsync_WithExpiredToken_ShouldNotInvalidateToken()
     {
         var token = "expired-token";
-        var tokenInfo = new TokenInfo
-        {
-            UserId = "user123",
-            CreatedAt = DateTime.UtcNow.AddHours(-25),
-            ExpiresAt = DateTime.UtcNow.AddHours(-1)
-        };
+        var tokenInfo = new TokenInfo(
+            "user123",
+            DateTime.UtcNow.AddHours(-25),
+            DateTime.UtcNow.AddHours(-1));
 
         _mockTokenRepository
             .Setup(r => r.ValidateTokenAsync(token, TokenType.EmailVerification, It.IsAny<CancellationToken>()))
@@ -475,24 +471,22 @@ public class EmailVerificationServiceTests
                 It.IsAny<TokenType>(),
                 It.IsAny<DateTime>(),
                 It.IsAny<CancellationToken>()))
-            .Callback<string, string, TokenType, DateTime, CancellationToken>((_, token, _, _, _) =>
+            .Callback<string, string, TokenType, DateTime, CancellationToken>((_, tokenHash, _, _, _) =>
             {
-                generatedToken = token;
+                generatedToken = tokenHash;  // Store the hash
             })
             .Returns(Task.CompletedTask);
 
         _mockTokenRepository
-            .Setup(r => r.ValidateTokenAsync(It.IsAny<string>(), TokenType.EmailVerification, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((string token, TokenType type, CancellationToken ct) =>
+            .Setup(r => r.ConsumeTokenAsync(It.IsAny<string>(), TokenType.EmailVerification, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((string tokenHash, TokenType type, CancellationToken ct) =>
             {
-                if (token == generatedToken)
+                if (tokenHash == generatedToken)  // Compare the hash
                 {
-                    return new TokenInfo
-                    {
-                        UserId = userId,
-                        CreatedAt = DateTime.UtcNow.AddHours(-1),
-                        ExpiresAt = DateTime.UtcNow.AddHours(23)
-                    };
+                    return new TokenInfo(
+                        userId,
+                        DateTime.UtcNow.AddHours(-1),
+                        DateTime.UtcNow.AddHours(23));
                 }
                 return null;
             });
@@ -505,7 +499,7 @@ public class EmailVerificationServiceTests
             s => s.SendEmailAsync(email, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Once);
         _mockTokenRepository.Verify(
-            r => r.InvalidateTokenAsync(token, TokenType.EmailVerification, It.IsAny<CancellationToken>()),
+            r => r.ConsumeTokenAsync(It.IsAny<string>(), TokenType.EmailVerification, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 

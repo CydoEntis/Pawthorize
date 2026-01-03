@@ -4,6 +4,7 @@ using Moq;
 using Pawthorize.Abstractions;
 using Pawthorize.Models;
 using Pawthorize.Services;
+using Pawthorize.Utilities;
 using Xunit;
 
 namespace Pawthorize.Core.Tests;
@@ -62,10 +63,11 @@ public class PasswordResetServiceTests
 
         token.Should().NotBeNullOrEmpty();
 
+        // The service hashes the token before storing, so we verify the hash was stored (not the raw token)
         _mockTokenRepository.Verify(
             r => r.StoreTokenAsync(
                 userId,
-                token,
+                It.IsAny<string>(),  // Token hash
                 TokenType.PasswordReset,
                 It.Is<DateTime>(dt => dt > DateTime.UtcNow && dt <= DateTime.UtcNow.AddHours(2)),
                 cancellationToken),
@@ -197,16 +199,15 @@ public class PasswordResetServiceTests
     public async Task ValidateResetTokenAsync_WithValidToken_ShouldReturnUserId()
     {
         var token = "valid-token";
+        var tokenHash = TokenHasher.HashToken(token);
         var userId = "user123";
-        var tokenInfo = new TokenInfo
-        {
-            UserId = userId,
-            CreatedAt = DateTime.UtcNow.AddMinutes(-30),
-            ExpiresAt = DateTime.UtcNow.AddMinutes(30)
-        };
+        var tokenInfo = new TokenInfo(
+            userId,
+            DateTime.UtcNow.AddMinutes(-30),
+            DateTime.UtcNow.AddMinutes(30));
 
         _mockTokenRepository
-            .Setup(r => r.ValidateTokenAsync(token, TokenType.PasswordReset, It.IsAny<CancellationToken>()))
+            .Setup(r => r.ValidateTokenAsync(tokenHash, TokenType.PasswordReset, It.IsAny<CancellationToken>()))
             .ReturnsAsync(tokenInfo);
 
         var result = await _service.ValidateResetTokenAsync(token);
@@ -218,12 +219,10 @@ public class PasswordResetServiceTests
     public async Task ValidateResetTokenAsync_WithExpiredToken_ShouldReturnNull()
     {
         var token = "expired-token";
-        var tokenInfo = new TokenInfo
-        {
-            UserId = "user123",
-            CreatedAt = DateTime.UtcNow.AddHours(-2),
-            ExpiresAt = DateTime.UtcNow.AddHours(-1)
-        };
+        var tokenInfo = new TokenInfo(
+            "user123",
+            DateTime.UtcNow.AddHours(-2),
+            DateTime.UtcNow.AddHours(-1));
 
         _mockTokenRepository
             .Setup(r => r.ValidateTokenAsync(token, TokenType.PasswordReset, It.IsAny<CancellationToken>()))
@@ -252,22 +251,21 @@ public class PasswordResetServiceTests
     public async Task ValidateResetTokenAsync_WithCancellationToken_ShouldPassItToRepository()
     {
         var token = "valid-token";
+        var tokenHash = TokenHasher.HashToken(token);
         var cancellationToken = new CancellationToken();
-        var tokenInfo = new TokenInfo
-        {
-            UserId = "user123",
-            CreatedAt = DateTime.UtcNow.AddMinutes(-30),
-            ExpiresAt = DateTime.UtcNow.AddMinutes(30)
-        };
+        var tokenInfo = new TokenInfo(
+            "user123",
+            DateTime.UtcNow.AddMinutes(-30),
+            DateTime.UtcNow.AddMinutes(30));
 
         _mockTokenRepository
-            .Setup(r => r.ValidateTokenAsync(token, TokenType.PasswordReset, cancellationToken))
+            .Setup(r => r.ValidateTokenAsync(tokenHash, TokenType.PasswordReset, cancellationToken))
             .ReturnsAsync(tokenInfo);
 
         await _service.ValidateResetTokenAsync(token, cancellationToken);
 
         _mockTokenRepository.Verify(
-            r => r.ValidateTokenAsync(token, TokenType.PasswordReset, cancellationToken),
+            r => r.ValidateTokenAsync(tokenHash, TokenType.PasswordReset, cancellationToken),
             Times.Once);
     }
 
@@ -279,12 +277,13 @@ public class PasswordResetServiceTests
     public async Task InvalidateResetTokenAsync_ShouldCallRepositoryInvalidate()
     {
         var token = "token-to-invalidate";
+        var tokenHash = TokenHasher.HashToken(token);
         var cancellationToken = CancellationToken.None;
 
         await _service.InvalidateResetTokenAsync(token, cancellationToken);
 
         _mockTokenRepository.Verify(
-            r => r.InvalidateTokenAsync(token, TokenType.PasswordReset, cancellationToken),
+            r => r.InvalidateTokenAsync(tokenHash, TokenType.PasswordReset, cancellationToken),
             Times.Once);
     }
 
@@ -292,12 +291,13 @@ public class PasswordResetServiceTests
     public async Task InvalidateResetTokenAsync_WithCancellationToken_ShouldPassItToRepository()
     {
         var token = "token-to-invalidate";
+        var tokenHash = TokenHasher.HashToken(token);
         var cancellationToken = new CancellationToken();
 
         await _service.InvalidateResetTokenAsync(token, cancellationToken);
 
         _mockTokenRepository.Verify(
-            r => r.InvalidateTokenAsync(token, TokenType.PasswordReset, cancellationToken),
+            r => r.InvalidateTokenAsync(tokenHash, TokenType.PasswordReset, cancellationToken),
             Times.Once);
     }
 
@@ -402,24 +402,22 @@ public class PasswordResetServiceTests
                 It.IsAny<TokenType>(),
                 It.IsAny<DateTime>(),
                 It.IsAny<CancellationToken>()))
-            .Callback<string, string, TokenType, DateTime, CancellationToken>((_, token, _, _, _) =>
+            .Callback<string, string, TokenType, DateTime, CancellationToken>((_, tokenHash, _, _, _) =>
             {
-                generatedToken = token;
+                generatedToken = tokenHash;  // Store the hash
             })
             .Returns(Task.CompletedTask);
 
         _mockTokenRepository
             .Setup(r => r.ValidateTokenAsync(It.IsAny<string>(), TokenType.PasswordReset, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((string token, TokenType type, CancellationToken ct) =>
+            .ReturnsAsync((string tokenHash, TokenType type, CancellationToken ct) =>
             {
-                if (token == generatedToken)
+                if (tokenHash == generatedToken)  // Compare the hash
                 {
-                    return new TokenInfo
-                    {
-                        UserId = userId,
-                        CreatedAt = DateTime.UtcNow.AddMinutes(-30),
-                        ExpiresAt = DateTime.UtcNow.AddMinutes(30)
-                    };
+                    return new TokenInfo(
+                        userId,
+                        DateTime.UtcNow.AddMinutes(-30),
+                        DateTime.UtcNow.AddMinutes(30));
                 }
                 return null;
             });
@@ -433,7 +431,7 @@ public class PasswordResetServiceTests
             s => s.SendEmailAsync(email, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Once);
         _mockTokenRepository.Verify(
-            r => r.InvalidateTokenAsync(token, TokenType.PasswordReset, It.IsAny<CancellationToken>()),
+            r => r.InvalidateTokenAsync(It.IsAny<string>(), TokenType.PasswordReset, It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
@@ -467,12 +465,10 @@ public class PasswordResetServiceTests
             {
                 if (token == generatedToken)
                 {
-                    return new TokenInfo
-                    {
-                        UserId = userId,
-                        CreatedAt = DateTime.UtcNow.AddHours(-2),
-                        ExpiresAt = DateTime.UtcNow.AddHours(-1)
-                    };
+                    return new TokenInfo(
+                        userId,
+                        DateTime.UtcNow.AddHours(-2),
+                        DateTime.UtcNow.AddHours(-1));
                 }
                 return null;
             });

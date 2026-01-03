@@ -5,6 +5,7 @@ using Moq;
 using Pawthorize.Integration.Tests.Helpers;
 using Pawthorize.Models;
 using Pawthorize.Services;
+using Pawthorize.Utilities;
 using Xunit;
 
 namespace Pawthorize.Integration.Tests;
@@ -253,21 +254,22 @@ public class ServiceIntegrationTests : IDisposable
         await _userRepository.CreateAsync(user);
 
         var initialAuthResult = await _authService.GenerateTokensAsync(user);
+        var initialRefreshTokenHash = TokenHasher.HashToken(initialAuthResult.RefreshToken!);
 
-        var tokenInfo = await _refreshTokenRepository.ValidateAsync(initialAuthResult.RefreshToken!);
+        var tokenInfo = await _refreshTokenRepository.ValidateAsync(initialRefreshTokenHash);
         tokenInfo.Should().NotBeNull();
         tokenInfo!.UserId.Should().Be(user.Id);
         tokenInfo.IsRevoked.Should().BeFalse();
         tokenInfo.IsExpired.Should().BeFalse();
 
-        await _refreshTokenRepository.RevokeAsync(initialAuthResult.RefreshToken!);
+        await _refreshTokenRepository.RevokeAsync(initialRefreshTokenHash);
 
         var newAuthResult = await _authService.GenerateTokensAsync(user);
 
         newAuthResult.AccessToken.Should().NotBe(initialAuthResult.AccessToken);
         newAuthResult.RefreshToken.Should().NotBe(initialAuthResult.RefreshToken);
 
-        var oldTokenInfo = await _refreshTokenRepository.ValidateAsync(initialAuthResult.RefreshToken!);
+        var oldTokenInfo = await _refreshTokenRepository.ValidateAsync(initialRefreshTokenHash);
         oldTokenInfo!.IsRevoked.Should().BeTrue();
     }
 
@@ -289,9 +291,13 @@ public class ServiceIntegrationTests : IDisposable
 
         await _refreshTokenRepository.RevokeAllForUserAsync(user.Id);
 
-        var token1Info = await _refreshTokenRepository.ValidateAsync(token1.RefreshToken!);
-        var token2Info = await _refreshTokenRepository.ValidateAsync(token2.RefreshToken!);
-        var token3Info = await _refreshTokenRepository.ValidateAsync(token3.RefreshToken!);
+        var token1Hash = TokenHasher.HashToken(token1.RefreshToken!);
+        var token2Hash = TokenHasher.HashToken(token2.RefreshToken!);
+        var token3Hash = TokenHasher.HashToken(token3.RefreshToken!);
+
+        var token1Info = await _refreshTokenRepository.ValidateAsync(token1Hash);
+        var token2Info = await _refreshTokenRepository.ValidateAsync(token2Hash);
+        var token3Info = await _refreshTokenRepository.ValidateAsync(token3Hash);
 
         token1Info!.IsRevoked.Should().BeTrue();
         token2Info!.IsRevoked.Should().BeTrue();
@@ -353,8 +359,11 @@ public class ServiceIntegrationTests : IDisposable
 
         await _refreshTokenRepository.RevokeAllForUserAsync(user1.Id);
 
-        var token1Info = await _refreshTokenRepository.ValidateAsync(auth1.RefreshToken!);
-        var token2Info = await _refreshTokenRepository.ValidateAsync(auth2.RefreshToken!);
+        var auth1Hash = TokenHasher.HashToken(auth1.RefreshToken!);
+        var auth2Hash = TokenHasher.HashToken(auth2.RefreshToken!);
+
+        var token1Info = await _refreshTokenRepository.ValidateAsync(auth1Hash);
+        var token2Info = await _refreshTokenRepository.ValidateAsync(auth2Hash);
 
         token1Info!.IsRevoked.Should().BeTrue();
         token2Info!.IsRevoked.Should().BeFalse();

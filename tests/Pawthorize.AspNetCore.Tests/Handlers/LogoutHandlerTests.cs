@@ -12,6 +12,7 @@ using Pawthorize.DTOs;
 using Pawthorize.Errors;
 using Pawthorize.Handlers;
 using Pawthorize.Models;
+using Pawthorize.Utilities;
 using Xunit;
 
 namespace Pawthorize.AspNetCore.Tests.Handlers;
@@ -54,6 +55,7 @@ public class LogoutHandlerTests
     public async Task HandleAsync_WithValidRefreshToken_ShouldRevokeToken()
     {
         var refreshToken = "valid_refresh_token_123";
+        var refreshTokenHash = TokenHasher.HashToken(refreshToken);
         var request = new LogoutRequest { RefreshToken = refreshToken };
 
         _mockValidator
@@ -61,13 +63,13 @@ public class LogoutHandlerTests
             .ReturnsAsync(new ValidationResult());
 
         _mockRefreshTokenRepository
-            .Setup(r => r.RevokeAsync(refreshToken, It.IsAny<CancellationToken>()))
+            .Setup(r => r.RevokeAsync(refreshTokenHash, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         var result = await _handler.HandleAsync(request, _httpContext, CancellationToken.None);
 
         result.Should().NotBeNull();
-        _mockRefreshTokenRepository.Verify(r => r.RevokeAsync(refreshToken, It.IsAny<CancellationToken>()), Times.Once);
+        _mockRefreshTokenRepository.Verify(r => r.RevokeAsync(refreshTokenHash, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -110,6 +112,7 @@ public class LogoutHandlerTests
     {
         _options.TokenDelivery = TokenDeliveryStrategy.HttpOnlyCookies;
         var refreshToken = "cookie_refresh_token";
+        var refreshTokenHash = TokenHasher.HashToken(refreshToken);
         var request = new LogoutRequest { RefreshToken = "" }; // Empty body
 
         _httpContext.Request.Headers["Cookie"] = $"refresh_token={refreshToken}";
@@ -119,19 +122,20 @@ public class LogoutHandlerTests
             .ReturnsAsync(new ValidationResult());
 
         _mockRefreshTokenRepository
-            .Setup(r => r.RevokeAsync(refreshToken, It.IsAny<CancellationToken>()))
+            .Setup(r => r.RevokeAsync(refreshTokenHash, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         var result = await _handler.HandleAsync(request, _httpContext, CancellationToken.None);
 
         result.Should().NotBeNull();
-        _mockRefreshTokenRepository.Verify(r => r.RevokeAsync(refreshToken, It.IsAny<CancellationToken>()), Times.Once);
+        _mockRefreshTokenRepository.Verify(r => r.RevokeAsync(refreshTokenHash, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
     public async Task HandleAsync_WhenRepositoryThrowsError_ShouldPropagateException()
     {
         var refreshToken = "valid_refresh_token";
+        var refreshTokenHash = TokenHasher.HashToken(refreshToken);
         var request = new LogoutRequest { RefreshToken = refreshToken };
 
         _mockValidator
@@ -139,7 +143,7 @@ public class LogoutHandlerTests
             .ReturnsAsync(new ValidationResult());
 
         _mockRefreshTokenRepository
-            .Setup(r => r.RevokeAsync(refreshToken, It.IsAny<CancellationToken>()))
+            .Setup(r => r.RevokeAsync(refreshTokenHash, It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("Database error"));
 
         Func<Task> act = async () => await _handler.HandleAsync(request, _httpContext, CancellationToken.None);

@@ -5,17 +5,17 @@ namespace Pawthorize.Integration.Tests.Helpers;
 
 public class InMemoryRefreshTokenRepository : IRefreshTokenRepository
 {
-    private readonly List<RefreshTokenInfo> _tokens = new();
+    private readonly List<StoredRefreshToken> _tokens = new();
 
     public Task StoreAsync(
-        string token,
+        string tokenHash,
         string userId,
         DateTime expiresAt,
         CancellationToken cancellationToken = default)
     {
-        _tokens.Add(new RefreshTokenInfo
+        _tokens.Add(new StoredRefreshToken
         {
-            Token = token,
+            TokenHash = tokenHash,
             UserId = userId,
             ExpiresAt = expiresAt,
             CreatedAt = DateTime.UtcNow,
@@ -25,20 +25,30 @@ public class InMemoryRefreshTokenRepository : IRefreshTokenRepository
     }
 
     public Task<RefreshTokenInfo?> ValidateAsync(
-        string token,
+        string tokenHash,
         CancellationToken cancellationToken = default)
     {
-        var refreshToken = _tokens.FirstOrDefault(t => t.Token == token);
-        return Task.FromResult(refreshToken);
+        var storedToken = _tokens.FirstOrDefault(t => t.TokenHash == tokenHash);
+        if (storedToken == null)
+            return Task.FromResult<RefreshTokenInfo?>(null);
+
+        var tokenInfo = new RefreshTokenInfo(
+            storedToken.TokenHash,
+            storedToken.UserId,
+            storedToken.ExpiresAt,
+            storedToken.IsRevoked,
+            storedToken.CreatedAt);
+
+        return Task.FromResult<RefreshTokenInfo?>(tokenInfo);
     }
 
     public Task RevokeAsync(
-        string token,
+        string tokenHash,
         CancellationToken cancellationToken = default)
     {
-        var refreshToken = _tokens.FirstOrDefault(t => t.Token == token);
-        if (refreshToken != null)
-            refreshToken.IsRevoked = true;
+        var storedToken = _tokens.FirstOrDefault(t => t.TokenHash == tokenHash);
+        if (storedToken != null)
+            storedToken.IsRevoked = true;
 
         return Task.CompletedTask;
     }
@@ -60,6 +70,12 @@ public class InMemoryRefreshTokenRepository : IRefreshTokenRepository
     {
         var activeTokens = _tokens
             .Where(t => t.UserId == userId && !t.IsRevoked && t.ExpiresAt > DateTime.UtcNow)
+            .Select(t => new RefreshTokenInfo(
+                t.TokenHash,
+                t.UserId,
+                t.ExpiresAt,
+                t.IsRevoked,
+                t.CreatedAt))
             .ToList();
 
         return Task.FromResult<IEnumerable<RefreshTokenInfo>>(activeTokens);
@@ -67,10 +83,10 @@ public class InMemoryRefreshTokenRepository : IRefreshTokenRepository
 
     public Task RevokeAllExceptAsync(
         string userId,
-        string exceptToken,
+        string exceptTokenHash,
         CancellationToken cancellationToken = default)
     {
-        foreach (var token in _tokens.Where(t => t.UserId == userId && t.Token != exceptToken))
+        foreach (var token in _tokens.Where(t => t.UserId == userId && t.TokenHash != exceptTokenHash))
         {
             token.IsRevoked = true;
         }
@@ -78,4 +94,13 @@ public class InMemoryRefreshTokenRepository : IRefreshTokenRepository
     }
 
     public void Clear() => _tokens.Clear();
+
+    private class StoredRefreshToken
+    {
+        public string TokenHash { get; set; } = string.Empty;
+        public string UserId { get; set; } = string.Empty;
+        public DateTime ExpiresAt { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public bool IsRevoked { get; set; }
+    }
 }

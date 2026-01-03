@@ -8,7 +8,7 @@ public class InMemoryTokenRepository : ITokenRepository
 
     public Task StoreTokenAsync(
         string userId,
-        string token,
+        string tokenHash,
         TokenType tokenType,
         DateTime expiresAt,
         CancellationToken cancellationToken = default)
@@ -16,7 +16,7 @@ public class InMemoryTokenRepository : ITokenRepository
         _tokens.Add(new StoredToken
         {
             UserId = userId,
-            Token = token,
+            TokenHash = tokenHash,
             TokenType = tokenType,
             ExpiresAt = expiresAt,
             CreatedAt = DateTime.UtcNow
@@ -25,33 +25,52 @@ public class InMemoryTokenRepository : ITokenRepository
     }
 
     public Task<TokenInfo?> ValidateTokenAsync(
-        string token,
+        string tokenHash,
         TokenType tokenType,
         CancellationToken cancellationToken = default)
     {
         var storedToken = _tokens.FirstOrDefault(t =>
-            t.Token == token &&
+            t.TokenHash == tokenHash &&
             t.TokenType == tokenType &&
             !t.IsInvalidated);
 
         if (storedToken == null)
             return Task.FromResult<TokenInfo?>(null);
 
-        return Task.FromResult<TokenInfo?>(new TokenInfo
-        {
-            UserId = storedToken.UserId,
-            CreatedAt = storedToken.CreatedAt,
-            ExpiresAt = storedToken.ExpiresAt
-        });
+        return Task.FromResult<TokenInfo?>(new TokenInfo(
+            storedToken.UserId,
+            storedToken.CreatedAt,
+            storedToken.ExpiresAt));
     }
 
-    public Task InvalidateTokenAsync(
-        string token,
+    public Task<TokenInfo?> ConsumeTokenAsync(
+        string tokenHash,
         TokenType tokenType,
         CancellationToken cancellationToken = default)
     {
         var storedToken = _tokens.FirstOrDefault(t =>
-            t.Token == token &&
+            t.TokenHash == tokenHash &&
+            t.TokenType == tokenType &&
+            !t.IsInvalidated);
+
+        if (storedToken == null)
+            return Task.FromResult<TokenInfo?>(null);
+
+        storedToken.IsInvalidated = true;
+
+        return Task.FromResult<TokenInfo?>(new TokenInfo(
+            storedToken.UserId,
+            storedToken.CreatedAt,
+            storedToken.ExpiresAt));
+    }
+
+    public Task InvalidateTokenAsync(
+        string tokenHash,
+        TokenType tokenType,
+        CancellationToken cancellationToken = default)
+    {
+        var storedToken = _tokens.FirstOrDefault(t =>
+            t.TokenHash == tokenHash &&
             t.TokenType == tokenType);
 
         if (storedToken != null)
@@ -77,7 +96,7 @@ public class InMemoryTokenRepository : ITokenRepository
     private class StoredToken
     {
         public string UserId { get; set; } = string.Empty;
-        public string Token { get; set; } = string.Empty;
+        public string TokenHash { get; set; } = string.Empty;
         public TokenType TokenType { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime ExpiresAt { get; set; }

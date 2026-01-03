@@ -12,6 +12,7 @@ using Pawthorize.Errors;
 using Pawthorize.Handlers;
 using Pawthorize.Models;
 using Pawthorize.Services;
+using Pawthorize.Utilities;
 using Xunit;
 
 namespace Pawthorize.AspNetCore.Tests.Handlers;
@@ -87,6 +88,7 @@ public class RefreshHandlerTests
     public async Task HandleAsync_WithValidRefreshToken_ShouldReturnNewTokens()
     {
         var refreshToken = "valid_refresh_token_123";
+        var refreshTokenHash = TokenHasher.HashToken(refreshToken);
         var request = new RefreshTokenRequest { RefreshToken = refreshToken };
 
         var user = new TestUser
@@ -98,13 +100,11 @@ public class RefreshHandlerTests
             IsLocked = false
         };
 
-        var tokenInfo = new RefreshTokenInfo
-        {
-            Token = refreshToken,
-            UserId = user.Id,
-            ExpiresAt = DateTime.UtcNow.AddDays(7),
-            IsRevoked = false
-        };
+        var tokenInfo = new RefreshTokenInfo(
+            refreshTokenHash,
+            user.Id,
+            DateTime.UtcNow.AddDays(7),
+            false);
 
         var authResult = new AuthResult
         {
@@ -119,7 +119,7 @@ public class RefreshHandlerTests
             .ReturnsAsync(new ValidationResult());
 
         _mockRefreshTokenRepository
-            .Setup(r => r.ValidateAsync(refreshToken, It.IsAny<CancellationToken>()))
+            .Setup(r => r.ValidateAsync(refreshTokenHash, It.IsAny<CancellationToken>()))
             .ReturnsAsync(tokenInfo);
 
         _mockUserRepository
@@ -127,7 +127,7 @@ public class RefreshHandlerTests
             .ReturnsAsync(user);
 
         _mockRefreshTokenRepository
-            .Setup(r => r.RevokeAsync(refreshToken, It.IsAny<CancellationToken>()))
+            .Setup(r => r.RevokeAsync(refreshTokenHash, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         _mockAuthService
@@ -137,9 +137,9 @@ public class RefreshHandlerTests
         var result = await _handler.HandleAsync(request, _httpContext, CancellationToken.None);
 
         result.Should().NotBeNull();
-        _mockRefreshTokenRepository.Verify(r => r.ValidateAsync(refreshToken, It.IsAny<CancellationToken>()), Times.Once);
+        _mockRefreshTokenRepository.Verify(r => r.ValidateAsync(refreshTokenHash, It.IsAny<CancellationToken>()), Times.Once);
         _mockUserRepository.Verify(r => r.FindByIdAsync(user.Id, It.IsAny<CancellationToken>()), Times.Once);
-        _mockRefreshTokenRepository.Verify(r => r.RevokeAsync(refreshToken, It.IsAny<CancellationToken>()), Times.Once);
+        _mockRefreshTokenRepository.Verify(r => r.RevokeAsync(refreshTokenHash, It.IsAny<CancellationToken>()), Times.Once);
         _mockAuthService.Verify(s => s.GenerateTokensAsync(user, It.IsAny<CancellationToken>()), Times.Once);
     }
 
@@ -147,22 +147,21 @@ public class RefreshHandlerTests
     public async Task HandleAsync_WithExpiredRefreshToken_ShouldThrowInvalidRefreshTokenError()
     {
         var refreshToken = "expired_refresh_token";
+        var refreshTokenHash = TokenHasher.HashToken(refreshToken);
         var request = new RefreshTokenRequest { RefreshToken = refreshToken };
 
-        var tokenInfo = new RefreshTokenInfo
-        {
-            Token = refreshToken,
-            UserId = "user123",
-            ExpiresAt = DateTime.UtcNow.AddDays(-1),
-            IsRevoked = false
-        };
+        var tokenInfo = new RefreshTokenInfo(
+            refreshTokenHash,
+            "user123",
+            DateTime.UtcNow.AddDays(-1),
+            false);
 
         _mockValidator
             .Setup(v => v.ValidateAsync(request, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ValidationResult());
 
         _mockRefreshTokenRepository
-            .Setup(r => r.ValidateAsync(refreshToken, It.IsAny<CancellationToken>()))
+            .Setup(r => r.ValidateAsync(refreshTokenHash, It.IsAny<CancellationToken>()))
             .ReturnsAsync(tokenInfo);
 
         Func<Task> act = async () => await _handler.HandleAsync(request, _httpContext, CancellationToken.None);
@@ -176,6 +175,7 @@ public class RefreshHandlerTests
     public async Task HandleAsync_WithInvalidRefreshToken_ShouldThrowInvalidRefreshTokenError()
     {
         var refreshToken = "invalid_refresh_token";
+        var refreshTokenHash = TokenHasher.HashToken(refreshToken);
         var request = new RefreshTokenRequest { RefreshToken = refreshToken };
 
         _mockValidator
@@ -183,7 +183,7 @@ public class RefreshHandlerTests
             .ReturnsAsync(new ValidationResult());
 
         _mockRefreshTokenRepository
-            .Setup(r => r.ValidateAsync(refreshToken, It.IsAny<CancellationToken>()))
+            .Setup(r => r.ValidateAsync(refreshTokenHash, It.IsAny<CancellationToken>()))
             .ReturnsAsync((RefreshTokenInfo?)null);
 
         Func<Task> act = async () => await _handler.HandleAsync(request, _httpContext, CancellationToken.None);
@@ -196,22 +196,21 @@ public class RefreshHandlerTests
     public async Task HandleAsync_WithNonExistentUser_ShouldThrowInvalidRefreshTokenError()
     {
         var refreshToken = "valid_token_for_deleted_user";
+        var refreshTokenHash = TokenHasher.HashToken(refreshToken);
         var request = new RefreshTokenRequest { RefreshToken = refreshToken };
 
-        var tokenInfo = new RefreshTokenInfo
-        {
-            Token = refreshToken,
-            UserId = "deleted_user_id",
-            ExpiresAt = DateTime.UtcNow.AddDays(7),
-            IsRevoked = false
-        };
+        var tokenInfo = new RefreshTokenInfo(
+            refreshTokenHash,
+            "deleted_user_id",
+            DateTime.UtcNow.AddDays(7),
+            false);
 
         _mockValidator
             .Setup(v => v.ValidateAsync(request, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ValidationResult());
 
         _mockRefreshTokenRepository
-            .Setup(r => r.ValidateAsync(refreshToken, It.IsAny<CancellationToken>()))
+            .Setup(r => r.ValidateAsync(refreshTokenHash, It.IsAny<CancellationToken>()))
             .ReturnsAsync(tokenInfo);
 
         _mockUserRepository
@@ -228,6 +227,7 @@ public class RefreshHandlerTests
     public async Task HandleAsync_WithLockedAccount_ShouldThrowAccountLockedError()
     {
         var refreshToken = "valid_refresh_token";
+        var refreshTokenHash = TokenHasher.HashToken(refreshToken);
         var request = new RefreshTokenRequest { RefreshToken = refreshToken };
 
         var user = new TestUser
@@ -239,20 +239,18 @@ public class RefreshHandlerTests
             LockedUntil = DateTime.UtcNow.AddHours(1)
         };
 
-        var tokenInfo = new RefreshTokenInfo
-        {
-            Token = refreshToken,
-            UserId = user.Id,
-            ExpiresAt = DateTime.UtcNow.AddDays(7),
-            IsRevoked = false
-        };
+        var tokenInfo = new RefreshTokenInfo(
+            refreshTokenHash,
+            user.Id,
+            DateTime.UtcNow.AddDays(7),
+            false);
 
         _mockValidator
             .Setup(v => v.ValidateAsync(request, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ValidationResult());
 
         _mockRefreshTokenRepository
-            .Setup(r => r.ValidateAsync(refreshToken, It.IsAny<CancellationToken>()))
+            .Setup(r => r.ValidateAsync(refreshTokenHash, It.IsAny<CancellationToken>()))
             .ReturnsAsync(tokenInfo);
 
         _mockUserRepository
@@ -271,6 +269,7 @@ public class RefreshHandlerTests
         _options.RequireEmailVerification = true;
 
         var refreshToken = "valid_refresh_token";
+        var refreshTokenHash = TokenHasher.HashToken(refreshToken);
         var request = new RefreshTokenRequest { RefreshToken = refreshToken };
 
         var user = new TestUser
@@ -281,20 +280,18 @@ public class RefreshHandlerTests
             IsEmailVerified = false
         };
 
-        var tokenInfo = new RefreshTokenInfo
-        {
-            Token = refreshToken,
-            UserId = user.Id,
-            ExpiresAt = DateTime.UtcNow.AddDays(7),
-            IsRevoked = false
-        };
+        var tokenInfo = new RefreshTokenInfo(
+            refreshTokenHash,
+            user.Id,
+            DateTime.UtcNow.AddDays(7),
+            false);
 
         _mockValidator
             .Setup(v => v.ValidateAsync(request, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new ValidationResult());
 
         _mockRefreshTokenRepository
-            .Setup(r => r.ValidateAsync(refreshToken, It.IsAny<CancellationToken>()))
+            .Setup(r => r.ValidateAsync(refreshTokenHash, It.IsAny<CancellationToken>()))
             .ReturnsAsync(tokenInfo);
 
         _mockUserRepository
@@ -333,6 +330,7 @@ public class RefreshHandlerTests
     public async Task HandleAsync_ShouldRevokeOldTokenBeforeGeneratingNew()
     {
         var refreshToken = "valid_refresh_token";
+        var refreshTokenHash = TokenHasher.HashToken(refreshToken);
         var request = new RefreshTokenRequest { RefreshToken = refreshToken };
 
         var user = new TestUser
@@ -344,13 +342,11 @@ public class RefreshHandlerTests
             IsLocked = false
         };
 
-        var tokenInfo = new RefreshTokenInfo
-        {
-            Token = refreshToken,
-            UserId = user.Id,
-            ExpiresAt = DateTime.UtcNow.AddDays(7),
-            IsRevoked = false
-        };
+        var tokenInfo = new RefreshTokenInfo(
+            refreshTokenHash,
+            user.Id,
+            DateTime.UtcNow.AddDays(7),
+            false);
 
         var authResult = new AuthResult
         {
@@ -367,7 +363,7 @@ public class RefreshHandlerTests
             .ReturnsAsync(new ValidationResult());
 
         _mockRefreshTokenRepository
-            .Setup(r => r.ValidateAsync(refreshToken, It.IsAny<CancellationToken>()))
+            .Setup(r => r.ValidateAsync(refreshTokenHash, It.IsAny<CancellationToken>()))
             .ReturnsAsync(tokenInfo);
 
         _mockUserRepository
@@ -375,7 +371,7 @@ public class RefreshHandlerTests
             .ReturnsAsync(user);
 
         _mockRefreshTokenRepository
-            .Setup(r => r.RevokeAsync(refreshToken, It.IsAny<CancellationToken>()))
+            .Setup(r => r.RevokeAsync(refreshTokenHash, It.IsAny<CancellationToken>()))
             .Callback(() => callSequence.Add("Revoke"))
             .Returns(Task.CompletedTask);
 
@@ -396,6 +392,7 @@ public class RefreshHandlerTests
     {
         _options.TokenDelivery = TokenDeliveryStrategy.HttpOnlyCookies;
         var refreshToken = "cookie_refresh_token";
+        var refreshTokenHash = TokenHasher.HashToken(refreshToken);
         var request = new RefreshTokenRequest { RefreshToken = "" }; // Empty body
 
         _httpContext.Request.Headers["Cookie"] = $"refresh_token={refreshToken}";
@@ -409,13 +406,11 @@ public class RefreshHandlerTests
             IsLocked = false
         };
 
-        var tokenInfo = new RefreshTokenInfo
-        {
-            Token = refreshToken,
-            UserId = user.Id,
-            ExpiresAt = DateTime.UtcNow.AddDays(7),
-            IsRevoked = false
-        };
+        var tokenInfo = new RefreshTokenInfo(
+            refreshTokenHash,
+            user.Id,
+            DateTime.UtcNow.AddDays(7),
+            false);
 
         var authResult = new AuthResult
         {
@@ -430,7 +425,7 @@ public class RefreshHandlerTests
             .ReturnsAsync(new ValidationResult());
 
         _mockRefreshTokenRepository
-            .Setup(r => r.ValidateAsync(refreshToken, It.IsAny<CancellationToken>()))
+            .Setup(r => r.ValidateAsync(refreshTokenHash, It.IsAny<CancellationToken>()))
             .ReturnsAsync(tokenInfo);
 
         _mockUserRepository
@@ -438,7 +433,7 @@ public class RefreshHandlerTests
             .ReturnsAsync(user);
 
         _mockRefreshTokenRepository
-            .Setup(r => r.RevokeAsync(refreshToken, It.IsAny<CancellationToken>()))
+            .Setup(r => r.RevokeAsync(refreshTokenHash, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
         _mockAuthService
@@ -448,7 +443,7 @@ public class RefreshHandlerTests
         var result = await _handler.HandleAsync(request, _httpContext, CancellationToken.None);
 
         result.Should().NotBeNull();
-        _mockRefreshTokenRepository.Verify(r => r.ValidateAsync(refreshToken, It.IsAny<CancellationToken>()), Times.Once);
+        _mockRefreshTokenRepository.Verify(r => r.ValidateAsync(refreshTokenHash, It.IsAny<CancellationToken>()), Times.Once);
         _mockAuthService.Verify(s => s.GenerateTokensAsync(user, It.IsAny<CancellationToken>()), Times.Once);
     }
 }

@@ -100,9 +100,10 @@ public class AuthenticationServiceTests
 
         var result = await _service.GenerateTokensAsync(user, cancellationToken);
 
+        // The service hashes the token before storing it, so we verify with It.IsAny<string>()
         _mockRefreshTokenRepository.Verify(
             r => r.StoreAsync(
-                result.RefreshToken!,
+                It.IsAny<string>(),  // Token hash
                 user.Id,
                 It.Is<DateTime>(dt => dt > DateTime.UtcNow),
                 cancellationToken),
