@@ -61,7 +61,8 @@ public class RefreshHandler<TUser> where TUser : IAuthenticatedUser
             var refreshToken = ExtractRefreshToken(request, httpContext);
             _logger.LogDebug("Refresh token extracted from request");
 
-            var tokenInfo = await _refreshTokenRepository.ValidateAsync(refreshToken, cancellationToken);
+            var refreshTokenHash = TokenHasher.HashToken(refreshToken);
+            var tokenInfo = await _refreshTokenRepository.ValidateAsync(refreshTokenHash, cancellationToken);
 
             if (tokenInfo == null)
             {
@@ -91,7 +92,7 @@ public class RefreshHandler<TUser> where TUser : IAuthenticatedUser
             _authService.ValidateAccountStatus(user);
             _logger.LogDebug("Account status validation passed for UserId: {UserId}", user.Id);
 
-            await _refreshTokenRepository.RevokeAsync(refreshToken, cancellationToken);
+            await _refreshTokenRepository.RevokeAsync(refreshTokenHash, cancellationToken);
             _logger.LogDebug("Old refresh token revoked for UserId: {UserId}", user.Id);
 
             var authResult = await _authService.GenerateTokensAsync(user, cancellationToken);

@@ -61,7 +61,8 @@ public class RevokeAllOtherSessionsHandler<TUser> where TUser : IAuthenticatedUs
             var currentRefreshToken = ExtractRefreshToken(request, httpContext);
             _logger.LogDebug("Refresh token extracted from request");
 
-            await _refreshTokenRepository.RevokeAllExceptAsync(userId, currentRefreshToken, cancellationToken);
+            var currentRefreshTokenHash = TokenHasher.HashToken(currentRefreshToken);
+            await _refreshTokenRepository.RevokeAllExceptAsync(userId, currentRefreshTokenHash, cancellationToken);
 
             _logger.LogInformation("All other sessions revoked successfully for UserId: {UserId}", userId);
 

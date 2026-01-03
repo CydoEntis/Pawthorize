@@ -52,7 +52,8 @@ public class LogoutHandler<TUser> where TUser : IAuthenticatedUser
             var refreshToken = ExtractRefreshToken(request, httpContext);
             _logger.LogDebug("Refresh token extracted from request");
 
-            await _refreshTokenRepository.RevokeAsync(refreshToken, cancellationToken);
+            var refreshTokenHash = TokenHasher.HashToken(refreshToken);
+            await _refreshTokenRepository.RevokeAsync(refreshTokenHash, cancellationToken);
             _logger.LogDebug("Refresh token revoked successfully");
 
             TokenDeliveryHelper.ClearAuthCookies(httpContext, _options.TokenDelivery, _options, _logger);
