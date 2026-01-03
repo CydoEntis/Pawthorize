@@ -9,15 +9,15 @@
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 </div>
 
-> **🎉 Version 1.1.0 Release**
+> **🎉 Version 0.3.0 Release**
 >
-> **New in v1.1.0:**
+> **New in v0.3.0:**
 > - **Enhanced Security**: All tokens (email verification, password reset, refresh) are now hashed using SHA256 before storage
 > - **Immutable Token Models**: TokenInfo and RefreshTokenInfo are now immutable records for better safety
 > - **Atomic Token Consumption**: New `ConsumeTokenAsync` method prevents token reuse bugs
 > - **Constant-Time Validation**: Protection against timing attacks
 >
-> **⚠️ Breaking Changes**: v1.1.0 includes breaking changes to `ITokenRepository` and `IRefreshTokenRepository`. See the [Migration Guide](#migration-from-v02-to-v11) below.
+> **⚠️ Breaking Changes**: v0.3.0 includes breaking changes to `ITokenRepository` and `IRefreshTokenRepository`. See the [Migration Guide](#migration-from-v02-to-v10) below.
 >
 > While Pawthorize is thoroughly tested with 158 passing tests, please test thoroughly with your specific use case before deploying to production.
 
@@ -763,7 +763,7 @@ Pawthorize integrates with [ErrorHound](https://github.com/yourusername/errorhou
   },
   "meta": {
     "timestamp": "2025-12-29T10:30:00Z",
-    "version": "v1.0"
+    "version": "v0.3"
   }
 }
 ```
@@ -798,9 +798,9 @@ public class CustomRegisterValidator : AbstractValidator<CustomRegisterRequest>
 builder.Services.AddScoped<IValidator<CustomRegisterRequest>, CustomRegisterValidator>();
 ```
 
-## Migration from v0.2 to v1.1
+## Migration from v0.2 to v0.3
 
-Version 1.1.0 introduces important security enhancements that require changes to your repository implementations.
+Version 0.3.0 introduces important security enhancements that require changes to your repository implementations.
 
 ### Breaking Changes
 
@@ -1048,7 +1048,7 @@ Pawthorize is designed with security in mind:
 ## Dependencies
 
 - ErrorHound (2.0.0+)
-- SuccessHound (1.0.0+)
+- SuccessHound (0.3.0+)
 - FluentValidation (11.9.0+)
 - BCrypt.Net-Next (4.0.3+)
 - JWT Bearer Authentication
