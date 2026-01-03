@@ -9,21 +9,21 @@ namespace Pawthorize.Sample.MinimalApi.Repositories;
 /// </summary>
 public class InMemoryRefreshTokenRepository : IRefreshTokenRepository
 {
-    private readonly Dictionary<string, RefreshTokenInfo> _tokens = new();
+    private readonly Dictionary<string, StoredRefreshToken> _tokens = new();
 
     /// <summary>
-    /// Stores a refresh token in the repository.
+    /// Stores a refresh token hash in the repository.
     /// </summary>
-    /// <param name="token">The refresh token to store.</param>
+    /// <param name="tokenHash">The refresh token hash to store.</param>
     /// <param name="userId">The user ID associated with the token.</param>
     /// <param name="expiresAt">The expiration date and time of the token.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    public Task StoreAsync(string token, string userId, DateTime expiresAt,
+    public Task StoreAsync(string tokenHash, string userId, DateTime expiresAt,
         CancellationToken cancellationToken = default)
     {
-        _tokens[token] = new RefreshTokenInfo
+        _tokens[tokenHash] = new StoredRefreshToken
         {
-            Token = token,
+            TokenHash = tokenHash,
             UserId = userId,
             ExpiresAt = expiresAt,
             CreatedAt = DateTime.UtcNow,
@@ -33,32 +33,39 @@ public class InMemoryRefreshTokenRepository : IRefreshTokenRepository
     }
 
     /// <summary>
-    /// Validates a refresh token and returns its information if valid.
+    /// Validates a refresh token hash and returns its information if valid.
     /// </summary>
-    /// <param name="token">The refresh token to validate.</param>
+    /// <param name="tokenHash">The refresh token hash to validate.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Token information if valid, null otherwise.</returns>
-    public Task<RefreshTokenInfo?> ValidateAsync(string token, CancellationToken cancellationToken = default)
+    public Task<RefreshTokenInfo?> ValidateAsync(string tokenHash, CancellationToken cancellationToken = default)
     {
-        if (!_tokens.TryGetValue(token, out var tokenInfo))
+        if (!_tokens.TryGetValue(tokenHash, out var storedToken))
             return Task.FromResult<RefreshTokenInfo?>(null);
 
-        if (tokenInfo.IsRevoked || tokenInfo.ExpiresAt < DateTime.UtcNow)
+        if (storedToken.IsRevoked || storedToken.ExpiresAt < DateTime.UtcNow)
             return Task.FromResult<RefreshTokenInfo?>(null);
+
+        var tokenInfo = new RefreshTokenInfo(
+            storedToken.TokenHash,
+            storedToken.UserId,
+            storedToken.ExpiresAt,
+            storedToken.IsRevoked,
+            storedToken.CreatedAt);
 
         return Task.FromResult<RefreshTokenInfo?>(tokenInfo);
     }
 
     /// <summary>
-    /// Revokes a specific refresh token.
+    /// Revokes a specific refresh token hash.
     /// </summary>
-    /// <param name="token">The refresh token to revoke.</param>
+    /// <param name="tokenHash">The refresh token hash to revoke.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    public Task RevokeAsync(string token, CancellationToken cancellationToken = default)
+    public Task RevokeAsync(string tokenHash, CancellationToken cancellationToken = default)
     {
-        if (_tokens.TryGetValue(token, out var tokenInfo))
+        if (_tokens.TryGetValue(tokenHash, out var storedToken))
         {
-            tokenInfo.IsRevoked = true;
+            storedToken.IsRevoked = true;
         }
 
         return Task.CompletedTask;
@@ -71,9 +78,9 @@ public class InMemoryRefreshTokenRepository : IRefreshTokenRepository
     /// <param name="cancellationToken">Cancellation token.</param>
     public Task RevokeAllForUserAsync(string userId, CancellationToken cancellationToken = default)
     {
-        foreach (var tokenInfo in _tokens.Values.Where(t => t.UserId == userId))
+        foreach (var storedToken in _tokens.Values.Where(t => t.UserId == userId))
         {
-            tokenInfo.IsRevoked = true;
+            storedToken.IsRevoked = true;
         }
 
         return Task.CompletedTask;
@@ -89,24 +96,39 @@ public class InMemoryRefreshTokenRepository : IRefreshTokenRepository
     {
         var activeTokens = _tokens.Values
             .Where(t => t.UserId == userId && !t.IsRevoked && t.ExpiresAt > DateTime.UtcNow)
+            .Select(t => new RefreshTokenInfo(
+                t.TokenHash,
+                t.UserId,
+                t.ExpiresAt,
+                t.IsRevoked,
+                t.CreatedAt))
             .ToList();
 
         return Task.FromResult<IEnumerable<RefreshTokenInfo>>(activeTokens);
     }
 
     /// <summary>
-    /// Revokes all refresh tokens for a user except the specified token.
+    /// Revokes all refresh tokens for a user except the specified token hash.
     /// </summary>
     /// <param name="userId">The user ID whose tokens should be revoked.</param>
-    /// <param name="exceptToken">The token to keep active (current session).</param>
+    /// <param name="exceptTokenHash">The token hash to keep active (current session).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    public Task RevokeAllExceptAsync(string userId, string exceptToken, CancellationToken cancellationToken = default)
+    public Task RevokeAllExceptAsync(string userId, string exceptTokenHash, CancellationToken cancellationToken = default)
     {
-        foreach (var tokenInfo in _tokens.Values.Where(t => t.UserId == userId && t.Token != exceptToken))
+        foreach (var storedToken in _tokens.Values.Where(t => t.UserId == userId && t.TokenHash != exceptTokenHash))
         {
-            tokenInfo.IsRevoked = true;
+            storedToken.IsRevoked = true;
         }
 
         return Task.CompletedTask;
+    }
+
+    private class StoredRefreshToken
+    {
+        public string TokenHash { get; set; } = string.Empty;
+        public string UserId { get; set; } = string.Empty;
+        public DateTime ExpiresAt { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public bool IsRevoked { get; set; }
     }
 }

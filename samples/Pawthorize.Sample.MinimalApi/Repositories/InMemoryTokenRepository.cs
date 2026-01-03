@@ -9,14 +9,14 @@ public class InMemoryTokenRepository : ITokenRepository
 
     public Task StoreTokenAsync(
         string userId,
-        string token,
+        string tokenHash,
         TokenType type,
         DateTime expiresAt,
         CancellationToken cancellationToken = default)
     {
         var storedToken = new StoredToken
         {
-            Token = token,
+            TokenHash = tokenHash,
             UserId = userId,
             Type = type,
             CreatedAt = DateTime.UtcNow,
@@ -24,16 +24,16 @@ public class InMemoryTokenRepository : ITokenRepository
             IsInvalidated = false
         };
 
-        _tokens[token] = storedToken;
+        _tokens[tokenHash] = storedToken;
         return Task.CompletedTask;
     }
 
     public Task<TokenInfo?> ValidateTokenAsync(
-        string token,
+        string tokenHash,
         TokenType type,
         CancellationToken cancellationToken = default)
     {
-        if (!_tokens.TryGetValue(token, out var storedToken))
+        if (!_tokens.TryGetValue(tokenHash, out var storedToken))
             return Task.FromResult<TokenInfo?>(null);
 
         if (storedToken.Type != type)
@@ -42,22 +42,45 @@ public class InMemoryTokenRepository : ITokenRepository
         if (storedToken.IsInvalidated)
             return Task.FromResult<TokenInfo?>(null);
 
-        var tokenInfo = new TokenInfo
-        {
-            UserId = storedToken.UserId,
-            CreatedAt = storedToken.CreatedAt,
-            ExpiresAt = storedToken.ExpiresAt
-        };
+        var tokenInfo = new TokenInfo(
+            storedToken.UserId,
+            storedToken.CreatedAt,
+            storedToken.ExpiresAt);
+
+        return Task.FromResult<TokenInfo?>(tokenInfo);
+    }
+
+    public Task<TokenInfo?> ConsumeTokenAsync(
+        string tokenHash,
+        TokenType type,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_tokens.TryGetValue(tokenHash, out var storedToken))
+            return Task.FromResult<TokenInfo?>(null);
+
+        if (storedToken.Type != type)
+            return Task.FromResult<TokenInfo?>(null);
+
+        if (storedToken.IsInvalidated)
+            return Task.FromResult<TokenInfo?>(null);
+
+        // Invalidate the token atomically
+        storedToken.IsInvalidated = true;
+
+        var tokenInfo = new TokenInfo(
+            storedToken.UserId,
+            storedToken.CreatedAt,
+            storedToken.ExpiresAt);
 
         return Task.FromResult<TokenInfo?>(tokenInfo);
     }
 
     public Task InvalidateTokenAsync(
-        string token,
+        string tokenHash,
         TokenType type,
         CancellationToken cancellationToken = default)
     {
-        if (_tokens.TryGetValue(token, out var storedToken) && storedToken.Type == type)
+        if (_tokens.TryGetValue(tokenHash, out var storedToken) && storedToken.Type == type)
         {
             storedToken.IsInvalidated = true;
         }
@@ -80,7 +103,7 @@ public class InMemoryTokenRepository : ITokenRepository
 
     private class StoredToken
     {
-        public string Token { get; set; } = string.Empty;
+        public string TokenHash { get; set; } = string.Empty;
         public string UserId { get; set; } = string.Empty;
         public TokenType Type { get; set; }
         public DateTime CreatedAt { get; set; }
