@@ -67,14 +67,18 @@ public class RefreshHandler<TUser> where TUser : IAuthenticatedUser
             if (tokenInfo == null)
             {
                 _logger.LogWarning("Token refresh failed: Invalid or non-existent refresh token");
-                throw new InvalidRefreshTokenError();
+                throw new InvalidRefreshTokenError(
+                    "Refresh token not found or has been revoked",
+                    _options.TokenDelivery.ToString());
             }
 
             if (tokenInfo.IsExpired)
             {
                 _logger.LogWarning("Token refresh failed: Refresh token expired for UserId: {UserId}",
                     tokenInfo.UserId);
-                throw new InvalidRefreshTokenError();
+                throw new InvalidRefreshTokenError(
+                    $"Refresh token expired on {tokenInfo.ExpiresAt:yyyy-MM-dd HH:mm:ss} UTC",
+                    _options.TokenDelivery.ToString());
             }
 
             _logger.LogDebug("Refresh token validated successfully for UserId: {UserId}", tokenInfo.UserId);
@@ -84,7 +88,9 @@ public class RefreshHandler<TUser> where TUser : IAuthenticatedUser
             if (user == null)
             {
                 _logger.LogError("Token refresh failed: User not found for UserId: {UserId}", tokenInfo.UserId);
-                throw new InvalidRefreshTokenError();
+                throw new InvalidRefreshTokenError(
+                    $"User not found for token. UserId: {tokenInfo.UserId}",
+                    _options.TokenDelivery.ToString());
             }
 
             _logger.LogDebug("User found for refresh token, UserId: {UserId}", user.Id);
@@ -150,6 +156,8 @@ public class RefreshHandler<TUser> where TUser : IAuthenticatedUser
         }
 
         _logger.LogWarning("No refresh token found in cookie or request body");
-        throw new InvalidRefreshTokenError();
+        throw new InvalidRefreshTokenError(
+            "Refresh token not provided in request",
+            _options.TokenDelivery.ToString());
     }
 }

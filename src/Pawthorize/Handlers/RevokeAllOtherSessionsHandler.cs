@@ -109,6 +109,8 @@ public class RevokeAllOtherSessionsHandler<TUser> where TUser : IAuthenticatedUs
         }
 
         _logger.LogWarning("No refresh token found in cookie or request body");
-        throw new InvalidRefreshTokenError();
+        throw new InvalidRefreshTokenError(
+            "Refresh token not provided in request",
+            _options.TokenDelivery.ToString());
     }
 }

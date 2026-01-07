@@ -2,6 +2,7 @@ using ErrorHound.BuiltIn;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Pawthorize.Errors;
 using Pawthorize.Models;
 using Pawthorize.Services;
 
@@ -88,16 +89,48 @@ public class CsrfProtectionMiddleware
 
         _logger.LogDebug("Validating CSRF token for {Method} {Path}", context.Request.Method, path);
 
+        // Check for missing cookie
+        if (string.IsNullOrEmpty(cookieToken))
+        {
+            _logger.LogWarning(
+                "CSRF validation failed for {Method} {Path}. Reason: Missing CSRF cookie '{CookieName}'",
+                context.Request.Method,
+                path,
+                _options.Csrf.CookieName);
+
+            throw new CsrfValidationError(
+                reason: $"Missing CSRF cookie '{_options.Csrf.CookieName}'",
+                cookieName: _options.Csrf.CookieName,
+                headerName: _options.Csrf.HeaderName);
+        }
+
+        // Check for missing header
+        if (string.IsNullOrEmpty(headerToken))
+        {
+            _logger.LogWarning(
+                "CSRF validation failed for {Method} {Path}. Reason: Missing CSRF header '{HeaderName}'",
+                context.Request.Method,
+                path,
+                _options.Csrf.HeaderName);
+
+            throw new CsrfValidationError(
+                reason: $"Missing CSRF header '{_options.Csrf.HeaderName}'",
+                cookieName: _options.Csrf.CookieName,
+                headerName: _options.Csrf.HeaderName);
+        }
+
+        // Validate tokens match (constant-time comparison)
         if (!csrfService.ValidateToken(cookieToken, headerToken))
         {
             _logger.LogWarning(
-                "CSRF validation failed for {Method} {Path}. Cookie present: {HasCookie}, Header present: {HasHeader}",
+                "CSRF validation failed for {Method} {Path}. Reason: CSRF token mismatch. Cookie and header values do not match.",
                 context.Request.Method,
-                path,
-                !string.IsNullOrEmpty(cookieToken),
-                !string.IsNullOrEmpty(headerToken));
+                path);
 
-            throw new ForbiddenError("CSRF token validation failed");
+            throw new CsrfValidationError(
+                reason: "CSRF token mismatch. The cookie value does not match the header value.",
+                cookieName: _options.Csrf.CookieName,
+                headerName: _options.Csrf.HeaderName);
         }
 
         _logger.LogDebug("CSRF validation successful for {Method} {Path}", context.Request.Method, path);

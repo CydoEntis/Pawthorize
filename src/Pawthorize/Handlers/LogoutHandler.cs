@@ -99,6 +99,8 @@ public class LogoutHandler<TUser> where TUser : IAuthenticatedUser
         }
 
         _logger.LogWarning("No refresh token found in cookie or request body for logout");
-        throw new InvalidRefreshTokenError();
+        throw new InvalidRefreshTokenError(
+            "Refresh token not provided in logout request",
+            _options.TokenDelivery.ToString());
     }
 }
