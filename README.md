@@ -9,15 +9,14 @@
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 </div>
 
-> **🎉 Version 0.3.0 Release**
+> **🎉 Version 0.4.0 Release**
 >
-> **New in v0.3.0:**
-> - **Enhanced Security**: All tokens (email verification, password reset, refresh) are now hashed using SHA256 before storage
-> - **Immutable Token Models**: TokenInfo and RefreshTokenInfo are now immutable records for better safety
-> - **Atomic Token Consumption**: New `ConsumeTokenAsync` method prevents token reuse bugs
-> - **Constant-Time Validation**: Protection against timing attacks
+> **New in v0.4.0:**
+> - **Improved Configuration API**: Uniform options pattern - all configuration now goes through options parameter
+> - **Enhanced Error Messages**: Detailed, actionable error responses for CSRF and refresh token failures
+> - **Better Developer Experience**: Clear hints and examples in error responses to speed up debugging
 >
-> **⚠️ Breaking Changes**: v0.3.0 includes breaking changes to `ITokenRepository` and `IRefreshTokenRepository`. See the [Migration Guide](#migration-from-v02-to-v03) below.
+> **⚠️ Breaking Changes**: v0.4.0 changes the `AddPawthorize` method signature. See examples below for the new API.
 >
 > While Pawthorize is thoroughly tested with 158 passing tests, please test thoroughly with your specific use case before deploying to production.
 
@@ -115,8 +114,9 @@ public class RefreshTokenRepository : IRefreshTokenRepository
 ```csharp
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddPawthorize<User>(builder.Configuration, options =>
+builder.Services.AddPawthorize<User>(options =>
 {
+    options.UseConfiguration(builder.Configuration);
     options.UseDefaultFormatters();
 });
 
@@ -740,8 +740,9 @@ public class CustomRegisterRequest : RegisterRequest
 }
 
 // Register with custom request type
-builder.Services.AddPawthorize<User, CustomRegisterRequest>(builder.Configuration, options =>
+builder.Services.AddPawthorize<User, CustomRegisterRequest>(options =>
 {
+    options.UseConfiguration(builder.Configuration);
     options.UseDefaultFormatters();
 });
 
@@ -771,11 +772,160 @@ Pawthorize integrates with [ErrorHound](https://github.com/yourusername/errorhou
 Common error codes:
 - `INVALID_CREDENTIALS` - Wrong email/password
 - `DUPLICATE_EMAIL` - Email already registered
-- `INVALID_REFRESH_TOKEN` - Token expired or revoked
+- `INVALID_REFRESH_TOKEN` - Token expired, revoked, or not provided
 - `EMAIL_NOT_VERIFIED` - Email verification required
 - `ACCOUNT_LOCKED` - Account temporarily locked
 - `VALIDATION_ERROR` - Request validation failed
 - `CSRF_VALIDATION_FAILED` - CSRF token missing or invalid (Hybrid/HttpOnlyCookies mode)
+
+
+### Troubleshooting CSRF Errors
+
+If you receive a `403 Forbidden` error with code `CSRF_VALIDATION_FAILED`, the error response will include specific details:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "CSRF_VALIDATION_FAILED",
+    "message": "CSRF token validation failed",
+    "details": {
+      "reason": "Missing CSRF header 'X-XSRF-TOKEN'",
+      "cookieName": "XSRF-TOKEN",
+      "headerName": "X-XSRF-TOKEN",
+      "hint": "Read the CSRF token from the 'XSRF-TOKEN' cookie and include it in the 'X-XSRF-TOKEN' request header. Both values must match.",
+      "example": "X-XSRF-TOKEN: <value-from-XSRF-TOKEN-cookie>",
+      "documentation": "CSRF tokens are automatically set in cookies after login/register. Your frontend must read the cookie value and include it in the header for state-changing requests (POST, PUT, DELETE, PATCH)."
+    }
+  }
+}
+```
+
+**Common CSRF Issues:**
+
+1. **Missing CSRF cookie** (`reason: "Missing CSRF cookie 'XSRF-TOKEN'"`)
+   - **Cause:** User hasn't logged in yet, or cookies were cleared
+   - **Solution:** Ensure user has logged in or registered first. CSRF tokens are issued during authentication.
+
+2. **Missing CSRF header** (`reason: "Missing CSRF header 'X-XSRF-TOKEN'"`)
+   - **Cause:** Frontend isn't reading the cookie or isn't sending it in the header
+   - **Solution:** Read the `XSRF-TOKEN` cookie value and include it in the `X-XSRF-TOKEN` request header
+   - **Example (JavaScript):**
+     ```javascript
+     // Read CSRF token from cookie
+     const csrfToken = document.cookie
+       .split('; ')
+       .find(row => row.startsWith('XSRF-TOKEN='))
+       ?.split('=')[1];
+
+     // Include in request header
+     fetch('/api/auth/refresh', {
+       method: 'POST',
+       headers: {
+         'X-XSRF-TOKEN': csrfToken
+       },
+       credentials: 'include'
+     });
+     ```
+
+3. **CSRF token mismatch** (`reason: "CSRF token mismatch"`)
+   - **Cause:** Cookie value doesn't match header value, or using an old/rotated token
+   - **Solution:** Ensure you're reading the latest cookie value. Re-read the cookie after login/register/refresh operations.
+   - **Common mistake:** Caching the CSRF token in local storage/memory and not updating it after token rotation
+
+4. **Token expired**
+   - **Cause:** CSRF token lifetime exceeded (default: 7 days)
+   - **Solution:** Have user log in again to get a fresh token
+
+**CSRF Debug Checklist:**
+- ✅ Check that `TokenDelivery` is set to `Hybrid` or `HttpOnlyCookies` (CSRF doesn't apply to `ResponseBody` mode)
+- ✅ Verify the `XSRF-TOKEN` cookie exists in your browser's developer tools
+- ✅ Confirm the `X-XSRF-TOKEN` header is present in your request
+- ✅ Ensure both cookie and header values match exactly
+- ✅ Check that you're re-reading the cookie after login/register/refresh operations (tokens rotate!)
+- ✅ Verify credentials are included in fetch requests (`credentials: 'include'`)
+
+---
+
+### Troubleshooting Refresh Token Errors
+
+If you receive a `401 Unauthorized` error with code `INVALID_REFRESH_TOKEN`, the error response will include specific details:
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "INVALID_REFRESH_TOKEN",
+    "message": "Refresh token is invalid or expired",
+    "details": {
+      "reason": "Refresh token expired on 2026-01-13 10:30:00 UTC",
+      "tokenDeliveryMode": "Hybrid",
+      "hint": "The refresh token has exceeded its lifetime. Refresh tokens expire after the configured duration (default: 7 days). The user needs to log in again to get a new refresh token.",
+      "action": "Redirect user to login page",
+      "documentation": "Refresh tokens are single-use and expire after 7 days (configurable). When a refresh token is used, it's revoked and a new one is issued. Tokens are automatically rotated on each refresh for security."
+    }
+  }
+}
+```
+
+**Common Refresh Token Issues:**
+
+1. **Token expired** (`reason`: "Refresh token expired on...")
+   - **Cause:** Refresh token lifetime exceeded (default: 7 days)
+   - **Solution:** User needs to log in again
+   - **Action:** Clear auth state and redirect to login page
+
+2. **Token not found or revoked** (`reason`: "Refresh token not found or has been revoked")
+   - **Cause:** Token was already used (single-use), manually revoked, or never existed
+   - **Solution:** User needs to log in again
+   - **Common scenarios:**
+     - Token was used to get a new access token (automatic rotation)
+     - User changed their password (all tokens revoked for security)
+     - User logged out from all devices
+   - **Action:** Clear auth cookies/storage and redirect to login
+
+3. **Token not provided** (`reason`: "Refresh token not provided in request")
+   - **Cause:** No refresh token in request body or cookies
+   - **Solution (ResponseBody mode):** Include `refreshToken` in POST body
+   - **Solution (Hybrid/HttpOnlyCookies mode):** Ensure cookies are sent with request (`credentials: 'include'` in fetch)
+   - **Example (Hybrid/Cookie mode):**
+     ```javascript
+     fetch('/api/auth/refresh', {
+       method: 'POST',
+       credentials: 'include'  // Critical! Sends refresh token cookie
+     });
+     ```
+   - **Example (ResponseBody mode):**
+     ```javascript
+     fetch('/api/auth/refresh', {
+       method: 'POST',
+       headers: { 'Content-Type': 'application/json' },
+       body: JSON.stringify({
+         refreshToken: storedRefreshToken  // From localStorage/memory
+       })
+     });
+     ```
+
+4. **User not found** (`reason`: "User not found for token")
+   - **Cause:** User account was deleted while token still existed
+   - **Solution:** Clear auth state and redirect to login
+   - **Action:** Remove all stored tokens and redirect user
+
+**Refresh Token Debug Checklist:**
+- ✅ Verify refresh token exists in cookies (Hybrid/HttpOnlyCookies) or request body (ResponseBody)
+- ✅ Check that `credentials: 'include'` is set in fetch requests (for cookie-based modes)
+- ✅ Confirm refresh token hasn't expired (default: 7 days, check `RefreshTokenLifetimeDays` setting)
+- ✅ Ensure token wasn't already used (tokens are single-use and rotate on each refresh)
+- ✅ Check if user changed their password recently (revokes all refresh tokens)
+- ✅ Verify the token delivery mode matches your implementation (`TokenDelivery` setting)
+
+**Token Rotation Behavior:**
+- Every successful `/api/auth/refresh` call:
+  1. **Consumes** the old refresh token (marks it as used/revoked)
+  2. **Issues** a new refresh token with fresh expiration
+  3. **Returns** new access token + new refresh token
+- This prevents token replay attacks
+- If you try to use an old refresh token, you'll get "Token not found or has been revoked"
 
 ## Validation
 
