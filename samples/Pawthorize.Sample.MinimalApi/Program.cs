@@ -13,8 +13,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddPawthorize<User>(builder.Configuration, options =>
+builder.Services.AddPawthorize<User>(options =>
 {
+    options.UseConfiguration(builder.Configuration);
     options.UseDefaultFormatters();
 });
 

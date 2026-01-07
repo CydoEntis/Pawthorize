@@ -1,4 +1,4 @@
-﻿using System.Text;
+using System.Text;
 using ErrorHound.BuiltIn;
 using ErrorHound.Extensions;
 using FluentValidation;
@@ -30,16 +30,14 @@ public static class ServiceCollectionExtensions
     /// </summary>
     /// <typeparam name="TUser">User type implementing IAuthenticatedUser</typeparam>
     /// <param name="services">Service collection</param>
-    /// <param name="configuration">Configuration root (optional - reads from "Pawthorize" section)</param>
-    /// <param name="configure">Optional action to configure response formatting</param>
+    /// <param name="configure">Action to configure response formatting</param>
     /// <returns>Service collection for chaining</returns>
     public static IServiceCollection AddPawthorize<TUser>(
         this IServiceCollection services,
-        IConfiguration? configuration = null,
-        Action<PawthorizeResponseOptions>? configure = null)
+        Action<PawthorizeResponseOptions> configure)
         where TUser : class, IAuthenticatedUser
     {
-        return AddPawthorize<TUser, RegisterRequest>(services, configuration, configure);
+        return AddPawthorize<TUser, RegisterRequest>(services, configure);
     }
 
     /// <summary>
@@ -48,20 +46,18 @@ public static class ServiceCollectionExtensions
     /// <typeparam name="TUser">User type implementing IAuthenticatedUser</typeparam>
     /// <typeparam name="TRegisterRequest">Registration request type (can be extended)</typeparam>
     /// <param name="services">Service collection</param>
-    /// <param name="configuration">Configuration root (optional - reads from "Pawthorize" section)</param>
-    /// <param name="configure">Optional action to configure response formatting</param>
+    /// <param name="configure">Action to configure response formatting</param>
     /// <returns>Service collection for chaining</returns>
     public static IServiceCollection AddPawthorize<TUser, TRegisterRequest>(
         this IServiceCollection services,
-        IConfiguration? configuration = null,
-        Action<PawthorizeResponseOptions>? configure = null)
+        Action<PawthorizeResponseOptions> configure)
         where TUser : class, IAuthenticatedUser
         where TRegisterRequest : RegisterRequest
     {
         services.AddSingleton(new PawthorizeTypeMetadata(typeof(TUser), typeof(TRegisterRequest)));
 
         var responseOptions = new PawthorizeResponseOptions();
-        configure?.Invoke(responseOptions);
+        configure.Invoke(responseOptions);
 
         if (responseOptions.EnableSuccessHound)
         {
@@ -73,8 +69,8 @@ public static class ServiceCollectionExtensions
             ConfigureErrorHound(services, responseOptions.ErrorFormatterType);
         }
 
-        RegisterConfiguration(services, configuration);
-        RegisterAuthentication(services, configuration);
+        RegisterConfiguration(services, responseOptions.Configuration);
+        RegisterAuthentication(services, responseOptions.Configuration);
         RegisterCoreServices<TUser>(services);
         RegisterHandlers<TUser, TRegisterRequest>(services);
         RegisterValidators<TRegisterRequest>(services);
