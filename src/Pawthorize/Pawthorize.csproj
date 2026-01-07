@@ -2,7 +2,7 @@
     <PropertyGroup>
         <TargetFramework>net8.0</TargetFramework>
         <PackageId>Pawthorize</PackageId>
-        <Version>0.3.0</Version>
+        <Version>0.4.0</Version>
         <Authors>Pawthorize Contributors</Authors>
         <Description>Modern authentication library for ASP.NET Core - simple, secure, and powerful. Includes JWT tokens with SHA256 hashing, refresh rotation, CSRF protection, role-based authorization, email verification, password reset, and session management. BETA: Under active development. 158 passing tests.</Description>
         <PackageTags>authentication;aspnetcore;jwt;minimal-api;password;security;oauth;sessions;csrf;roles;authorization;token-hashing</PackageTags>
