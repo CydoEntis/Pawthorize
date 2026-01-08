@@ -96,6 +96,10 @@ public static class WebApplicationExtensions
         var options = new PawthorizeEndpointOptions();
         configure?.Invoke(options);
 
+        // Check if OAuth is enabled from metadata
+        var metadata = app.Services.GetService<PawthorizeTypeMetadata>();
+        var isOAuthEnabled = metadata?.EnableOAuth ?? false;
+
         var group = app.MapGroup(options.BasePath)
             .WithTags("Authentication");
 
@@ -219,6 +223,167 @@ public static class WebApplicationExtensions
                 return await handler.HandleAsync(request ?? new RevokeAllOtherSessionsRequest(), context, ct);
             })
             .WithName("RevokeAllOtherSessions")
+            .RequireAuthorization()
+            .WithOpenApi();
+
+        // Auto-map OAuth endpoints if OAuth is enabled
+        if (isOAuthEnabled)
+        {
+            // OAuth Initiate - Redirect user to OAuth provider
+            group.MapGet(options.OAuthInitiatePath, async (
+                    string provider,
+                    string? returnUrl,
+                    Handlers.OAuthInitiateHandler handler,
+                    CancellationToken ct) =>
+                {
+                    return await handler.HandleAsync(provider, returnUrl, ct);
+                })
+                .WithName("OAuthInitiate")
+                .WithOpenApi();
+
+            // OAuth Callback - Handle OAuth provider callback
+            group.MapGet(options.OAuthCallbackPath, async (
+                    string provider,
+                    string? code,
+                    string? state,
+                    string? error,
+                    string? error_description,
+                    Handlers.OAuthCallbackHandler<TUser> handler,
+                    HttpContext context,
+                    CancellationToken ct) =>
+                {
+                    return await handler.HandleAsync(provider, code, state, error, error_description, context, ct);
+                })
+                .WithName("OAuthCallback")
+                .WithOpenApi();
+
+            // Link Provider - Link OAuth provider to authenticated user
+            group.MapPost(options.OAuthLinkPath, async (
+                    string provider,
+                    string code,
+                    string state,
+                    Handlers.LinkProviderHandler<TUser> handler,
+                    HttpContext context,
+                    CancellationToken ct) =>
+                {
+                    return await handler.HandleAsync(provider, code, state, context, ct);
+                })
+                .WithName("LinkOAuthProvider")
+                .RequireAuthorization()
+                .WithOpenApi();
+
+            // Unlink Provider - Unlink OAuth provider from authenticated user
+            group.MapDelete(options.OAuthUnlinkPath, async (
+                    string provider,
+                    Handlers.UnlinkProviderHandler<TUser> handler,
+                    HttpContext context,
+                    CancellationToken ct) =>
+                {
+                    return await handler.HandleAsync(provider, context, ct);
+                })
+                .WithName("UnlinkOAuthProvider")
+                .RequireAuthorization()
+                .WithOpenApi();
+
+            // List Linked Providers - Get all linked OAuth providers for authenticated user
+            group.MapGet(options.OAuthLinkedProvidersPath, async (
+                    Handlers.ListLinkedProvidersHandler<TUser> handler,
+                    HttpContext context,
+                    CancellationToken ct) =>
+                {
+                    return await handler.HandleAsync(context, ct);
+                })
+                .WithName("ListLinkedProviders")
+                .RequireAuthorization()
+                .WithOpenApi();
+        }
+
+        return group;
+    }
+
+    /// <summary>
+    /// Map OAuth 2.0 endpoints for external provider authentication.
+    /// </summary>
+    /// <typeparam name="TUser">User type implementing IAuthenticatedUser</typeparam>
+    /// <param name="app">Web application</param>
+    /// <param name="configure">Optional configuration for endpoint paths</param>
+    /// <returns>Route group builder for further configuration</returns>
+    public static RouteGroupBuilder MapPawthorizeOAuth<TUser>(
+        this WebApplication app,
+        Action<PawthorizeEndpointOptions>? configure = null)
+        where TUser : class, IAuthenticatedUser
+    {
+        var options = new PawthorizeEndpointOptions();
+        configure?.Invoke(options);
+
+        var group = app.MapGroup(options.BasePath)
+            .WithTags("OAuth Authentication");
+
+        // OAuth Initiate - Redirect user to OAuth provider
+        group.MapGet(options.OAuthInitiatePath, async (
+                string provider,
+                string? returnUrl,
+                Handlers.OAuthInitiateHandler handler,
+                CancellationToken ct) =>
+            {
+                return await handler.HandleAsync(provider, returnUrl, ct);
+            })
+            .WithName("OAuthInitiate")
+            .WithOpenApi();
+
+        // OAuth Callback - Handle OAuth provider callback
+        group.MapGet(options.OAuthCallbackPath, async (
+                string provider,
+                string? code,
+                string? state,
+                string? error,
+                string? error_description,
+                Handlers.OAuthCallbackHandler<TUser> handler,
+                HttpContext context,
+                CancellationToken ct) =>
+            {
+                return await handler.HandleAsync(provider, code, state, error, error_description, context, ct);
+            })
+            .WithName("OAuthCallback")
+            .WithOpenApi();
+
+        // Link Provider - Link OAuth provider to authenticated user
+        group.MapPost(options.OAuthLinkPath, async (
+                string provider,
+                string code,
+                string state,
+                Handlers.LinkProviderHandler<TUser> handler,
+                HttpContext context,
+                CancellationToken ct) =>
+            {
+                return await handler.HandleAsync(provider, code, state, context, ct);
+            })
+            .WithName("LinkOAuthProvider")
+            .RequireAuthorization()
+            .WithOpenApi();
+
+        // Unlink Provider - Unlink OAuth provider from authenticated user
+        group.MapDelete(options.OAuthUnlinkPath, async (
+                string provider,
+                Handlers.UnlinkProviderHandler<TUser> handler,
+                HttpContext context,
+                CancellationToken ct) =>
+            {
+                return await handler.HandleAsync(provider, context, ct);
+            })
+            .WithName("UnlinkOAuthProvider")
+            .RequireAuthorization()
+            .WithOpenApi();
+
+        // List Linked Providers - Get all linked OAuth providers for authenticated user
+        group.MapGet(options.OAuthLinkedProvidersPath, async (
+                Handlers.ListLinkedProvidersHandler<TUser> handler,
+                HttpContext context,
+                CancellationToken ct) =>
+            {
+                return await handler.HandleAsync(context, ct);
+            })
+            .WithName("ListLinkedProviders")
             .RequireAuthorization()
             .WithOpenApi();
 
@@ -416,4 +581,39 @@ public class PawthorizeEndpointOptions
     /// Full path: {BasePath}/sessions/revoke-others
     /// </summary>
     public string RevokeAllOtherSessionsPath { get; set; } = "/sessions/revoke-others";
+
+    /// <summary>
+    /// Path for OAuth initiate endpoint (relative to BasePath).
+    /// Default: "/oauth/{provider}"
+    /// Full path: {BasePath}/oauth/{provider}
+    /// </summary>
+    public string OAuthInitiatePath { get; set; } = "/oauth/{provider}";
+
+    /// <summary>
+    /// Path for OAuth callback endpoint (relative to BasePath).
+    /// Default: "/oauth/{provider}/callback"
+    /// Full path: {BasePath}/oauth/{provider}/callback
+    /// </summary>
+    public string OAuthCallbackPath { get; set; } = "/oauth/{provider}/callback";
+
+    /// <summary>
+    /// Path for OAuth link provider endpoint (relative to BasePath).
+    /// Default: "/oauth/{provider}/link"
+    /// Full path: {BasePath}/oauth/{provider}/link
+    /// </summary>
+    public string OAuthLinkPath { get; set; } = "/oauth/{provider}/link";
+
+    /// <summary>
+    /// Path for OAuth unlink provider endpoint (relative to BasePath).
+    /// Default: "/oauth/{provider}/unlink"
+    /// Full path: {BasePath}/oauth/{provider}/unlink
+    /// </summary>
+    public string OAuthUnlinkPath { get; set; } = "/oauth/{provider}/unlink";
+
+    /// <summary>
+    /// Path for list linked providers endpoint (relative to BasePath).
+    /// Default: "/oauth/linked"
+    /// Full path: {BasePath}/oauth/linked
+    /// </summary>
+    public string OAuthLinkedProvidersPath { get; set; } = "/oauth/linked";
 }

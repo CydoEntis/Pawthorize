@@ -12,6 +12,8 @@ public sealed class PawthorizeResponseOptions
     internal Type? SuccessFormatterType { get; private set; }
     internal Type? ErrorFormatterType { get; private set; }
     internal IConfiguration? Configuration { get; private set; }
+    internal bool EnableOAuth { get; private set; }
+    internal List<OAuthProviderRegistration> OAuthProviders { get; private set; } = new();
 
     /// <summary>
     /// Load Pawthorize configuration from appsettings.json (IConfiguration).
@@ -59,4 +61,60 @@ public sealed class PawthorizeResponseOptions
         ErrorFormatterType = typeof(TFormatter);
         return this;
     }
+
+    /// <summary>
+    /// Enable Google OAuth authentication.
+    /// Requires configuration in appsettings.json under Pawthorize:OAuth:Providers:Google.
+    /// </summary>
+    public PawthorizeResponseOptions AddGoogle()
+    {
+        EnableOAuth = true;
+        OAuthProviders.Add(new OAuthProviderRegistration
+        {
+            ProviderName = "google",
+            ProviderType = typeof(Providers.GoogleOAuthProvider)
+        });
+        return this;
+    }
+
+    /// <summary>
+    /// Enable Discord OAuth authentication.
+    /// Requires configuration in appsettings.json under Pawthorize:OAuth:Providers:Discord.
+    /// </summary>
+    public PawthorizeResponseOptions AddDiscord()
+    {
+        EnableOAuth = true;
+        OAuthProviders.Add(new OAuthProviderRegistration
+        {
+            ProviderName = "discord",
+            ProviderType = typeof(Providers.DiscordOAuthProvider)
+        });
+        return this;
+    }
+
+    /// <summary>
+    /// Add a custom OAuth provider.
+    /// </summary>
+    /// <typeparam name="TProvider">Provider type implementing IExternalAuthProvider</typeparam>
+    /// <param name="providerName">Provider name (e.g., "github", "facebook")</param>
+    public PawthorizeResponseOptions AddCustomOAuthProvider<TProvider>(string providerName)
+        where TProvider : Abstractions.IExternalAuthProvider
+    {
+        EnableOAuth = true;
+        OAuthProviders.Add(new OAuthProviderRegistration
+        {
+            ProviderName = providerName.ToLowerInvariant(),
+            ProviderType = typeof(TProvider)
+        });
+        return this;
+    }
+}
+
+/// <summary>
+/// Internal class to track OAuth provider registrations.
+/// </summary>
+internal class OAuthProviderRegistration
+{
+    public required string ProviderName { get; init; }
+    public required Type ProviderType { get; init; }
 }

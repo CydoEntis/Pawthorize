@@ -5,6 +5,8 @@ using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Pawthorize.Abstractions;
@@ -54,10 +56,10 @@ public static class ServiceCollectionExtensions
         where TUser : class, IAuthenticatedUser
         where TRegisterRequest : RegisterRequest
     {
-        services.AddSingleton(new PawthorizeTypeMetadata(typeof(TUser), typeof(TRegisterRequest)));
-
         var responseOptions = new PawthorizeResponseOptions();
         configure.Invoke(responseOptions);
+
+        services.AddSingleton(new PawthorizeTypeMetadata(typeof(TUser), typeof(TRegisterRequest), responseOptions.EnableOAuth));
 
         if (responseOptions.EnableSuccessHound)
         {
@@ -74,6 +76,13 @@ public static class ServiceCollectionExtensions
         RegisterCoreServices<TUser>(services);
         RegisterHandlers<TUser, TRegisterRequest>(services);
         RegisterValidators<TRegisterRequest>(services);
+
+        // Register OAuth if enabled
+        if (responseOptions.EnableOAuth)
+        {
+            RegisterOAuth<TUser>(services, responseOptions);
+        }
+
         ValidateConfiguration(services);
 
         return services;
@@ -446,5 +455,67 @@ public static class ServiceCollectionExtensions
 
         throw new InvalidOperationException(
             "Could not configure ErrorHound. Please ensure ErrorHound is properly installed.");
+    }
+
+    /// <summary>
+    /// Internal method to register OAuth services based on options configuration.
+    /// </summary>
+    private static void RegisterOAuth<TUser>(
+        IServiceCollection services,
+        PawthorizeResponseOptions options)
+        where TUser : class, IAuthenticatedUser
+    {
+        // Register OAuth configuration
+        if (options.Configuration != null)
+        {
+            services.Configure<Configuration.OAuthOptions>(
+                options.Configuration.GetSection(Configuration.OAuthOptions.SectionName));
+        }
+
+        // Register HTTP client factory for OAuth providers
+        services.AddHttpClient();
+
+        // Use internal state token repository if not already registered
+        // Users can override by registering their own IStateTokenRepository<TStateToken> before calling AddPawthorize
+        services.TryAddSingleton<IStateTokenRepository<Models.InternalStateToken>, Repositories.InternalStateTokenRepository>();
+
+        // Register OAuth provider factory with all registered providers
+        services.AddSingleton<IOAuthProviderFactory>(sp =>
+        {
+            var factory = new Services.OAuthProviderFactory(
+                sp,
+                sp.GetRequiredService<ILogger<Services.OAuthProviderFactory>>());
+
+            // Register all providers from options
+            foreach (var providerReg in options.OAuthProviders)
+            {
+                var registerMethod = factory.GetType()
+                    .GetMethod(nameof(Services.OAuthProviderFactory.RegisterProvider))!
+                    .MakeGenericMethod(providerReg.ProviderType);
+
+                registerMethod.Invoke(factory, new object[] { providerReg.ProviderName });
+            }
+
+            return factory;
+        });
+
+        // Register state token service
+        services.AddScoped<IStateTokenService, Services.StateTokenService<Models.InternalStateToken>>();
+
+        // Register external authentication service
+        services.AddScoped<Services.ExternalAuthenticationService<TUser>>();
+
+        // Register OAuth provider instances
+        foreach (var providerReg in options.OAuthProviders)
+        {
+            services.AddTransient(providerReg.ProviderType);
+        }
+
+        // Register OAuth handlers
+        services.AddScoped<Handlers.OAuthInitiateHandler>();
+        services.AddScoped<Handlers.OAuthCallbackHandler<TUser>>();
+        services.AddScoped<Handlers.LinkProviderHandler<TUser>>();
+        services.AddScoped<Handlers.UnlinkProviderHandler<TUser>>();
+        services.AddScoped<Handlers.ListLinkedProvidersHandler<TUser>>();
     }
 }
