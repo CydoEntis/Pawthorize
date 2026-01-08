@@ -56,7 +56,8 @@ Pawthorize is a complete, production-ready authentication library for ASP.NET Co
 
 ### Developer Experience
 - ✅ **Flexible Token Delivery** - Cookies, response body, or hybrid strategies
-- ✅ **Role-Based Authorization** - Built-in role management with JWT claims
+- ✅ **Role-Based Authorization** - Automatic role claims in JWT (you manage roles)
+- ✅ **Customizable Endpoints** - Custom paths or manual endpoint mapping
 - ✅ **Integrated Error Handling** - ErrorHound integration for consistent API responses
 - ✅ **OpenAPI/Swagger Support** - Automatic API documentation
 - ✅ **FluentValidation** - Request validation out of the box
@@ -190,6 +191,55 @@ app.Run();
 - `GET /api/auth/me` - Get current user info
 - `GET /api/auth/sessions` - Get active sessions
 - `POST /api/auth/sessions/revoke-others` - Revoke other sessions
+
+### 5. Quick Start: Add OAuth (Optional)
+
+Want social login? Add OAuth in minutes:
+
+```csharp
+// Program.cs - Add to your AddPawthorize configuration
+builder.Services.AddPawthorize<User>(options =>
+{
+    options.UseConfiguration(builder.Configuration);
+    options.UseDefaultFormatters();
+
+    // Enable OAuth providers
+    options.AddGoogle();
+    options.AddDiscord();
+});
+
+// Register OAuth repository
+builder.Services.AddScoped<IExternalAuthRepository<User>, ExternalAuthRepository>();
+```
+
+**appsettings.json:**
+```json
+{
+  "Pawthorize": {
+    "OAuth": {
+      "AllowAutoRegistration": true,
+      "UsePkce": true,
+      "Providers": {
+        "Google": {
+          "Enabled": true,
+          "ClientId": "YOUR_CLIENT_ID.apps.googleusercontent.com",
+          "ClientSecret": "YOUR_CLIENT_SECRET",
+          "RedirectUri": "http://localhost:5000/api/auth/oauth/google/callback"
+        }
+      }
+    }
+  }
+}
+```
+
+**Frontend:**
+```html
+<button onclick="window.location.href='/api/auth/oauth/google'">
+  Sign in with Google
+</button>
+```
+
+That's it! See [OAuth 2.0 Setup](#oauth-20-setup) for detailed configuration.
 
 ---
 
@@ -347,19 +397,84 @@ fetch('/api/auth/logout', {
 
 ### Role-Based Authorization
 
+Pawthorize automatically adds roles from `IAuthenticatedUser.Roles` to JWT claims. You manage roles yourself:
+
 ```csharp
-// Create user with roles
+// Your User class
+public class User : IAuthenticatedUser
+{
+    public string Id { get; set; }
+    public string Email { get; set; }
+    public string PasswordHash { get; set; }
+    public string? Name { get; set; }
+
+    // Populate this property based on your role system
+    public IEnumerable<string> Roles { get; set; } = new List<string>();
+
+    // ... other properties
+}
+
+// When creating/updating users, set their roles
 var user = new User
 {
     Email = "admin@example.com",
-    Roles = new List<string> { "Admin", "Manager" }
+    Roles = new List<string> { "Admin", "Manager" } // Your role management logic
 };
 
 // Roles automatically added to JWT claims
 
-// Protect endpoints
+// Protect endpoints using standard ASP.NET Core authorization
 app.MapGet("/admin/users", () => { /* ... */ })
    .RequireAuthorization(policy => policy.RequireRole("Admin"));
+```
+
+**Note:** Pawthorize does not include role management features (creating roles, assigning roles to users). You implement role storage and management in your application, and Pawthorize will include them in JWT tokens.
+
+### Endpoint Customization
+
+Pawthorize offers flexible endpoint mapping options:
+
+#### Option 1: Automatic Mapping (Default)
+
+```csharp
+// Maps all endpoints to /api/auth/*
+app.MapPawthorize();
+```
+
+#### Option 2: Custom Base Path
+
+```csharp
+app.MapPawthorize(options =>
+{
+    options.BasePath = "/myapp/v1/auth";  // Changes base from /api/auth
+    options.LoginPath = "/signin";         // Optional: customize individual paths
+    options.RegisterPath = "/signup";
+});
+
+// Results in: /myapp/v1/auth/signin, /myapp/v1/auth/signup, etc.
+```
+
+#### Option 3: Manual Mapping (Full Control)
+
+```csharp
+var authGroup = app.MapGroup("/myapp/v1/auth");
+
+// Map only the endpoints you need with custom policies
+authGroup.MapPawthorizeLogin<User>()
+    .RequireRateLimiting("auth");
+
+authGroup.MapPawthorizeRegister<User, RegisterRequest>()
+    .RequireRateLimiting("auth");
+
+authGroup.MapPawthorizeRefresh<User>();
+authGroup.MapPawthorizeLogout<User>();
+
+// Available methods:
+// - MapPawthorizeLogin<TUser>()
+// - MapPawthorizeRegister<TUser, TRegisterRequest>()
+// - MapPawthorizeRefresh<TUser>()
+// - MapPawthorizeLogout<TUser>()
+// - MapPawthorizeOAuth<TUser>() (if OAuth enabled)
 ```
 
 ### Custom Claims
@@ -377,6 +492,7 @@ public class User : IAuthenticatedUser
 }
 
 // Claims automatically added to JWT
+// Access in endpoints: context.User.FindFirst("department")?.Value
 ```
 
 ### Email Verification
@@ -435,6 +551,77 @@ Authorization: Bearer {accessToken}
 Revokes all sessions except current one.
 ```
 
+### Rate Limiting
+
+Pawthorize doesn't include rate limiting, but you can easily add it using ASP.NET Core's built-in rate limiting:
+
+```csharp
+// Program.cs
+using System.Threading.RateLimiting;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Configure rate limiting
+builder.Services.AddRateLimiter(options =>
+{
+    // Policy for authentication endpoints
+    options.AddFixedWindowLimiter("auth", opt =>
+    {
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.PermitLimit = 5; // 5 requests per minute
+        opt.QueueLimit = 0;
+    });
+
+    // Stricter policy for login
+    options.AddFixedWindowLimiter("login", opt =>
+    {
+        opt.Window = TimeSpan.FromMinutes(5);
+        opt.PermitLimit = 3; // 3 login attempts per 5 minutes
+        opt.QueueLimit = 0;
+    });
+});
+
+builder.Services.AddPawthorize<User>(/* ... */);
+
+var app = builder.Build();
+
+app.UseRateLimiter(); // Must be before MapPawthorize
+
+// Apply to all auth endpoints
+app.MapPawthorize(options => options.BasePath = "/api/auth")
+   .RequireRateLimiting("auth");
+
+// Or apply to individual endpoints
+var authGroup = app.MapGroup("/api/auth");
+authGroup.MapPawthorizeLogin<User>().RequireRateLimiting("login");
+authGroup.MapPawthorizeRegister<User, RegisterRequest>().RequireRateLimiting("auth");
+```
+
+**Rate limiting by IP address:**
+
+```csharp
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddFixedWindowLimiter("auth", opt =>
+    {
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.PermitLimit = 5;
+        opt.QueueLimit = 0;
+    });
+
+    // Global rate limiter by IP
+    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+    {
+        var ipAddress = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        return RateLimitPartition.GetFixedWindowLimiter(ipAddress, _ => new FixedWindowRateLimiterOptions
+        {
+            Window = TimeSpan.FromMinutes(1),
+            PermitLimit = 100 // 100 requests per minute per IP
+        });
+    });
+});
+```
+
 ### Custom Validation
 
 Extend built-in validators or create your own:
@@ -488,8 +675,20 @@ app.Run();
 
 ```javascript
 // client.js
-async function register(email, password) {
+async function register(email, password, name) {
   const response = await fetch('/api/auth/register', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password, name })
+  });
+
+  const data = await response.json();
+  localStorage.setItem('accessToken', data.accessToken);
+  localStorage.setItem('refreshToken', data.refreshToken);
+}
+
+async function login(email, password) {
+  const response = await fetch('/api/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email, password })
@@ -525,7 +724,65 @@ async function refreshToken() {
 }
 ```
 
-### Example 2: OAuth Social Login
+### Example 2: Hybrid Mode with CSRF Protection
+
+```javascript
+// client.js - Hybrid mode (access token in body, refresh in cookie)
+async function login(email, password) {
+  const response = await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+    credentials: 'include' // Important: Include cookies
+  });
+
+  const data = await response.json();
+
+  // Store access token
+  localStorage.setItem('accessToken', data.accessToken);
+
+  // Extract and store CSRF token from response header
+  const csrfToken = response.headers.get('X-XSRF-TOKEN');
+  localStorage.setItem('csrfToken', csrfToken);
+}
+
+// For state-changing requests, include CSRF token
+async function logout() {
+  await fetch('/api/auth/logout', {
+    method: 'POST',
+    headers: {
+      'X-XSRF-TOKEN': localStorage.getItem('csrfToken')
+    },
+    credentials: 'include'
+  });
+
+  localStorage.clear();
+}
+
+// Refresh uses cookie automatically
+async function refreshAccessToken() {
+  const response = await fetch('/api/auth/refresh', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-XSRF-TOKEN': localStorage.getItem('csrfToken')
+    },
+    credentials: 'include',
+    body: JSON.stringify({})
+  });
+
+  const data = await response.json();
+  localStorage.setItem('accessToken', data.accessToken);
+
+  // Update CSRF token if rotated
+  const newCsrfToken = response.headers.get('X-XSRF-TOKEN');
+  if (newCsrfToken) {
+    localStorage.setItem('csrfToken', newCsrfToken);
+  }
+}
+```
+
+### Example 3: OAuth Social Login
 
 ```html
 <!-- Login page -->
@@ -542,35 +799,130 @@ function loginWithDiscord() {
   window.location.href = '/api/auth/oauth/discord?returnUrl=/dashboard';
 }
 
+// Link OAuth provider to existing account (user must be logged in)
+async function linkGoogleAccount() {
+  const response = await fetch('/api/auth/oauth/google/link', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+      'X-XSRF-TOKEN': localStorage.getItem('csrfToken')
+    },
+    credentials: 'include'
+  });
+
+  const data = await response.json();
+  if (data.authUrl) {
+    // Redirect to OAuth provider
+    window.location.href = data.authUrl;
+  }
+}
+
 // After OAuth callback, tokens are set via cookies or returned in URL
 // User is redirected to /dashboard
 </script>
 ```
 
-### Example 3: Multi-Tenant SaaS
+### Example 4: Custom Endpoint Paths
+
+You can customize the base path and individual endpoint paths:
 
 ```csharp
-public class User : IAuthenticatedUser
+// Program.cs
+app.MapPawthorize(options =>
 {
-    public string Id { get; set; } = Guid.NewGuid().ToString();
-    public string Email { get; set; } = string.Empty;
-    public string PasswordHash { get; set; } = string.Empty;
-    public string TenantId { get; set; } = string.Empty; // Tenant identifier
+    // Change base path from /api/auth to /myapp/v1/auth
+    options.BasePath = "/myapp/v1/auth";
 
-    public IDictionary<string, string>? AdditionalClaims => new Dictionary<string, string>
-    {
-        ["tenant_id"] = TenantId
-    };
-
-    // ... other properties
-}
-
-// In your protected endpoints
-app.MapGet("/api/data", (HttpContext context) =>
-{
-    var tenantId = context.User.FindFirst("tenant_id")?.Value;
-    // Query data scoped to tenant
+    // Or customize individual endpoints
+    options.LoginPath = "/signin";
+    options.RegisterPath = "/signup";
+    options.LogoutPath = "/signout";
 });
+
+// Results in endpoints like:
+// POST /myapp/v1/auth/signin
+// POST /myapp/v1/auth/signup
+// POST /myapp/v1/auth/signout
+```
+
+### Example 5: Manual Endpoint Mapping
+
+For full control, map endpoints individually:
+
+```csharp
+// Program.cs - Don't call MapPawthorize()
+var authGroup = app.MapGroup("/myapp/v1/auth");
+
+// Map only the endpoints you want
+authGroup.MapPawthorizeLogin<User>()
+    .RequireRateLimiting("auth"); // Add custom policies
+
+authGroup.MapPawthorizeRegister<User, RegisterRequest>()
+    .RequireRateLimiting("auth");
+
+authGroup.MapPawthorizeRefresh<User>();
+
+authGroup.MapPawthorizeLogout<User>();
+
+// Don't map endpoints you don't need (e.g., password reset)
+```
+
+### Example 6: Direct Handler Usage (Maximum Control)
+
+For complete control over endpoint logic, inject handlers directly:
+
+```csharp
+// Program.cs
+app.MapPost("/api/v1/auth/login", async (
+    LoginRequest request,
+    LoginHandler<User> handler,
+    HttpContext context,
+    CancellationToken ct) =>
+{
+    // Add custom logic before authentication
+    Console.WriteLine($"Login attempt from IP: {context.Connection.RemoteIpAddress}");
+
+    // Call Pawthorize handler
+    var result = await handler.HandleAsync(request, context, ct);
+
+    // Add custom logic after authentication
+    Console.WriteLine("Login successful");
+
+    return result;
+})
+.RequireRateLimiting("login-limiter");
+
+app.MapPost("/api/v1/auth/register", async (
+    RegisterRequest request,
+    RegisterHandler<User, RegisterRequest> handler,
+    HttpContext context,
+    CancellationToken ct) =>
+{
+    // Add custom validation or business logic
+    if (request.Email.EndsWith("@blocked-domain.com"))
+    {
+        return Results.BadRequest("Email domain not allowed");
+    }
+
+    return await handler.HandleAsync(request, context, ct);
+});
+
+// Available handlers you can inject:
+// - LoginHandler<TUser>
+// - RegisterHandler<TUser, TRegisterRequest>
+// - RefreshHandler<TUser>
+// - LogoutHandler<TUser>
+// - ChangePasswordHandler<TUser>
+// - ForgotPasswordHandler
+// - ResetPasswordHandler
+// - GetCurrentUserHandler<TUser>
+// - GetActiveSessionsHandler<TUser>
+// - RevokeAllOtherSessionsHandler<TUser>
+// - OAuthInitiateHandler<TUser> (if OAuth enabled)
+// - OAuthCallbackHandler<TUser> (if OAuth enabled)
+// - LinkProviderHandler<TUser> (if OAuth enabled)
+// - UnlinkProviderHandler<TUser> (if OAuth enabled)
+// - ListLinkedProvidersHandler<TUser> (if OAuth enabled)
 ```
 
 ---
@@ -629,16 +981,63 @@ Pawthorize follows clean architecture principles:
 - **Fix**: Ensure `credentials: 'include'` in fetch requests
 
 #### "Duplicate email error" during OAuth
-- **Cause**: Email from OAuth provider already exists in database
-- **Fix**: User should login with password and link OAuth provider, or use "forgot password"
+- **Cause**: Email from OAuth provider already exists in database with password-based account
+- **Fix Option 1**: User should login with password first, then use `/api/auth/oauth/{provider}/link` to link the OAuth account
+- **Fix Option 2**: User can use "forgot password" to reset their password and then link OAuth
+- **Prevention**: Enable `AllowAutoRegistration: false` to require manual account linking
 
 #### OAuth redirect not working
 - **Cause**: Redirect URI mismatch between config and OAuth provider settings
-- **Fix**: Ensure `RedirectUri` in appsettings.json exactly matches OAuth app configuration
+- **Fix**:
+  - Ensure `RedirectUri` in appsettings.json **exactly** matches OAuth provider console
+  - Check for trailing slashes, http vs https, port numbers
+  - Example: `http://localhost:5000/api/auth/oauth/google/callback` (no trailing slash)
+- **Common mistake**: Using `localhost` in appsettings but `127.0.0.1` in OAuth console (or vice versa)
 
 #### "Provider not configured" error
 - **Cause**: OAuth provider not enabled or missing credentials
-- **Fix**: Check `appsettings.json` - ensure `Enabled: true` and credentials are set
+- **Fix**:
+  - Check `appsettings.json` - ensure `Enabled: true` and credentials are set
+  - Verify `options.AddGoogle()` or `options.AddDiscord()` is called in `Program.cs`
+  - Restart the application after config changes
+
+#### "Invalid state" or "State mismatch" error
+- **Cause**: OAuth state token expired or tampered with (CSRF protection)
+- **Fix**:
+  - State tokens are valid for 10 minutes by default
+  - User should complete OAuth flow within this time
+  - Check server time synchronization if persistent issues
+- **Note**: This is a security feature - don't disable it
+
+#### "invalid_grant" from OAuth provider
+- **Cause**: Authorization code already used or expired
+- **Fix**:
+  - Restart OAuth flow from beginning
+  - Don't refresh the callback page
+  - Authorization codes are single-use and short-lived (typically 10 minutes)
+
+#### OAuth works locally but not in production
+- **Cause**: Redirect URI not configured for production domain
+- **Fix**:
+  - Add production redirect URI to OAuth provider console
+  - Example: `https://yourapp.com/api/auth/oauth/google/callback`
+  - Update `RedirectUri` in production appsettings.json
+  - Ensure HTTPS is enabled in production
+
+#### User email not returned from OAuth provider
+- **Cause**: Email scope not requested or user denied email permission
+- **Fix**:
+  - Verify `Scopes` in appsettings.json includes email scope
+  - Google: `["openid", "profile", "email"]`
+  - Discord: `["identify", "email"]`
+  - If user denied permission, they need to re-authorize
+
+#### Cannot unlink last OAuth provider
+- **Cause**: User has no password and trying to unlink their only login method
+- **Fix**:
+  - Require user to set a password first using `/api/auth/change-password`
+  - Or link another OAuth provider before unlinking
+  - This prevents account lockout
 
 ### Error Response Format
 
@@ -671,62 +1070,20 @@ Enable debug logging for Pawthorize:
 
 ---
 
-## 🧪 Testing
-
-The sample application includes in-memory implementations perfect for testing:
-
-```csharp
-// Use in-memory repositories for integration tests
-builder.Services.AddSingleton<IUserRepository<User>, InMemoryUserRepository>();
-builder.Services.AddSingleton<IRefreshTokenRepository, InMemoryRefreshTokenRepository>();
-```
-
-Example test:
-
-```csharp
-[Fact]
-public async Task Register_ValidRequest_ReturnsTokens()
-{
-    // Arrange
-    var client = _factory.CreateClient();
-    var request = new { email = "test@example.com", password = "Password123!" };
-
-    // Act
-    var response = await client.PostAsJsonAsync("/api/auth/register", request);
-
-    // Assert
-    response.StatusCode.Should().Be(HttpStatusCode.OK);
-    var result = await response.Content.ReadFromJsonAsync<AuthResult>();
-    result.AccessToken.Should().NotBeNullOrEmpty();
-}
-```
-
----
-
 ## 🎯 Roadmap
 
 - [ ] **More OAuth Providers**: GitHub, Microsoft, Facebook, Twitter
 - [ ] **Two-Factor Authentication (2FA)**: TOTP, SMS, Email codes
-- [ ] **Rate Limiting**: Built-in rate limiting for auth endpoints
+- [ ] **Built-in Rate Limiting**: Configurable rate limiting for auth endpoints (currently users can add their own via ASP.NET Core)
 - [ ] **Magic Links**: Passwordless email login
 - [ ] **Audit Logging**: Track authentication events
-- [ ] **Account Lockout**: Progressive delays after failed attempts
+- [ ] **Progressive Account Lockout**: Automatic lockout after failed attempts
 - [ ] **WebAuthn Support**: Biometric authentication
 - [ ] **OpenID Connect**: Full OIDC compliance
 
 ---
 
-## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (use conventional commits)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-See [OAUTH_COMMIT_GUIDE.md](OAUTH_COMMIT_GUIDE.md) for commit message conventions.
 
 ---
 
@@ -736,24 +1093,8 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-## 🙏 Acknowledgments
-
-- **ErrorHound** - Consistent error handling
-- **FluentValidation** - Request validation
-- **BCrypt.Net** - Secure password hashing
-
----
-
-## 📞 Support
-
-- 📧 **Issues**: [GitHub Issues](https://github.com/yourusername/pawthorize/issues)
-- 📖 **Documentation**: [Wiki](https://github.com/yourusername/pawthorize/wiki)
-- 💬 **Discussions**: [GitHub Discussions](https://github.com/yourusername/pawthorize/discussions)
-
----
-
 <div align="center">
-  Made with ❤️ by the Pawthorize Team
+  Made by Cydo Entis
 
   **Star ⭐ this repo if you find it helpful!**
 </div>

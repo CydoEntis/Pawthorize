@@ -200,7 +200,7 @@ Authenticate with email and password.
 **Request:**
 ```json
 {
-  "identifier": "user@example.com",
+  "email": "user@example.com",
   "password": "SecureP@ssw0rd"
 }
 ```
@@ -377,6 +377,549 @@ Cookie: refresh_token=<token>
 
 ---
 
+## OAuth 2.0 Social Login
+
+The sample app includes full OAuth support for Google and Discord. Follow these steps to enable social login.
+
+### OAuth Endpoints
+
+#### 1. Initiate OAuth Flow
+
+**GET** `/auth/oauth/{provider}`
+
+Redirects user to OAuth provider (Google, Discord, etc.) for authentication.
+
+**Parameters:**
+- `provider` (path): `google` or `discord`
+- `returnUrl` (query, optional): URL to redirect after successful authentication
+
+**Example:**
+```
+http://localhost:5022/auth/oauth/google?returnUrl=/dashboard
+```
+
+**What happens:**
+1. Server generates secure state token (CSRF protection)
+2. Redirects to OAuth provider's authorization page
+3. User authorizes the app
+4. Provider redirects back to callback URL
+
+---
+
+#### 2. OAuth Callback (Automatic)
+
+**GET** `/auth/oauth/{provider}/callback`
+
+OAuth provider redirects here after user authorization. **This endpoint is called automatically by the OAuth provider** - you don't call it directly.
+
+**Query Parameters (from OAuth provider):**
+- `code`: Authorization code
+- `state`: State token for CSRF protection
+
+**Success Flow:**
+1. Validates state token
+2. Exchanges authorization code for access token with OAuth provider
+3. Fetches user info from OAuth provider
+4. Creates or links user account
+5. Issues JWT tokens (access + refresh)
+6. Redirects to `returnUrl` or default page
+
+---
+
+#### 3. Link OAuth Provider to Account
+
+**POST** `/auth/oauth/{provider}/link`
+
+Links an OAuth provider to an existing authenticated account.
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+X-XSRF-TOKEN: <csrf_token>
+```
+
+**Request Body:**
+```json
+{}
+```
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "authUrl": "https://accounts.google.com/o/oauth2/v2/auth?..."
+  }
+}
+```
+
+**What to do:**
+Redirect user to `authUrl` to complete OAuth flow. After authorization, the provider will be linked to their account.
+
+---
+
+#### 4. Unlink OAuth Provider
+
+**DELETE** `/auth/oauth/{provider}/unlink`
+
+Removes OAuth provider link from authenticated account.
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+X-XSRF-TOKEN: <csrf_token>
+```
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "message": "Provider unlinked successfully"
+}
+```
+
+**Note:** Cannot unlink if it's the user's only login method and they have no password.
+
+---
+
+#### 5. List Linked Providers
+
+**GET** `/auth/oauth/linked`
+
+Gets all OAuth providers linked to authenticated account.
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+```
+
+**Success Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "providers": ["google", "discord"]
+  }
+}
+```
+
+---
+
+### Enabling OAuth in Sample App
+
+By default, OAuth is **not enabled** in the sample app. To enable it:
+
+#### Step 1: Update appsettings.json
+
+Add OAuth configuration:
+
+```json
+{
+  "Pawthorize": {
+    "OAuth": {
+      "AllowAutoRegistration": true,
+      "UsePkce": true,
+      "Providers": {
+        "Google": {
+          "Enabled": true,
+          "ClientId": "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com",
+          "ClientSecret": "YOUR_GOOGLE_CLIENT_SECRET",
+          "RedirectUri": "http://localhost:5022/auth/oauth/google/callback",
+          "Scopes": ["openid", "profile", "email"]
+        },
+        "Discord": {
+          "Enabled": true,
+          "ClientId": "YOUR_DISCORD_CLIENT_ID",
+          "ClientSecret": "YOUR_DISCORD_CLIENT_SECRET",
+          "RedirectUri": "http://localhost:5022/auth/oauth/discord/callback",
+          "Scopes": ["identify", "email"]
+        }
+      }
+    }
+  }
+}
+```
+
+#### Step 2: Update Program.cs
+
+Enable OAuth providers:
+
+```csharp
+builder.Services.AddPawthorize<User>(options =>
+{
+    options.UseConfiguration(builder.Configuration);
+    options.UseDefaultFormatters();
+
+    // Enable OAuth providers
+    options.AddGoogle();
+    options.AddDiscord();
+});
+
+// Register OAuth repository
+builder.Services.AddScoped<IExternalAuthRepository<User>, InMemoryExternalAuthRepository>();
+```
+
+#### Step 3: Get OAuth Credentials
+
+**For Google:**
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project
+3. Enable "Google+ API"
+4. Go to "Credentials" → "Create Credentials" → "OAuth client ID"
+5. Application type: "Web application"
+6. Add redirect URI: `http://localhost:5022/auth/oauth/google/callback`
+7. Copy Client ID and Client Secret to appsettings.json
+
+**For Discord:**
+1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
+2. Create a new application
+3. Go to "OAuth2" section
+4. Add redirect URI: `http://localhost:5022/auth/oauth/discord/callback`
+5. Copy Client ID and Client Secret to appsettings.json
+
+#### Step 4: Restart and Test
+
+Restart the app and test OAuth:
+
+```
+http://localhost:5022/auth/oauth/google
+```
+
+You'll be redirected to Google's login page. After authorizing, you'll be redirected back with tokens.
+
+---
+
+### OAuth Testing with Postman
+
+If you updated the Postman collection to include OAuth endpoints:
+
+**1. Initiate OAuth (Manual)**
+- Cannot test directly in Postman (requires browser redirect)
+- Open in browser: `http://localhost:5022/auth/oauth/google`
+
+**2. Link Provider to Account**
+- Request: `POST http://localhost:5022/auth/oauth/google/link`
+- Headers: Authorization + X-XSRF-TOKEN
+- Response includes `authUrl` - open in browser
+
+**3. List Linked Providers**
+- Request: `GET http://localhost:5022/auth/oauth/linked`
+- Headers: Authorization Bearer token
+
+**4. Unlink Provider**
+- Request: `DELETE http://localhost:5022/auth/oauth/google/unlink`
+- Headers: Authorization + X-XSRF-TOKEN
+
+---
+
+### OAuth Frontend Example
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <title>OAuth Login Example</title>
+</head>
+<body>
+  <h1>Login</h1>
+
+  <!-- Traditional login -->
+  <form id="loginForm">
+    <input type="email" id="email" placeholder="Email" required />
+    <input type="password" id="password" placeholder="Password" required />
+    <button type="submit">Login</button>
+  </form>
+
+  <hr>
+
+  <!-- OAuth buttons -->
+  <button onclick="loginWithGoogle()">Sign in with Google</button>
+  <button onclick="loginWithDiscord()">Sign in with Discord</button>
+
+  <script>
+    // Traditional login
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+
+      const response = await fetch('/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email, password })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        localStorage.setItem('accessToken', data.data.accessToken);
+        const csrfToken = response.headers.get('X-XSRF-TOKEN');
+        localStorage.setItem('csrfToken', csrfToken);
+        window.location.href = '/dashboard';
+      }
+    });
+
+    // OAuth login
+    function loginWithGoogle() {
+      window.location.href = '/auth/oauth/google?returnUrl=/dashboard';
+    }
+
+    function loginWithDiscord() {
+      window.location.href = '/auth/oauth/discord?returnUrl=/dashboard';
+    }
+
+    // Link OAuth provider (user must be logged in)
+    async function linkGoogleAccount() {
+      const response = await fetch('/auth/oauth/google/link', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+          'X-XSRF-TOKEN': localStorage.getItem('csrfToken')
+        },
+        credentials: 'include',
+        body: JSON.stringify({})
+      });
+
+      const data = await response.json();
+      if (data.success && data.data.authUrl) {
+        // Redirect to OAuth provider
+        window.location.href = data.data.authUrl;
+      }
+    }
+  </script>
+</body>
+</html>
+```
+
+---
+
+### OAuth Flow Diagram
+
+```
+User clicks "Sign in with Google"
+         ↓
+GET /auth/oauth/google
+         ↓
+Server generates state token
+         ↓
+Redirect to Google OAuth page
+         ↓
+User authorizes app
+         ↓
+Google redirects to /auth/oauth/google/callback?code=...&state=...
+         ↓
+Server validates state token
+         ↓
+Server exchanges code for access token with Google
+         ↓
+Server fetches user info from Google
+         ↓
+Server creates/links user account
+         ↓
+Server issues JWT tokens
+         ↓
+Redirect to returnUrl with tokens
+```
+
+---
+
+### OAuth Configuration Options
+
+**In appsettings.json:**
+
+```json
+{
+  "Pawthorize": {
+    "OAuth": {
+      // Allow creating accounts via OAuth without password
+      "AllowAutoRegistration": true,
+
+      // Use PKCE for enhanced security (recommended)
+      "UsePkce": true,
+
+      // State token lifetime (for CSRF protection)
+      "StateTokenLifetimeMinutes": 10,
+
+      "Providers": {
+        "Google": {
+          "Enabled": true,
+          "ClientId": "...",
+          "ClientSecret": "...",
+
+          // Must match OAuth provider console exactly
+          "RedirectUri": "http://localhost:5022/auth/oauth/google/callback",
+
+          // Scopes determine what data you can access
+          "Scopes": ["openid", "profile", "email"],
+
+          // Optional: Override default authorization endpoint
+          "AuthorizationEndpoint": "https://accounts.google.com/o/oauth2/v2/auth",
+
+          // Optional: Override default token endpoint
+          "TokenEndpoint": "https://oauth2.googleapis.com/token",
+
+          // Optional: Override default user info endpoint
+          "UserInfoEndpoint": "https://www.googleapis.com/oauth2/v2/userinfo"
+        }
+      }
+    }
+  }
+}
+```
+
+---
+
+### OAuth Troubleshooting
+
+#### Redirect URI Mismatch
+**Error:** `redirect_uri_mismatch` from OAuth provider
+
+**Fix:**
+- Ensure `RedirectUri` in appsettings.json **exactly** matches OAuth provider console
+- Check for: trailing slashes, http vs https, port numbers, localhost vs 127.0.0.1
+
+#### Invalid State Token
+**Error:** `Invalid or expired state token`
+
+**Causes:**
+- User took longer than 10 minutes to authorize
+- Browser cleared cookies
+- PKCE code verifier mismatch
+
+**Fix:**
+- Restart OAuth flow
+- Check browser allows cookies
+
+#### Email Already Exists
+**Error:** `Email already registered`
+
+**Scenario:** User tries to login via OAuth but email exists with password-based account
+
+**Fix:**
+- User should login with password first
+- Then use `/auth/oauth/{provider}/link` to link OAuth account
+- Or enable `AllowAutoRegistration: false` to prevent auto-registration
+
+#### Provider Not Configured
+**Error:** `OAuth provider 'google' is not configured or disabled`
+
+**Fix:**
+- Check `Enabled: true` in appsettings.json
+- Verify `options.AddGoogle()` is called in Program.cs
+- Restart application after config changes
+
+#### PKCE Verification Failed
+**Error:** `PKCE code verification failed`
+
+**Causes:**
+- Code verifier doesn't match code challenge
+- State token storage issue
+
+**Fix:**
+- Ensure `UsePkce: true` is set if provider requires it
+- Check state token storage implementation
+- Verify browser allows cookies
+
+---
+
+## Customizing Endpoint Paths
+
+The sample uses the default endpoint paths (`/auth/*`), but Pawthorize supports customization:
+
+### Option 1: Custom Base Path
+
+```csharp
+// Program.cs
+app.MapPawthorize(options =>
+{
+    options.BasePath = "/myapp/v1/auth";  // Change from /auth to /myapp/v1/auth
+});
+
+// Endpoints become:
+// POST /myapp/v1/auth/login
+// POST /myapp/v1/auth/register
+// etc.
+```
+
+### Option 2: Custom Individual Paths
+
+```csharp
+app.MapPawthorize(options =>
+{
+    options.BasePath = "/auth";
+    options.LoginPath = "/signin";
+    options.RegisterPath = "/signup";
+    options.LogoutPath = "/signout";
+});
+
+// Endpoints become:
+// POST /auth/signin
+// POST /auth/signup
+// POST /auth/signout
+```
+
+### Option 3: Manual Mapping
+
+```csharp
+// Don't call MapPawthorize()
+var authGroup = app.MapGroup("/myapp/v1/auth");
+
+// Map only the endpoints you need
+authGroup.MapPawthorizeLogin<User>();
+authGroup.MapPawthorizeRegister<User, RegisterRequest>();
+authGroup.MapPawthorizeRefresh<User>();
+authGroup.MapPawthorizeLogout<User>();
+
+// Available methods:
+// - MapPawthorizeLogin<TUser>()
+// - MapPawthorizeRegister<TUser, TRegisterRequest>()
+// - MapPawthorizeRefresh<TUser>()
+// - MapPawthorizeLogout<TUser>()
+// - MapPawthorizeOAuth<TUser>() (if OAuth enabled)
+```
+
+This gives you full control over which endpoints to expose and lets you add custom policies like rate limiting.
+
+### Option 4: Direct Handler Injection (Maximum Control)
+
+For complete control, inject handlers directly into your own endpoints:
+
+```csharp
+// Don't call MapPawthorize() at all
+app.MapPost("/api/v1/auth/login", async (
+    LoginRequest request,
+    LoginHandler<User> handler,
+    HttpContext context,
+    CancellationToken ct) =>
+{
+    // Add custom logic before authentication
+    var ip = context.Connection.RemoteIpAddress?.ToString();
+    Console.WriteLine($"Login attempt from IP: {ip}");
+
+    // Call Pawthorize handler
+    var result = await handler.HandleAsync(request, context, ct);
+
+    // Add custom logic after authentication
+    Console.WriteLine("Login successful");
+
+    return result;
+});
+
+// Available handlers:
+// - LoginHandler<TUser>
+// - RegisterHandler<TUser, TRegisterRequest>
+// - RefreshHandler<TUser>
+// - LogoutHandler<TUser>
+// - ChangePasswordHandler<TUser>
+// - ForgotPasswordHandler, ResetPasswordHandler
+// - GetCurrentUserHandler<TUser>, GetActiveSessionsHandler<TUser>
+// - OAuth handlers (if enabled): OAuthInitiateHandler<TUser>, OAuthCallbackHandler<TUser>, etc.
+```
+
+This approach gives you maximum flexibility to add logging, custom validation, rate limiting, or any other middleware logic around Pawthorize's core authentication functionality.
+
+---
+
 ## Configuration
 
 Configuration in `appsettings.json`:
@@ -444,7 +987,7 @@ curl -X POST http://localhost:5022/auth/register \
 curl -X POST http://localhost:5022/auth/login \
   -H "Content-Type: application/json" \
   -d '{
-    "identifier": "test@example.com",
+    "email": "test@example.com",
     "password": "Test123!"
   }' \
   -c cookies.txt
@@ -539,10 +1082,11 @@ This sample uses in-memory storage for simplicity. For production:
 
 **Security:**
 - ✅ Enable email verification (`RequireEmailVerification: true`)
-- ✅ Implement rate limiting (login attempts, registration)
-- ✅ Use environment variables for secrets
+- ✅ Implement rate limiting using ASP.NET Core's `AddRateLimiter()` (see main README for examples)
+- ✅ Use environment variables for secrets (never commit credentials to source control)
 - ✅ Enable HTTPS in production
-- ✅ Configure CORS properly
+- ✅ Configure CORS properly for your frontend domains
+- ✅ Consider adding security headers (HSTS, Content-Security-Policy, etc.)
 
 **Monitoring:**
 - ✅ Add structured logging
