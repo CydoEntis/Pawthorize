@@ -100,7 +100,7 @@ public class TokenDeliveryTests
         var httpContext = HttpContextTestHelper.CreateHttpContext();
         var request = new LoginRequest
         {
-            Identifier = "test@example.com",
+            Email = "test@example.com",
             Password = "Password123!"
         };
 
@@ -126,7 +126,7 @@ public class TokenDeliveryTests
             .ReturnsAsync(new ValidationResult());
 
         _mockUserRepository
-            .Setup(r => r.FindByIdentifierAsync(request.Identifier, It.IsAny<CancellationToken>()))
+            .Setup(r => r.FindByEmailAsync(request.Email, It.IsAny<CancellationToken>()))
             .ReturnsAsync(user);
 
         _mockPasswordHasher
@@ -179,7 +179,7 @@ public class TokenDeliveryTests
         var httpContext = HttpContextTestHelper.CreateHttpContext();
         var request = new LoginRequest
         {
-            Identifier = "test@example.com",
+            Email = "test@example.com",
             Password = "Password123!"
         };
 
@@ -205,7 +205,7 @@ public class TokenDeliveryTests
             .ReturnsAsync(new ValidationResult());
 
         _mockUserRepository
-            .Setup(r => r.FindByIdentifierAsync(request.Identifier, It.IsAny<CancellationToken>()))
+            .Setup(r => r.FindByEmailAsync(request.Email, It.IsAny<CancellationToken>()))
             .ReturnsAsync(user);
 
         _mockPasswordHasher
@@ -260,7 +260,7 @@ public class TokenDeliveryTests
         var httpContext = HttpContextTestHelper.CreateHttpContext();
         var request = new LoginRequest
         {
-            Identifier = "test@example.com",
+            Email = "test@example.com",
             Password = "Password123!"
         };
 
@@ -286,7 +286,7 @@ public class TokenDeliveryTests
             .ReturnsAsync(new ValidationResult());
 
         _mockUserRepository
-            .Setup(r => r.FindByIdentifierAsync(request.Identifier, It.IsAny<CancellationToken>()))
+            .Setup(r => r.FindByEmailAsync(request.Email, It.IsAny<CancellationToken>()))
             .ReturnsAsync(user);
 
         _mockPasswordHasher

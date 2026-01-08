@@ -7,12 +7,6 @@ public class InMemoryUserRepository<TUser> : IUserRepository<TUser>
 {
     private readonly Dictionary<string, TUser> _users = new();
 
-    public Task<TUser?> FindByIdentifierAsync(string identifier, CancellationToken cancellationToken = default)
-    {
-        var user = _users.Values.FirstOrDefault(u => u.Email.Equals(identifier, StringComparison.OrdinalIgnoreCase));
-        return Task.FromResult(user);
-    }
-
     public Task<TUser?> FindByEmailAsync(string email, CancellationToken cancellationToken = default)
     {
         var user = _users.Values.FirstOrDefault(u => u.Email.Equals(email, StringComparison.OrdinalIgnoreCase));

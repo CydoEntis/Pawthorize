@@ -5,16 +5,19 @@ namespace Pawthorize.Validators;
 
 /// <summary>
 /// Validator for login requests.
+/// Pawthorize is opinionated and requires email-based authentication.
 /// </summary>
 public class LoginRequestValidator : AbstractValidator<LoginRequest>
 {
     public LoginRequestValidator()
     {
-        RuleFor(x => x.Identifier)
+        RuleFor(x => x.Email)
             .NotEmpty()
-            .WithMessage("Identifier is required")
+            .WithMessage("Email is required")
+            .EmailAddress()
+            .WithMessage("Please provide a valid email address")
             .MaximumLength(255)
-            .WithMessage("Identifier must not exceed 255 characters");
+            .WithMessage("Email must not exceed 255 characters");
 
         RuleFor(x => x.Password)
             .NotEmpty()

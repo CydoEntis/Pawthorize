@@ -7,18 +7,13 @@
 public interface IUserRepository<TUser> where TUser : IAuthenticatedUser
 {
     /// <summary>
-    /// Find a user by identifier (email, username, phone, etc.)
-    /// The identifier type is determined by consumer's implementation.
-    /// </summary>
-    Task<TUser?> FindByIdentifierAsync(string identifier, CancellationToken cancellationToken = default);
-    
-    /// <summary>
     /// Find a user by ID.
     /// </summary>
     Task<TUser?> FindByIdAsync(string id, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Find a user by email address.
+    /// Pawthorize is opinionated and uses email-only authentication.
     /// </summary>
     Task<TUser?> FindByEmailAsync(string email, CancellationToken cancellationToken = default);
 

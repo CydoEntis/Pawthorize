@@ -51,27 +51,27 @@ public class LoginHandler<TUser> where TUser : IAuthenticatedUser
         HttpContext httpContext,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Login attempt initiated for identifier: {Identifier}", request.Identifier);
+        _logger.LogInformation("Login attempt initiated for email: {Email}", request.Email);
 
         try
         {
             await ValidationHelper.ValidateAndThrowAsync(request, _validator, cancellationToken, _logger);
-            _logger.LogDebug("Login request validation passed for identifier: {Identifier}", request.Identifier);
+            _logger.LogDebug("Login request validation passed for email: {Email}", request.Email);
 
-            var user = await _userRepository.FindByIdentifierAsync(request.Identifier, cancellationToken);
+            var user = await _userRepository.FindByEmailAsync(request.Email, cancellationToken);
 
             if (user == null)
             {
-                _logger.LogWarning("Login failed: User not found for identifier: {Identifier}", request.Identifier);
+                _logger.LogWarning("Login failed: User not found for email: {Email}", request.Email);
                 throw new InvalidCredentialsError();
             }
 
-            _logger.LogDebug("User found for identifier: {Identifier}, UserId: {UserId}", request.Identifier, user.Id);
+            _logger.LogDebug("User found for email: {Email}, UserId: {UserId}", request.Email, user.Id);
 
             if (!_passwordHasher.VerifyPassword(request.Password, user.PasswordHash))
             {
-                _logger.LogWarning("Login failed: Invalid password for identifier: {Identifier}, UserId: {UserId}",
-                    request.Identifier, user.Id);
+                _logger.LogWarning("Login failed: Invalid password for email: {Email}, UserId: {UserId}",
+                    request.Email, user.Id);
                 throw new InvalidCredentialsError();
             }
 
@@ -85,29 +85,29 @@ public class LoginHandler<TUser> where TUser : IAuthenticatedUser
 
             var result = TokenDeliveryHelper.DeliverTokens(authResult, httpContext, _options.TokenDelivery, _options, _csrfService, _logger);
 
-            _logger.LogInformation("Login successful for identifier: {Identifier}, UserId: {UserId}",
-                request.Identifier, user.Id);
+            _logger.LogInformation("Login successful for email: {Email}, UserId: {UserId}",
+                request.Email, user.Id);
 
             return result;
         }
         catch (InvalidCredentialsError)
         {
-            _logger.LogError("Login failed: Invalid credentials for identifier: {Identifier}", request.Identifier);
+            _logger.LogError("Login failed: Invalid credentials for email: {Email}", request.Email);
             throw;
         }
         catch (EmailNotVerifiedError ex)
         {
-            _logger.LogWarning("Login failed: Email not verified for identifier: {Identifier}", request.Identifier);
+            _logger.LogWarning("Login failed: Email not verified for email: {Email}", request.Email);
             throw;
         }
         catch (AccountLockedError ex)
         {
-            _logger.LogWarning("Login failed: Account locked for identifier: {Identifier}", request.Identifier);
+            _logger.LogWarning("Login failed: Account locked for email: {Email}", request.Email);
             throw;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error during login for identifier: {Identifier}", request.Identifier);
+            _logger.LogError(ex, "Unexpected error during login for email: {Email}", request.Email);
             throw;
         }
     }

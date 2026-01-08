@@ -8,16 +8,12 @@ namespace Pawthorize.DTOs;
 public class LoginRequest
 {
     /// <summary>
-    /// Login identifier.
-    /// The type of identifier depends on your Pawthorize configuration:
-    /// - Email login (default): provide email address
-    /// - Username login: provide username
-    /// - Phone login: provide phone number
+    /// User's email address for login.
+    /// Pawthorize is opinionated and uses email-only authentication.
     /// </summary>
     /// <example>john@example.com</example>
-    /// <example>johndoe</example>
-    [JsonPropertyName("identifier")]
-    public string Identifier { get; set; } = string.Empty;
+    [JsonPropertyName("email")]
+    public string Email { get; set; } = string.Empty;
 
     public string Password { get; set; } = string.Empty;
 }

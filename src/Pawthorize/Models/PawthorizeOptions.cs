@@ -26,12 +26,6 @@ public class PawthorizeOptions
     public PlatformOptions? Platform { get; set; }
 
     /// <summary>
-    /// Type of identifier to use for login (Email, Username, Phone)
-    /// Default: Email
-    /// </summary>
-    public LoginIdentifierType LoginIdentifier { get; set; } = LoginIdentifierType.Email;
-
-    /// <summary>
     /// How tokens should be delivered to the client
     /// Default: Hybrid (access token in body, refresh token in cookie)
     /// </summary>
@@ -61,27 +55,6 @@ public class PawthorizeOptions
     /// Automatically enabled for HttpOnlyCookies and Hybrid token delivery modes.
     /// </summary>
     public CsrfOptions Csrf { get; set; } = new();
-}
-
-/// <summary>
-/// Type of identifier used for login
-/// </summary>
-public enum LoginIdentifierType
-{
-    /// <summary>
-    /// Users log in with email address (default)
-    /// </summary>
-    Email,
-
-    /// <summary>
-    /// Users log in with username
-    /// </summary>
-    Username,
-
-    /// <summary>
-    /// Users log in with phone number
-    /// </summary>
-    Phone
 }
 
 /// <summary>

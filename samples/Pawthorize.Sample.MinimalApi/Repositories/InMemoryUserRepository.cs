@@ -24,6 +24,7 @@ public class InMemoryUserRepository : IUserRepository<User>
 
     /// <summary>
     /// Finds a user by their email address.
+    /// Pawthorize is opinionated and uses email-only authentication.
     /// </summary>
     /// <param name="email">The email address to search for.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
@@ -32,17 +33,6 @@ public class InMemoryUserRepository : IUserRepository<User>
     {
         var user = _users.Values.FirstOrDefault(u => u.Email.Equals(email, StringComparison.OrdinalIgnoreCase));
         return Task.FromResult(user);
-    }
-
-    /// <summary>
-    /// Finds a user by their identifier (email in this implementation).
-    /// </summary>
-    /// <param name="identifier">The identifier to search for.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The user if found, null otherwise.</returns>
-    public Task<User?> FindByIdentifierAsync(string identifier, CancellationToken cancellationToken = default)
-    {
-        return FindByEmailAsync(identifier, cancellationToken);
     }
 
     /// <summary>

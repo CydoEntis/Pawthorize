@@ -96,7 +96,7 @@ public class LoginHandlerTests
     {
         var request = new LoginRequest
         {
-            Identifier = "test@example.com",
+            Email = "test@example.com",
             Password = "Password123!"
         };
 
@@ -122,7 +122,7 @@ public class LoginHandlerTests
             .ReturnsAsync(new ValidationResult());
 
         _mockUserRepository
-            .Setup(r => r.FindByIdentifierAsync(request.Identifier, It.IsAny<CancellationToken>()))
+            .Setup(r => r.FindByEmailAsync(request.Email, It.IsAny<CancellationToken>()))
             .ReturnsAsync(user);
 
         _mockPasswordHasher
@@ -136,7 +136,7 @@ public class LoginHandlerTests
         var result = await _handler.HandleAsync(request, _httpContext, CancellationToken.None);
 
         result.Should().NotBeNull();
-        _mockUserRepository.Verify(r => r.FindByIdentifierAsync(request.Identifier, It.IsAny<CancellationToken>()), Times.Once);
+        _mockUserRepository.Verify(r => r.FindByEmailAsync(request.Email, It.IsAny<CancellationToken>()), Times.Once);
         _mockPasswordHasher.Verify(h => h.VerifyPassword(request.Password, user.PasswordHash), Times.Once);
         _mockAuthService.Verify(s => s.GenerateTokensAsync(user, It.IsAny<CancellationToken>()), Times.Once);
     }
@@ -146,7 +146,7 @@ public class LoginHandlerTests
     {
         var request = new LoginRequest
         {
-            Identifier = "test@example.com",
+            Email = "test@example.com",
             Password = "WrongPassword!"
         };
 
@@ -162,7 +162,7 @@ public class LoginHandlerTests
             .ReturnsAsync(new ValidationResult());
 
         _mockUserRepository
-            .Setup(r => r.FindByIdentifierAsync(request.Identifier, It.IsAny<CancellationToken>()))
+            .Setup(r => r.FindByEmailAsync(request.Email, It.IsAny<CancellationToken>()))
             .ReturnsAsync(user);
 
         _mockPasswordHasher
@@ -180,7 +180,7 @@ public class LoginHandlerTests
     {
         var request = new LoginRequest
         {
-            Identifier = "nonexistent@example.com",
+            Email = "nonexistent@example.com",
             Password = "Password123!"
         };
 
@@ -189,7 +189,7 @@ public class LoginHandlerTests
             .ReturnsAsync(new ValidationResult());
 
         _mockUserRepository
-            .Setup(r => r.FindByIdentifierAsync(request.Identifier, It.IsAny<CancellationToken>()))
+            .Setup(r => r.FindByEmailAsync(request.Email, It.IsAny<CancellationToken>()))
             .ReturnsAsync((TestUser?)null);
 
         Func<Task> act = async () => await _handler.HandleAsync(request, _httpContext, CancellationToken.None);
@@ -205,7 +205,7 @@ public class LoginHandlerTests
 
         var request = new LoginRequest
         {
-            Identifier = "test@example.com",
+            Email = "test@example.com",
             Password = "Password123!"
         };
 
@@ -222,7 +222,7 @@ public class LoginHandlerTests
             .ReturnsAsync(new ValidationResult());
 
         _mockUserRepository
-            .Setup(r => r.FindByIdentifierAsync(request.Identifier, It.IsAny<CancellationToken>()))
+            .Setup(r => r.FindByEmailAsync(request.Email, It.IsAny<CancellationToken>()))
             .ReturnsAsync(user);
 
         _mockPasswordHasher
@@ -243,7 +243,7 @@ public class LoginHandlerTests
     {
         var request = new LoginRequest
         {
-            Identifier = "test@example.com",
+            Email = "test@example.com",
             Password = "Password123!"
         };
 
@@ -261,7 +261,7 @@ public class LoginHandlerTests
             .ReturnsAsync(new ValidationResult());
 
         _mockUserRepository
-            .Setup(r => r.FindByIdentifierAsync(request.Identifier, It.IsAny<CancellationToken>()))
+            .Setup(r => r.FindByEmailAsync(request.Email, It.IsAny<CancellationToken>()))
             .ReturnsAsync(user);
 
         _mockPasswordHasher
@@ -282,7 +282,7 @@ public class LoginHandlerTests
     {
         var request = new LoginRequest
         {
-            Identifier = "",
+            Email = "",
             Password = "Password123!"
         };
 
@@ -298,6 +298,6 @@ public class LoginHandlerTests
         Func<Task> act = async () => await _handler.HandleAsync(request, _httpContext, CancellationToken.None);
 
         await act.Should().ThrowAsync<ValidationError>();
-        _mockUserRepository.Verify(r => r.FindByIdentifierAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        _mockUserRepository.Verify(r => r.FindByEmailAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }
