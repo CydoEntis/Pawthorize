@@ -1,15 +1,16 @@
 ﻿using FluentValidation;
 using Pawthorize.DTOs;
+using Pawthorize.Services;
 
 namespace Pawthorize.Validators;
 
 /// <summary>
 /// Validator for registration requests.
-/// Enforces password strength requirements.
+/// Enforces password strength requirements using configured password policy.
 /// </summary>
 public class RegisterRequestValidator : AbstractValidator<RegisterRequest>
 {
-    public RegisterRequestValidator()
+    public RegisterRequestValidator(PasswordValidationService passwordValidationService)
     {
         RuleFor(x => x.Email)
             .NotEmpty()
@@ -22,18 +23,17 @@ public class RegisterRequestValidator : AbstractValidator<RegisterRequest>
         RuleFor(x => x.Password)
             .NotEmpty()
             .WithMessage("Password is required")
-            .MinimumLength(8)
-            .WithMessage("Password must be at least 8 characters")
-            .MaximumLength(128)
-            .WithMessage("Password must not exceed 128 characters")
-            .Matches(@"[A-Z]")
-            .WithMessage("Password must contain at least one uppercase letter")
-            .Matches(@"[a-z]")
-            .WithMessage("Password must contain at least one lowercase letter")
-            .Matches(@"[0-9]")
-            .WithMessage("Password must contain at least one number")
-            .Matches(@"[\W_]")
-            .WithMessage("Password must contain at least one special character");
+            .Custom((password, context) =>
+            {
+                var result = passwordValidationService.Validate(password);
+                if (!result.IsValid)
+                {
+                    foreach (var error in result.Errors)
+                    {
+                        context.AddFailure("Password", error);
+                    }
+                }
+            });
 
         RuleFor(x => x.Name)
             .MaximumLength(100)
