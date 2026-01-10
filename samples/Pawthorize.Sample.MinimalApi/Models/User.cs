@@ -53,6 +53,16 @@ public class User : IAuthenticatedUser
     public DateTime? LockedUntil { get; set; }
 
     /// <summary>
+    /// Gets or sets the number of consecutive failed login attempts.
+    /// </summary>
+    public int FailedLoginAttempts { get; set; } = 0;
+
+    /// <summary>
+    /// Gets or sets the date and time when the account lockout will end.
+    /// </summary>
+    public DateTime? LockoutEnd { get; set; }
+
+    /// <summary>
     /// Gets or sets the date and time when the user account was created.
     /// </summary>
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
