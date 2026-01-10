@@ -53,6 +53,36 @@ if (app.Environment.IsDevelopment())
 // Map all authentication endpoints (OAuth endpoints auto-detected and mapped)
 app.MapPawthorize();
 
+// Example: Custom endpoint with Pawthorize rate limiting
+// This demonstrates how to apply Pawthorize's rate limiting policies to your own endpoints
+app.MapPost("/api/custom/verify-otp", (string otp) => new
+{
+    Message = "OTP verification endpoint",
+    Note = "This endpoint uses Pawthorize's strict Login rate limit (5 req/5min)"
+})
+.RequirePawthorizeRateLimit(PawthorizeRateLimitPolicy.Login)
+.WithTags("Custom Endpoints")
+.WithOpenApi();
+
+// Example: Custom endpoint group with rate limiting
+var customAuthGroup = app.MapGroup("/api/custom-auth")
+    .WithTags("Custom Auth Group")
+    .RequirePawthorizeRateLimit(PawthorizeRateLimitPolicy.Register);
+
+customAuthGroup.MapPost("/verify-phone", (string phone) => new
+{
+    Message = "Phone verification endpoint",
+    Note = "Entire group uses Register rate limit (3 req/15min)"
+})
+.WithOpenApi();
+
+customAuthGroup.MapPost("/send-verification", (string phone) => new
+{
+    Message = "Send verification code endpoint",
+    Note = "Entire group uses Register rate limit (3 req/15min)"
+})
+.WithOpenApi();
+
 app.MapGet("/", () => new
 {
     Message = "Pawthorize Sample API - Authentication with OAuth 2.0",
