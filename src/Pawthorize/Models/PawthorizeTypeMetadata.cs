@@ -22,6 +22,16 @@ internal sealed class PawthorizeTypeMetadata
     /// </summary>
     public bool EnableOAuth { get; }
 
+    /// <summary>
+    /// Indicates whether rate limiting is enabled.
+    /// </summary>
+    internal bool _rateLimitingEnabled = true;
+
+    /// <summary>
+    /// Public accessor for rate limiting enabled state.
+    /// </summary>
+    public bool RateLimitingEnabled => _rateLimitingEnabled;
+
     public PawthorizeTypeMetadata(Type userType, Type registerRequestType, bool enableOAuth = false)
     {
         UserType = userType ?? throw new ArgumentNullException(nameof(userType));

@@ -20,7 +20,7 @@ namespace Pawthorize.Extensions;
 public static class WebApplicationExtensions
 {
     /// <summary>
-    /// Configures Pawthorize middleware including ErrorHound, CSRF protection, Authentication, and Authorization.
+    /// Configures Pawthorize middleware including ErrorHound, CSRF protection, Rate Limiting, Authentication, and Authorization.
     /// Must be called before MapPawthorize.
     /// </summary>
     /// <param name="app">Web application</param>
@@ -30,6 +30,12 @@ public static class WebApplicationExtensions
         app.UseErrorHound();
 
         var options = app.ApplicationServices.GetRequiredService<IOptions<PawthorizeOptions>>().Value;
+
+        // Apply rate limiting middleware if enabled
+        if (options.RateLimiting.Enabled)
+        {
+            app.UseRateLimiter();
+        }
 
         if (options.Csrf.Enabled &&
             (options.TokenDelivery == TokenDeliveryStrategy.Hybrid ||
@@ -99,11 +105,12 @@ public static class WebApplicationExtensions
         // Check if OAuth is enabled from metadata
         var metadata = app.Services.GetService<PawthorizeTypeMetadata>();
         var isOAuthEnabled = metadata?.EnableOAuth ?? false;
+        var isRateLimitingEnabled = metadata?.RateLimitingEnabled ?? true;
 
         var group = app.MapGroup(options.BasePath)
             .WithTags("Authentication");
 
-        group.MapPost(options.LoginPath, async (
+        var loginEndpoint = group.MapPost(options.LoginPath, async (
                 LoginRequest request,
                 LoginHandler<TUser> handler,
                 HttpContext context,
@@ -114,7 +121,12 @@ public static class WebApplicationExtensions
             .WithName("Login")
             .WithOpenApi();
 
-        group.MapPost(options.RegisterPath, async (
+        if (isRateLimitingEnabled)
+        {
+            loginEndpoint.RequireRateLimiting("pawthorize-login");
+        }
+
+        var registerEndpoint = group.MapPost(options.RegisterPath, async (
                 TRegisterRequest request,
                 RegisterHandler<TUser, TRegisterRequest> handler,
                 HttpContext context,
@@ -125,7 +137,12 @@ public static class WebApplicationExtensions
             .WithName("Register")
             .WithOpenApi();
 
-        group.MapPost(options.RefreshPath, async (
+        if (isRateLimitingEnabled)
+        {
+            registerEndpoint.RequireRateLimiting("pawthorize-register");
+        }
+
+        var refreshEndpoint = group.MapPost(options.RefreshPath, async (
                 RefreshTokenRequest request,
                 RefreshHandler<TUser> handler,
                 HttpContext context,
@@ -136,7 +153,12 @@ public static class WebApplicationExtensions
             .WithName("RefreshToken")
             .WithOpenApi();
 
-        group.MapPost(options.LogoutPath, async (
+        if (isRateLimitingEnabled)
+        {
+            refreshEndpoint.RequireRateLimiting("pawthorize-refresh");
+        }
+
+        var logoutEndpoint = group.MapPost(options.LogoutPath, async (
                 LogoutRequest request,
                 LogoutHandler<TUser> handler,
                 HttpContext context,
@@ -147,7 +169,12 @@ public static class WebApplicationExtensions
             .WithName("Logout")
             .WithOpenApi();
 
-        group.MapPost(options.ForgotPasswordPath, async (
+        if (isRateLimitingEnabled)
+        {
+            logoutEndpoint.RequireRateLimiting("pawthorize-global");
+        }
+
+        var forgotPasswordEndpoint = group.MapPost(options.ForgotPasswordPath, async (
                 ForgotPasswordRequest request,
                 ForgotPasswordHandler<TUser> handler,
                 HttpContext context,
@@ -158,7 +185,12 @@ public static class WebApplicationExtensions
             .WithName("ForgotPassword")
             .WithOpenApi();
 
-        group.MapPost(options.ResetPasswordPath, async (
+        if (isRateLimitingEnabled)
+        {
+            forgotPasswordEndpoint.RequireRateLimiting("pawthorize-password-reset");
+        }
+
+        var resetPasswordEndpoint = group.MapPost(options.ResetPasswordPath, async (
                 ResetPasswordRequest request,
                 ResetPasswordHandler<TUser> handler,
                 HttpContext context,
@@ -169,7 +201,12 @@ public static class WebApplicationExtensions
             .WithName("ResetPassword")
             .WithOpenApi();
 
-        group.MapPost(options.ChangePasswordPath, async (
+        if (isRateLimitingEnabled)
+        {
+            resetPasswordEndpoint.RequireRateLimiting("pawthorize-password-reset");
+        }
+
+        var changePasswordEndpoint = group.MapPost(options.ChangePasswordPath, async (
                 ChangePasswordRequest request,
                 ChangePasswordHandler<TUser> handler,
                 HttpContext context,
@@ -181,7 +218,12 @@ public static class WebApplicationExtensions
             .RequireAuthorization()
             .WithOpenApi();
 
-        group.MapPost(options.VerifyEmailPath, async (
+        if (isRateLimitingEnabled)
+        {
+            changePasswordEndpoint.RequireRateLimiting("pawthorize-global");
+        }
+
+        var verifyEmailEndpoint = group.MapPost(options.VerifyEmailPath, async (
                 VerifyEmailRequest request,
                 VerifyEmailHandler<TUser> handler,
                 HttpContext context,
@@ -192,7 +234,12 @@ public static class WebApplicationExtensions
             .WithName("VerifyEmail")
             .WithOpenApi();
 
-        group.MapGet(options.GetCurrentUserPath, async (
+        if (isRateLimitingEnabled)
+        {
+            verifyEmailEndpoint.RequireRateLimiting("pawthorize-global");
+        }
+
+        var getCurrentUserEndpoint = group.MapGet(options.GetCurrentUserPath, async (
                 GetCurrentUserHandler<TUser> handler,
                 HttpContext context,
                 CancellationToken ct) =>
@@ -203,7 +250,12 @@ public static class WebApplicationExtensions
             .RequireAuthorization()
             .WithOpenApi();
 
-        group.MapGet(options.GetActiveSessionsPath, async (
+        if (isRateLimitingEnabled)
+        {
+            getCurrentUserEndpoint.RequireRateLimiting("pawthorize-global");
+        }
+
+        var getActiveSessionsEndpoint = group.MapGet(options.GetActiveSessionsPath, async (
                 GetActiveSessionsHandler<TUser> handler,
                 HttpContext context,
                 CancellationToken ct) =>
@@ -214,7 +266,12 @@ public static class WebApplicationExtensions
             .RequireAuthorization()
             .WithOpenApi();
 
-        group.MapPost(options.RevokeAllOtherSessionsPath, async (
+        if (isRateLimitingEnabled)
+        {
+            getActiveSessionsEndpoint.RequireRateLimiting("pawthorize-global");
+        }
+
+        var revokeSessionsEndpoint = group.MapPost(options.RevokeAllOtherSessionsPath, async (
                 RevokeAllOtherSessionsRequest? request,
                 RevokeAllOtherSessionsHandler<TUser> handler,
                 HttpContext context,
@@ -226,11 +283,16 @@ public static class WebApplicationExtensions
             .RequireAuthorization()
             .WithOpenApi();
 
+        if (isRateLimitingEnabled)
+        {
+            revokeSessionsEndpoint.RequireRateLimiting("pawthorize-global");
+        }
+
         // Auto-map OAuth endpoints if OAuth is enabled
         if (isOAuthEnabled)
         {
             // OAuth Initiate - Redirect user to OAuth provider
-            group.MapGet(options.OAuthInitiatePath, async (
+            var oauthInitiateEndpoint = group.MapGet(options.OAuthInitiatePath, async (
                     string provider,
                     string? returnUrl,
                     Handlers.OAuthInitiateHandler handler,
@@ -241,8 +303,13 @@ public static class WebApplicationExtensions
                 .WithName("OAuthInitiate")
                 .WithOpenApi();
 
+            if (isRateLimitingEnabled)
+            {
+                oauthInitiateEndpoint.RequireRateLimiting("pawthorize-oauth");
+            }
+
             // OAuth Callback - Handle OAuth provider callback
-            group.MapGet(options.OAuthCallbackPath, async (
+            var oauthCallbackEndpoint = group.MapGet(options.OAuthCallbackPath, async (
                     string provider,
                     string? code,
                     string? state,
@@ -257,8 +324,13 @@ public static class WebApplicationExtensions
                 .WithName("OAuthCallback")
                 .WithOpenApi();
 
+            if (isRateLimitingEnabled)
+            {
+                oauthCallbackEndpoint.RequireRateLimiting("pawthorize-oauth");
+            }
+
             // Link Provider - Link OAuth provider to authenticated user
-            group.MapPost(options.OAuthLinkPath, async (
+            var linkProviderEndpoint = group.MapPost(options.OAuthLinkPath, async (
                     string provider,
                     string code,
                     string state,
@@ -272,8 +344,13 @@ public static class WebApplicationExtensions
                 .RequireAuthorization()
                 .WithOpenApi();
 
+            if (isRateLimitingEnabled)
+            {
+                linkProviderEndpoint.RequireRateLimiting("pawthorize-oauth");
+            }
+
             // Unlink Provider - Unlink OAuth provider from authenticated user
-            group.MapDelete(options.OAuthUnlinkPath, async (
+            var unlinkProviderEndpoint = group.MapDelete(options.OAuthUnlinkPath, async (
                     string provider,
                     Handlers.UnlinkProviderHandler<TUser> handler,
                     HttpContext context,
@@ -285,8 +362,13 @@ public static class WebApplicationExtensions
                 .RequireAuthorization()
                 .WithOpenApi();
 
+            if (isRateLimitingEnabled)
+            {
+                unlinkProviderEndpoint.RequireRateLimiting("pawthorize-global");
+            }
+
             // List Linked Providers - Get all linked OAuth providers for authenticated user
-            group.MapGet(options.OAuthLinkedProvidersPath, async (
+            var listLinkedProvidersEndpoint = group.MapGet(options.OAuthLinkedProvidersPath, async (
                     Handlers.ListLinkedProvidersHandler<TUser> handler,
                     HttpContext context,
                     CancellationToken ct) =>
@@ -296,6 +378,11 @@ public static class WebApplicationExtensions
                 .WithName("ListLinkedProviders")
                 .RequireAuthorization()
                 .WithOpenApi();
+
+            if (isRateLimitingEnabled)
+            {
+                listLinkedProvidersEndpoint.RequireRateLimiting("pawthorize-global");
+            }
         }
 
         return group;

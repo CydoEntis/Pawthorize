@@ -83,6 +83,9 @@ public static class ServiceCollectionExtensions
             RegisterOAuth<TUser>(services, responseOptions);
         }
 
+        // Register rate limiting
+        RegisterRateLimiting(services, responseOptions.Configuration);
+
         ValidateConfiguration(services);
 
         return services;
@@ -517,5 +520,48 @@ public static class ServiceCollectionExtensions
         services.AddScoped<Handlers.LinkProviderHandler<TUser>>();
         services.AddScoped<Handlers.UnlinkProviderHandler<TUser>>();
         services.AddScoped<Handlers.ListLinkedProvidersHandler<TUser>>();
+    }
+
+    /// <summary>
+    /// Register rate limiting services.
+    /// </summary>
+    private static void RegisterRateLimiting(
+        IServiceCollection services,
+        IConfiguration? configuration)
+    {
+        // Build a temporary service provider to get the options
+        var serviceProvider = services.BuildServiceProvider();
+
+        try
+        {
+            var pawthorizeOptions = serviceProvider.GetService<IOptions<PawthorizeOptions>>()?.Value;
+            var rateLimitingOptions = pawthorizeOptions?.RateLimiting ?? new Configuration.PawthorizeRateLimitingOptions();
+
+            var logger = serviceProvider.GetService<ILogger<RateLimitingService>>();
+            var rateLimitingService = new RateLimitingService(logger);
+
+            // Validate configuration first
+            rateLimitingService.ValidateConfiguration(rateLimitingOptions);
+
+            // Configure rate limiting
+            rateLimitingService.ConfigureRateLimiting(services, rateLimitingOptions);
+
+            // Store rate limiting enabled state in metadata for WebApplicationExtensions
+            var metadata = serviceProvider.GetService<PawthorizeTypeMetadata>();
+            if (metadata != null)
+            {
+                // Use reflection to set the rate limiting enabled state
+                var field = typeof(PawthorizeTypeMetadata).GetField("_rateLimitingEnabled",
+                    System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                field?.SetValue(metadata, rateLimitingOptions.Enabled);
+            }
+        }
+        finally
+        {
+            if (serviceProvider is IDisposable disposable)
+            {
+                disposable.Dispose();
+            }
+        }
     }
 }

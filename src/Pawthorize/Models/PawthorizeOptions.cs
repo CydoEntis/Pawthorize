@@ -1,4 +1,6 @@
-﻿namespace Pawthorize.Models;
+using Pawthorize.Configuration;
+
+namespace Pawthorize.Models;
 
 /// <summary>
 /// Main configuration options for Pawthorize.
@@ -55,6 +57,13 @@ public class PawthorizeOptions
     /// Automatically enabled for HttpOnlyCookies and Hybrid token delivery modes.
     /// </summary>
     public CsrfOptions Csrf { get; set; } = new();
+
+    /// <summary>
+    /// Rate limiting configuration.
+    /// Enabled by default to protect against brute force attacks, credential stuffing,
+    /// account enumeration, and denial of service attacks.
+    /// </summary>
+    public PawthorizeRateLimitingOptions RateLimiting { get; set; } = new();
 }
 
 /// <summary>
