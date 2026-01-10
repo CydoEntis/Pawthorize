@@ -8,6 +8,7 @@ using Microsoft.Extensions.Options;
 using Moq;
 using Pawthorize.Abstractions;
 using Pawthorize.AspNetCore.Handlers;
+using Pawthorize.Configuration;
 using Pawthorize.DTOs;
 using Pawthorize.Errors;
 using Pawthorize.Handlers;
@@ -26,6 +27,7 @@ public class LoginHandlerTests
     private readonly Mock<AuthenticationService<TestUser>> _mockAuthService;
     private readonly Mock<IValidator<LoginRequest>> _mockValidator;
     private readonly Mock<IOptions<PawthorizeOptions>> _mockOptions;
+    private readonly Mock<IOptions<AccountLockoutOptions>> _mockLockoutOptions;
     private readonly Mock<CsrfTokenService> _mockCsrfService;
     private readonly Mock<ILogger<LoginHandler<TestUser>>> _mockLogger;
     private readonly Mock<ILogger<AuthenticationService<TestUser>>> _mockAuthLogger;
@@ -52,6 +54,16 @@ public class LoginHandlerTests
         };
         _mockOptions = new Mock<IOptions<PawthorizeOptions>>();
         _mockOptions.Setup(o => o.Value).Returns(_options);
+
+        var lockoutOptions = new AccountLockoutOptions
+        {
+            Enabled = true,
+            MaxFailedAttempts = 5,
+            LockoutMinutes = 30,
+            ResetOnSuccessfulLogin = true
+        };
+        _mockLockoutOptions = new Mock<IOptions<AccountLockoutOptions>>();
+        _mockLockoutOptions.Setup(o => o.Value).Returns(lockoutOptions);
 
         var jwtSettings = new JwtSettings
         {
@@ -84,6 +96,7 @@ public class LoginHandlerTests
             _mockAuthService.Object,
             _mockValidator.Object,
             _mockOptions.Object,
+            _mockLockoutOptions.Object,
             _mockCsrfService.Object,
             _mockLogger.Object
         );

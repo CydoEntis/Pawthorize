@@ -7,6 +7,7 @@ using Microsoft.Extensions.Options;
 using Moq;
 using Pawthorize.Abstractions;
 using Pawthorize.AspNetCore.Handlers;
+using Pawthorize.Configuration;
 using Pawthorize.DTOs;
 using Pawthorize.Handlers;
 using Pawthorize.Models;
@@ -79,6 +80,10 @@ public class TokenDeliveryTests
         var mockOptions = new Mock<IOptions<PawthorizeOptions>>();
         mockOptions.Setup(o => o.Value).Returns(options);
 
+        var lockoutOptions = new AccountLockoutOptions { Enabled = true, MaxFailedAttempts = 5, LockoutMinutes = 30 };
+        var mockLockoutOptions = new Mock<IOptions<AccountLockoutOptions>>();
+        mockLockoutOptions.Setup(o => o.Value).Returns(lockoutOptions);
+
         var mockAuthService = new Mock<AuthenticationService<TestUser>>(
             _mockJwtService.Object,
             _mockRefreshTokenRepository.Object,
@@ -93,6 +98,7 @@ public class TokenDeliveryTests
             mockAuthService.Object,
             _mockValidator.Object,
             mockOptions.Object,
+            mockLockoutOptions.Object,
             _mockCsrfService.Object,
             _mockLogger.Object
         );
@@ -158,6 +164,10 @@ public class TokenDeliveryTests
         var mockOptions = new Mock<IOptions<PawthorizeOptions>>();
         mockOptions.Setup(o => o.Value).Returns(options);
 
+        var lockoutOptions = new AccountLockoutOptions { Enabled = true, MaxFailedAttempts = 5, LockoutMinutes = 30 };
+        var mockLockoutOptions = new Mock<IOptions<AccountLockoutOptions>>();
+        mockLockoutOptions.Setup(o => o.Value).Returns(lockoutOptions);
+
         var mockAuthService = new Mock<AuthenticationService<TestUser>>(
             _mockJwtService.Object,
             _mockRefreshTokenRepository.Object,
@@ -172,6 +182,7 @@ public class TokenDeliveryTests
             mockAuthService.Object,
             _mockValidator.Object,
             mockOptions.Object,
+            mockLockoutOptions.Object,
             _mockCsrfService.Object,
             _mockLogger.Object
         );
@@ -239,6 +250,10 @@ public class TokenDeliveryTests
         var mockOptions = new Mock<IOptions<PawthorizeOptions>>();
         mockOptions.Setup(o => o.Value).Returns(options);
 
+        var lockoutOptions = new AccountLockoutOptions { Enabled = true, MaxFailedAttempts = 5, LockoutMinutes = 30 };
+        var mockLockoutOptions = new Mock<IOptions<AccountLockoutOptions>>();
+        mockLockoutOptions.Setup(o => o.Value).Returns(lockoutOptions);
+
         var mockAuthService = new Mock<AuthenticationService<TestUser>>(
             _mockJwtService.Object,
             _mockRefreshTokenRepository.Object,
@@ -253,6 +268,7 @@ public class TokenDeliveryTests
             mockAuthService.Object,
             _mockValidator.Object,
             mockOptions.Object,
+            mockLockoutOptions.Object,
             _mockCsrfService.Object,
             _mockLogger.Object
         );
@@ -501,6 +517,8 @@ public class TestUser : IAuthenticatedUser
     public bool IsEmailVerified { get; set; }
     public bool IsLocked { get; set; }
     public DateTime? LockedUntil { get; set; }
+    public int FailedLoginAttempts { get; set; } = 0;
+    public DateTime? LockoutEnd { get; set; }
     public IEnumerable<string> Roles { get; set; } = new List<string>();
     public IDictionary<string, string> AdditionalClaims { get; set; } = new Dictionary<string, string>();
 }

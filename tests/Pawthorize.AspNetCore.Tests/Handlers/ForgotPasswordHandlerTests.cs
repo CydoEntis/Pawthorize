@@ -181,6 +181,8 @@ public class TestUser : IAuthenticatedUser
     public bool IsEmailVerified { get; set; } = true;
     public bool IsLocked { get; set; } = false;
     public DateTime? LockedUntil { get; set; }
+    public int FailedLoginAttempts { get; set; } = 0;
+    public DateTime? LockoutEnd { get; set; }
     public IEnumerable<string> Roles { get; set; } = new List<string>();
     public IDictionary<string, string>? AdditionalClaims { get; set; }
 }
