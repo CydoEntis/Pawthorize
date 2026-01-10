@@ -1,14 +1,16 @@
 using FluentValidation;
 using Pawthorize.DTOs;
+using Pawthorize.Services;
 
 namespace Pawthorize.Validators;
 
 /// <summary>
 /// Validator for change password requests.
+/// Enforces password strength requirements using configured password policy.
 /// </summary>
 public class ChangePasswordRequestValidator : AbstractValidator<ChangePasswordRequest>
 {
-    public ChangePasswordRequestValidator()
+    public ChangePasswordRequestValidator(PasswordValidationService passwordValidationService)
     {
         RuleFor(x => x.CurrentPassword)
             .NotEmpty()
@@ -17,12 +19,19 @@ public class ChangePasswordRequestValidator : AbstractValidator<ChangePasswordRe
         RuleFor(x => x.NewPassword)
             .NotEmpty()
             .WithMessage("New password is required")
-            .MinimumLength(8)
-            .WithMessage("Password must be at least 8 characters long")
-            .MaximumLength(100)
-            .WithMessage("Password must not exceed 100 characters")
             .NotEqual(x => x.CurrentPassword)
-            .WithMessage("New password must be different from current password");
+            .WithMessage("New password must be different from current password")
+            .Custom((newPassword, context) =>
+            {
+                var result = passwordValidationService.Validate(newPassword);
+                if (!result.IsValid)
+                {
+                    foreach (var error in result.Errors)
+                    {
+                        context.AddFailure("NewPassword", error);
+                    }
+                }
+            });
 
         RuleFor(x => x.ConfirmPassword)
             .NotEmpty()

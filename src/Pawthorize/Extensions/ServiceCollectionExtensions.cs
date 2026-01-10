@@ -102,6 +102,8 @@ public static class ServiceCollectionExtensions
         {
             services.Configure<PawthorizeOptions>(configuration.GetSection("Pawthorize"));
             services.Configure<JwtSettings>(configuration.GetSection("Jwt"));
+            services.Configure<Configuration.PasswordPolicyOptions>(configuration.GetSection("Pawthorize:PasswordPolicy"));
+            services.Configure<Configuration.AccountLockoutOptions>(configuration.GetSection("Pawthorize:AccountLockout"));
         }
 
         services.AddOptions<PawthorizeOptions>()
@@ -109,6 +111,14 @@ public static class ServiceCollectionExtensions
             .ValidateOnStart();
 
         services.AddOptions<JwtSettings>()
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddOptions<Configuration.PasswordPolicyOptions>()
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        services.AddOptions<Configuration.AccountLockoutOptions>()
             .ValidateDataAnnotations()
             .ValidateOnStart();
     }
@@ -216,6 +226,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<AuthenticationService<TUser>>();
         services.AddScoped<IPasswordResetService, PasswordResetService>();
         services.AddScoped<CsrfTokenService>();
+        services.AddScoped<PasswordValidationService>();
     }
 
     /// <summary>

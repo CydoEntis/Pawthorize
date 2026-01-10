@@ -64,6 +64,19 @@ public class PawthorizeOptions
     /// account enumeration, and denial of service attacks.
     /// </summary>
     public PawthorizeRateLimitingOptions RateLimiting { get; set; } = new();
+
+    /// <summary>
+    /// Password policy configuration.
+    /// Enforces strong passwords to protect against weak password attacks.
+    /// </summary>
+    public PasswordPolicyOptions PasswordPolicy { get; set; } = new();
+
+    /// <summary>
+    /// Account lockout configuration.
+    /// Protects individual accounts from brute force attacks by temporarily locking
+    /// accounts after repeated failed login attempts.
+    /// </summary>
+    public AccountLockoutOptions AccountLockout { get; set; } = new();
 }
 
 /// <summary>
