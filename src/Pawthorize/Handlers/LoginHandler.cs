@@ -137,12 +137,12 @@ public class LoginHandler<TUser> where TUser : IAuthenticatedUser
             _logger.LogError("Login failed: Invalid credentials for email: {Email}", request.Email);
             throw;
         }
-        catch (EmailNotVerifiedError ex)
+        catch (EmailNotVerifiedError)
         {
             _logger.LogWarning("Login failed: Email not verified for email: {Email}", request.Email);
             throw;
         }
-        catch (AccountLockedError ex)
+        catch (AccountLockedError)
         {
             _logger.LogWarning("Login failed: Account locked for email: {Email}", request.Email);
             throw;
