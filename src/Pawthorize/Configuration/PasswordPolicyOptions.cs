@@ -37,7 +37,7 @@ public class PasswordPolicyOptions
     public bool RequireDigit { get; set; } = true;
 
     /// <summary>
-    /// Require at least one special character (!@#$%^&*()_+-=[]{}|;:,.<>?).
+    /// Require at least one special character.
     /// Default: true
     /// </summary>
     public bool RequireSpecialChar { get; set; } = true;
@@ -51,7 +51,7 @@ public class PasswordPolicyOptions
 
     /// <summary>
     /// Special characters that are considered valid for the RequireSpecialChar check.
-    /// Default: !@#$%^&*()_+-=[]{}|;:,.<>?
+    /// Default value contains common special characters.
     /// </summary>
     public string SpecialCharacters { get; set; } = "!@#$%^&*()_+-=[]{}|;:,.<>?";
 }
