@@ -9,7 +9,7 @@
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
   [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
 
-  [Quick Start](#quick-start) • [Features](#features) • [Documentation](#documentation) • [Examples](#examples) • [OAuth Setup](#oauth-20-setup)
+  [Quick Start](#quick-start) • [Features](#features) • [Documentation](#documentation) • [Examples](#examples)
 </div>
 
 ---
@@ -50,6 +50,9 @@ Pawthorize is a complete, production-ready authentication library for ASP.NET Co
 ### Security
 - ✅ **CSRF Protection** - Double Submit Cookie pattern with automatic token rotation
 - ✅ **Secure Password Hashing** - BCrypt with automatic salting
+- ✅ **Password Policy** - Configurable password strength requirements
+- ✅ **Account Lockout** - Brute force protection with failed attempt tracking
+- ✅ **Rate Limiting** - Built-in configurable rate limiting for all endpoints
 - ✅ **Token Expiration** - Configurable TTLs for all tokens
 - ✅ **Constant-Time Comparisons** - Protection against timing attacks
 - ✅ **OAuth State Validation** - CSRF protection for OAuth flows
@@ -87,6 +90,10 @@ public class User : IAuthenticatedUser
     public bool IsEmailVerified { get; set; }
     public bool IsLocked { get; set; }
     public DateTime? LockedUntil { get; set; }
+
+    // Account lockout properties (v0.7.0+)
+    public int FailedLoginAttempts { get; set; } = 0;
+    public DateTime? LockoutEnd { get; set; }
 }
 ```
 
@@ -140,6 +147,26 @@ public class UserFactory : IUserFactory<User, RegisterRequest>
     "LoginIdentifier": "Email",
     "Csrf": {
       "Enabled": true
+    },
+    "PasswordPolicy": {
+      "MinLength": 8,
+      "MaxLength": 128,
+      "RequireUppercase": true,
+      "RequireLowercase": true,
+      "RequireDigit": true,
+      "RequireSpecialChar": true,
+      "BlockCommonPasswords": true
+    },
+    "AccountLockout": {
+      "Enabled": true,
+      "MaxFailedAttempts": 5,
+      "LockoutMinutes": 30,
+      "ResetOnSuccessfulLogin": true
+    },
+    "RateLimiting": {
+      "Enabled": true,
+      "PermitLimit": 100,
+      "WindowMinutes": 1
     }
   },
   "Jwt": {
@@ -239,91 +266,12 @@ builder.Services.AddScoped<IExternalAuthRepository<User>, ExternalAuthRepository
 </button>
 ```
 
-That's it! See [OAuth 2.0 Setup](#oauth-20-setup) for detailed configuration.
-
----
-
-## 🔐 OAuth 2.0 Setup
-
-Pawthorize includes built-in support for Google and Discord OAuth. Add social login in 2 simple steps:
-
-### 1. Enable OAuth Providers
-
-Update your `AddPawthorize` configuration to include OAuth providers:
-
-```csharp
-builder.Services.AddPawthorize<User>(options =>
-{
-    options.UseConfiguration(builder.Configuration);
-    options.UseDefaultFormatters();
-
-    // Enable OAuth providers (state token storage is handled automatically)
-    options.AddGoogle();
-    options.AddDiscord();
-    // options.AddCustomOAuthProvider<MyProvider>("myprovider"); // Custom providers supported
-});
-
-// Register only the external auth repository (state tokens are handled internally)
-builder.Services.AddScoped<IExternalAuthRepository<User>, ExternalAuthRepository>();
-```
-
-**Note:** State token storage (for CSRF protection) is handled internally by Pawthorize. You only need to implement `IExternalAuthRepository<User>` to store linked OAuth accounts.
-
-### 2. Configure OAuth Credentials
-
-**appsettings.json:**
-```json
-{
-  "Pawthorize": {
-    "OAuth": {
-      "AllowAutoRegistration": true,
-      "UsePkce": true,
-      "Providers": {
-        "Google": {
-          "Enabled": true,
-          "ClientId": "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com",
-          "ClientSecret": "YOUR_GOOGLE_CLIENT_SECRET",
-          "RedirectUri": "https://yourapp.com/api/auth/oauth/google/callback",
-          "Scopes": ["openid", "profile", "email"]
-        },
-        "Discord": {
-          "Enabled": true,
-          "ClientId": "YOUR_DISCORD_CLIENT_ID",
-          "ClientSecret": "YOUR_DISCORD_CLIENT_SECRET",
-          "RedirectUri": "https://yourapp.com/api/auth/oauth/discord/callback",
-          "Scopes": ["identify", "email"]
-        }
-      }
-    }
-  }
-}
-```
-
-**Done!** OAuth endpoints are automatically mapped when you call `app.MapPawthorize()`. You now have 5 additional endpoints:
-
+**OAuth endpoints:**
 - `GET /api/auth/oauth/{provider}` - Initiate OAuth flow
 - `GET /api/auth/oauth/{provider}/callback` - OAuth callback handler
 - `POST /api/auth/oauth/{provider}/link` - Link provider to account
 - `DELETE /api/auth/oauth/{provider}/unlink` - Unlink provider
 - `GET /api/auth/oauth/linked` - List linked providers
-
-### Getting OAuth Credentials
-
-**Google:**
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select existing
-3. Enable "Google+ API"
-4. Go to "Credentials" → "Create Credentials" → "OAuth client ID"
-5. Application type: "Web application"
-6. Add authorized redirect URI: `http://localhost:5000/api/auth/oauth/google/callback`
-7. Copy Client ID and Client Secret
-
-**Discord:**
-1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
-2. Create a new application
-3. Go to "OAuth2" section
-4. Add redirect URI: `http://localhost:5000/api/auth/oauth/discord/callback`
-5. Copy Client ID and Client Secret
 
 ---
 
@@ -551,75 +499,108 @@ Authorization: Bearer {accessToken}
 Revokes all sessions except current one.
 ```
 
-### Rate Limiting
+### Password Policy
 
-Pawthorize doesn't include rate limiting, but you can easily add it using ASP.NET Core's built-in rate limiting:
+Pawthorize includes configurable password policy enforcement to protect against weak passwords:
 
-```csharp
-// Program.cs
-using System.Threading.RateLimiting;
-
-var builder = WebApplication.CreateBuilder(args);
-
-// Configure rate limiting
-builder.Services.AddRateLimiter(options =>
+```json
 {
-    // Policy for authentication endpoints
-    options.AddFixedWindowLimiter("auth", opt =>
-    {
-        opt.Window = TimeSpan.FromMinutes(1);
-        opt.PermitLimit = 5; // 5 requests per minute
-        opt.QueueLimit = 0;
-    });
-
-    // Stricter policy for login
-    options.AddFixedWindowLimiter("login", opt =>
-    {
-        opt.Window = TimeSpan.FromMinutes(5);
-        opt.PermitLimit = 3; // 3 login attempts per 5 minutes
-        opt.QueueLimit = 0;
-    });
-});
-
-builder.Services.AddPawthorize<User>(/* ... */);
-
-var app = builder.Build();
-
-app.UseRateLimiter(); // Must be before MapPawthorize
-
-// Apply to all auth endpoints
-app.MapPawthorize(options => options.BasePath = "/api/auth")
-   .RequireRateLimiting("auth");
-
-// Or apply to individual endpoints
-var authGroup = app.MapGroup("/api/auth");
-authGroup.MapPawthorizeLogin<User>().RequireRateLimiting("login");
-authGroup.MapPawthorizeRegister<User, RegisterRequest>().RequireRateLimiting("auth");
+  "Pawthorize": {
+    "PasswordPolicy": {
+      "MinLength": 8,
+      "MaxLength": 128,
+      "RequireUppercase": true,
+      "RequireLowercase": true,
+      "RequireDigit": true,
+      "RequireSpecialChar": true,
+      "BlockCommonPasswords": true,
+      "SpecialCharacters": "!@#$%^&*()_+-=[]{}|;:,.<>?"
+    }
+  }
+}
 ```
 
-**Rate limiting by IP address:**
+**Features:**
+- **Length Requirements**: Configurable min/max password length
+- **Character Complexity**: Require uppercase, lowercase, digits, special characters
+- **Common Password Blocking**: Blocks top 1000 most common passwords
+- **Configurable Special Characters**: Define which special characters are allowed
+- **Centralized Validation**: Applied to registration and password changes
+
+Password validation errors are automatically returned to the client with clear messages.
+
+### Account Lockout
+
+Protect against brute force attacks with automatic account lockout after failed login attempts:
+
+```json
+{
+  "Pawthorize": {
+    "AccountLockout": {
+      "Enabled": true,
+      "MaxFailedAttempts": 5,
+      "LockoutMinutes": 30,
+      "ResetOnSuccessfulLogin": true
+    }
+  }
+}
+```
+
+**How it works:**
+1. Track failed login attempts per user
+2. Lock account after exceeding max failed attempts
+3. Automatically unlock after lockout duration
+4. Reset failed attempts counter on successful login
+
+**Default configuration**: 5 failed attempts triggers a 30-minute lockout.
+
+### Rate Limiting
+
+Pawthorize includes built-in rate limiting to protect against DoS and brute force attacks:
+
+```json
+{
+  "Pawthorize": {
+    "RateLimiting": {
+      "Enabled": true,
+      "PermitLimit": 100,
+      "WindowMinutes": 1,
+      "EndpointSpecificLimits": {
+        "Login": {
+          "PermitLimit": 5,
+          "WindowMinutes": 5
+        },
+        "Register": {
+          "PermitLimit": 3,
+          "WindowMinutes": 10
+        },
+        "ForgotPassword": {
+          "PermitLimit": 3,
+          "WindowMinutes": 15
+        }
+      }
+    }
+  }
+}
+```
+
+**Features:**
+- **Global Rate Limiting**: Default rate limit for all endpoints (100 requests/minute)
+- **Endpoint-Specific Limits**: Custom limits for sensitive endpoints
+- **IP-Based Tracking**: Limits applied per IP address
+- **Automatic 429 Responses**: Returns HTTP 429 Too Many Requests when exceeded
+
+Rate limiting is enabled by default and requires no additional code. The middleware is automatically registered when you call `app.UsePawthorize()`.
+
+**Customize for specific endpoints:**
 
 ```csharp
-builder.Services.AddRateLimiter(options =>
+// Override default rate limits for custom endpoints
+app.MapPost("/api/custom-login", async (LoginRequest request, ...) =>
 {
-    options.AddFixedWindowLimiter("auth", opt =>
-    {
-        opt.Window = TimeSpan.FromMinutes(1);
-        opt.PermitLimit = 5;
-        opt.QueueLimit = 0;
-    });
-
-    // Global rate limiter by IP
-    options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
-    {
-        var ipAddress = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-        return RateLimitPartition.GetFixedWindowLimiter(ipAddress, _ => new FixedWindowRateLimiterOptions
-        {
-            Window = TimeSpan.FromMinutes(1),
-            PermitLimit = 100 // 100 requests per minute per IP
-        });
-    });
-});
+    // Your custom logic
+})
+.RequireRateLimiting("pawthorize-login"); // Use built-in rate limit policy
 ```
 
 ### Custom Validation
@@ -822,52 +803,7 @@ async function linkGoogleAccount() {
 </script>
 ```
 
-### Example 4: Custom Endpoint Paths
-
-You can customize the base path and individual endpoint paths:
-
-```csharp
-// Program.cs
-app.MapPawthorize(options =>
-{
-    // Change base path from /api/auth to /myapp/v1/auth
-    options.BasePath = "/myapp/v1/auth";
-
-    // Or customize individual endpoints
-    options.LoginPath = "/signin";
-    options.RegisterPath = "/signup";
-    options.LogoutPath = "/signout";
-});
-
-// Results in endpoints like:
-// POST /myapp/v1/auth/signin
-// POST /myapp/v1/auth/signup
-// POST /myapp/v1/auth/signout
-```
-
-### Example 5: Manual Endpoint Mapping
-
-For full control, map endpoints individually:
-
-```csharp
-// Program.cs - Don't call MapPawthorize()
-var authGroup = app.MapGroup("/myapp/v1/auth");
-
-// Map only the endpoints you want
-authGroup.MapPawthorizeLogin<User>()
-    .RequireRateLimiting("auth"); // Add custom policies
-
-authGroup.MapPawthorizeRegister<User, RegisterRequest>()
-    .RequireRateLimiting("auth");
-
-authGroup.MapPawthorizeRefresh<User>();
-
-authGroup.MapPawthorizeLogout<User>();
-
-// Don't map endpoints you don't need (e.g., password reset)
-```
-
-### Example 6: Direct Handler Usage (Maximum Control)
+### Example 4: Direct Handler Usage (Maximum Control)
 
 For complete control over endpoint logic, inject handlers directly:
 
@@ -924,46 +860,6 @@ app.MapPost("/api/v1/auth/register", async (
 // - UnlinkProviderHandler<TUser> (if OAuth enabled)
 // - ListLinkedProvidersHandler<TUser> (if OAuth enabled)
 ```
-
----
-
-## 🏗️ Architecture
-
-Pawthorize follows clean architecture principles:
-
-```
-┌─────────────────────────────────────────────┐
-│          Your Application Layer             │
-│  (Controllers, Minimal API Endpoints)       │
-└─────────────────────────────────────────────┘
-                    ↓
-┌─────────────────────────────────────────────┐
-│         Pawthorize Handlers Layer           │
-│  (LoginHandler, RegisterHandler, etc.)      │
-└─────────────────────────────────────────────┘
-                    ↓
-┌─────────────────────────────────────────────┐
-│         Pawthorize Services Layer           │
-│  (JwtService, PasswordHasher, etc.)         │
-└─────────────────────────────────────────────┘
-                    ↓
-┌─────────────────────────────────────────────┐
-│         Your Repository Layer               │
-│  (IUserRepository, IRefreshTokenRepository) │
-└─────────────────────────────────────────────┘
-                    ↓
-┌─────────────────────────────────────────────┐
-│            Your Database                    │
-│  (SQL Server, PostgreSQL, MongoDB, etc.)    │
-└─────────────────────────────────────────────┘
-```
-
-**Key Design Principles:**
-- **Repository Pattern**: Abstract data access for flexibility
-- **Dependency Injection**: Fully DI-compatible
-- **Options Pattern**: Configuration via IOptions
-- **Handler Pattern**: Each endpoint has a dedicated handler
-- **Separation of Concerns**: Authentication, authorization, and data access are separate
 
 ---
 
@@ -1067,23 +963,6 @@ Enable debug logging for Pawthorize:
   }
 }
 ```
-
----
-
-## 🎯 Roadmap
-
-- [ ] **More OAuth Providers**: GitHub, Microsoft, Facebook, Twitter
-- [ ] **Two-Factor Authentication (2FA)**: TOTP, SMS, Email codes
-- [ ] **Built-in Rate Limiting**: Configurable rate limiting for auth endpoints (currently users can add their own via ASP.NET Core)
-- [ ] **Magic Links**: Passwordless email login
-- [ ] **Audit Logging**: Track authentication events
-- [ ] **Progressive Account Lockout**: Automatic lockout after failed attempts
-- [ ] **WebAuthn Support**: Biometric authentication
-- [ ] **OpenID Connect**: Full OIDC compliance
-
----
-
-
 
 ---
 

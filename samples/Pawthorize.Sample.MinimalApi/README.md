@@ -6,6 +6,9 @@ A complete **production-ready reference implementation** demonstrating **Pawthor
 
 - ✅ **Hybrid Token Delivery** - Access tokens in response, refresh tokens in HttpOnly cookies
 - ✅ **Built-in CSRF Protection** - Automatic token generation and validation
+- ✅ **Password Policy Enforcement** - Configurable password strength requirements (v0.7.0)
+- ✅ **Account Lockout Protection** - Brute force protection with failed attempt tracking (v0.7.0)
+- ✅ **Built-in Rate Limiting** - IP-based rate limiting for all endpoints (v0.7.0)
 - ✅ **User Registration** - Email/password with validation
 - ✅ **User Login** - JWT access tokens with cookie-based refresh tokens
 - ✅ **Token Refresh** - Automatic refresh token rotation with CSRF token rotation
@@ -939,6 +942,40 @@ Configuration in `appsettings.json`:
       "CookieName": "XSRF-TOKEN",
       "HeaderName": "X-XSRF-TOKEN",
       "TokenLifetimeMinutes": 10080
+    },
+    "PasswordPolicy": {
+      "MinLength": 8,
+      "MaxLength": 128,
+      "RequireUppercase": true,
+      "RequireLowercase": true,
+      "RequireDigit": true,
+      "RequireSpecialChar": true,
+      "BlockCommonPasswords": true
+    },
+    "AccountLockout": {
+      "Enabled": true,
+      "MaxFailedAttempts": 5,
+      "LockoutMinutes": 30,
+      "ResetOnSuccessfulLogin": true
+    },
+    "RateLimiting": {
+      "Enabled": true,
+      "PermitLimit": 100,
+      "WindowMinutes": 1,
+      "EndpointSpecificLimits": {
+        "Login": {
+          "PermitLimit": 5,
+          "WindowMinutes": 5
+        },
+        "Register": {
+          "PermitLimit": 3,
+          "WindowMinutes": 10
+        },
+        "ForgotPassword": {
+          "PermitLimit": 3,
+          "WindowMinutes": 15
+        }
+      }
     }
   },
   "Jwt": {
@@ -967,6 +1004,26 @@ Configuration in `appsettings.json`:
 **JWT:**
 - `AccessTokenLifetimeMinutes`: `15` - Short-lived access tokens
 - `RefreshTokenLifetimeDays`: `7` - Long-lived refresh tokens
+
+**Password Policy (v0.7.0):**
+- `MinLength`: `8` - Minimum password length
+- `RequireUppercase`: `true` - Require at least one uppercase letter
+- `RequireLowercase`: `true` - Require at least one lowercase letter
+- `RequireDigit`: `true` - Require at least one digit
+- `RequireSpecialChar`: `true` - Require at least one special character
+- `BlockCommonPasswords`: `true` - Block top 1000 common passwords
+
+**Account Lockout (v0.7.0):**
+- `Enabled`: `true` - Account lockout enabled
+- `MaxFailedAttempts`: `5` - Lock account after 5 failed login attempts
+- `LockoutMinutes`: `30` - Lock account for 30 minutes
+- `ResetOnSuccessfulLogin`: `true` - Reset failed attempts counter on successful login
+
+**Rate Limiting (v0.7.0):**
+- `Enabled`: `true` - Rate limiting enabled
+- `PermitLimit`: `100` - 100 requests per minute (global default)
+- `WindowMinutes`: `1` - 1-minute window
+- Endpoint-specific limits for Login (5/5min), Register (3/10min), ForgotPassword (3/15min)
 
 ## Testing with cURL
 
@@ -1082,7 +1139,9 @@ This sample uses in-memory storage for simplicity. For production:
 
 **Security:**
 - ✅ Enable email verification (`RequireEmailVerification: true`)
-- ✅ Implement rate limiting using ASP.NET Core's `AddRateLimiter()` (see main README for examples)
+- ✅ Configure password policy based on your security requirements
+- ✅ Adjust account lockout settings (max attempts, lockout duration)
+- ✅ Configure rate limiting thresholds for your traffic patterns
 - ✅ Use environment variables for secrets (never commit credentials to source control)
 - ✅ Enable HTTPS in production
 - ✅ Configure CORS properly for your frontend domains
@@ -1111,16 +1170,6 @@ This sample uses in-memory storage for simplicity. For production:
 ## Resources
 
 - **Pawthorize Documentation**: See main README
-- **Token Delivery Guide**: `TOKEN_DELIVERY_STRATEGIES.md`
-- **Migration Guide**: `MIGRATION_GUIDE.md`
-- **Full Change Log**: `CHANGES.md`
 
-## Support
-
-For issues or questions:
-- **GitHub Issues**: [Create an issue](https://github.com/your-repo/pawthorize/issues)
-- **Documentation**: See repository root README
-
----
 
 **Happy coding! 🐾**
