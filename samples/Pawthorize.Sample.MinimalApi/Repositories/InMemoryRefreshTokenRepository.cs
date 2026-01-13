@@ -17,8 +17,10 @@ public class InMemoryRefreshTokenRepository : IRefreshTokenRepository
     /// <param name="tokenHash">The refresh token hash to store.</param>
     /// <param name="userId">The user ID associated with the token.</param>
     /// <param name="expiresAt">The expiration date and time of the token.</param>
+    /// <param name="deviceInfo">Optional device/browser information.</param>
+    /// <param name="ipAddress">Optional IP address.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    public Task StoreAsync(string tokenHash, string userId, DateTime expiresAt,
+    public Task StoreAsync(string tokenHash, string userId, DateTime expiresAt, string? deviceInfo = null, string? ipAddress = null,
         CancellationToken cancellationToken = default)
     {
         _tokens[tokenHash] = new StoredRefreshToken
@@ -27,7 +29,10 @@ public class InMemoryRefreshTokenRepository : IRefreshTokenRepository
             UserId = userId,
             ExpiresAt = expiresAt,
             CreatedAt = DateTime.UtcNow,
-            IsRevoked = false
+            IsRevoked = false,
+            DeviceInfo = deviceInfo,
+            IpAddress = ipAddress,
+            LastActivityAt = DateTime.UtcNow
         };
         return Task.CompletedTask;
     }
@@ -51,7 +56,10 @@ public class InMemoryRefreshTokenRepository : IRefreshTokenRepository
             storedToken.UserId,
             storedToken.ExpiresAt,
             storedToken.IsRevoked,
-            storedToken.CreatedAt);
+            storedToken.CreatedAt,
+            storedToken.DeviceInfo,
+            storedToken.IpAddress,
+            storedToken.LastActivityAt);
 
         return Task.FromResult<RefreshTokenInfo?>(tokenInfo);
     }
@@ -101,7 +109,10 @@ public class InMemoryRefreshTokenRepository : IRefreshTokenRepository
                 t.UserId,
                 t.ExpiresAt,
                 t.IsRevoked,
-                t.CreatedAt))
+                t.CreatedAt,
+                t.DeviceInfo,
+                t.IpAddress,
+                t.LastActivityAt))
             .ToList();
 
         return Task.FromResult<IEnumerable<RefreshTokenInfo>>(activeTokens);
@@ -123,6 +134,22 @@ public class InMemoryRefreshTokenRepository : IRefreshTokenRepository
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Updates the last activity timestamp for a refresh token.
+    /// </summary>
+    /// <param name="tokenHash">The token hash to update.</param>
+    /// <param name="lastActivityAt">The timestamp of the last activity.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    public Task UpdateLastActivityAsync(string tokenHash, DateTime lastActivityAt, CancellationToken cancellationToken = default)
+    {
+        if (_tokens.TryGetValue(tokenHash, out var storedToken))
+        {
+            storedToken.LastActivityAt = lastActivityAt;
+        }
+
+        return Task.CompletedTask;
+    }
+
     private class StoredRefreshToken
     {
         public string TokenHash { get; set; } = string.Empty;
@@ -130,5 +157,8 @@ public class InMemoryRefreshTokenRepository : IRefreshTokenRepository
         public DateTime ExpiresAt { get; set; }
         public DateTime CreatedAt { get; set; }
         public bool IsRevoked { get; set; }
+        public string? DeviceInfo { get; set; }
+        public string? IpAddress { get; set; }
+        public DateTime? LastActivityAt { get; set; }
     }
 }
