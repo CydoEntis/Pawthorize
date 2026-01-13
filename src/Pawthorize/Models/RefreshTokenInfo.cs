@@ -10,7 +10,9 @@ public record RefreshTokenInfo(
     DateTime ExpiresAt,
     bool IsRevoked,
     DateTime? CreatedAt = null,
-    string? DeviceInfo = null)
+    string? DeviceInfo = null,
+    string? IpAddress = null,
+    DateTime? LastActivityAt = null)
 {
     /// <summary>
     /// Check if token has expired
