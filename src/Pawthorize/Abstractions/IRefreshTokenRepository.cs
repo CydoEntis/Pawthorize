@@ -15,8 +15,10 @@ public interface IRefreshTokenRepository
     /// <param name="tokenHash">SHA256 hash of the refresh token to store.</param>
     /// <param name="userId">The user ID associated with the token.</param>
     /// <param name="expiresAt">The expiration date and time of the token.</param>
+    /// <param name="deviceInfo">Optional device/browser information (User-Agent).</param>
+    /// <param name="ipAddress">Optional IP address of the client.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    Task StoreAsync(string tokenHash, string userId, DateTime expiresAt, CancellationToken cancellationToken = default);
+    Task StoreAsync(string tokenHash, string userId, DateTime expiresAt, string? deviceInfo = null, string? ipAddress = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Validates a refresh token hash and returns its information if valid.
@@ -60,4 +62,14 @@ public interface IRefreshTokenRepository
     /// <param name="exceptTokenHash">SHA256 hash of the token to keep active (current session).</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     Task RevokeAllExceptAsync(string userId, string exceptTokenHash, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Updates the last activity timestamp for a refresh token.
+    /// Used to track when a session was last used.
+    /// The framework hashes the raw token before calling this method.
+    /// </summary>
+    /// <param name="tokenHash">SHA256 hash of the refresh token.</param>
+    /// <param name="lastActivityAt">The timestamp of the last activity.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    Task UpdateLastActivityAsync(string tokenHash, DateTime lastActivityAt, CancellationToken cancellationToken = default);
 }
