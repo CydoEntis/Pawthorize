@@ -98,7 +98,11 @@ public class RegisterHandler<TUser, TRegisterRequest>
             _logger.LogDebug("Email verification not required, generating tokens for UserId: {UserId}",
                 createdUser.Id);
 
-            var authResult = await _authService.GenerateTokensAsync(createdUser, cancellationToken);
+            // Extract device and IP information for session tracking
+            var deviceInfo = httpContext.Request.Headers.UserAgent.ToString();
+            var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString();
+
+            var authResult = await _authService.GenerateTokensAsync(createdUser, deviceInfo, ipAddress, cancellationToken);
             var result = TokenDeliveryHelper.DeliverTokens(authResult, httpContext, _options.TokenDelivery, _options, _csrfService, _logger);
 
             _logger.LogInformation("Registration completed successfully for UserId: {UserId}, Email: {Email}",

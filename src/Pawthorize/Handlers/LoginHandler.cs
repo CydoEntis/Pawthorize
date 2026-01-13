@@ -122,7 +122,11 @@ public class LoginHandler<TUser> where TUser : IAuthenticatedUser
             _authService.ValidateAccountStatus(user);
             _logger.LogDebug("Account status validation passed for UserId: {UserId}", user.Id);
 
-            var authResult = await _authService.GenerateTokensAsync(user, cancellationToken);
+            // Extract device and IP information for session tracking
+            var deviceInfo = httpContext.Request.Headers.UserAgent.ToString();
+            var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString();
+
+            var authResult = await _authService.GenerateTokensAsync(user, deviceInfo, ipAddress, cancellationToken);
             _logger.LogDebug("Tokens generated successfully for UserId: {UserId}", user.Id);
 
             var result = TokenDeliveryHelper.DeliverTokens(authResult, httpContext, _options.TokenDelivery, _options, _csrfService, _logger);

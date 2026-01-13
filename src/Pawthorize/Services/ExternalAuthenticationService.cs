@@ -42,6 +42,8 @@ public class ExternalAuthenticationService<TUser> where TUser : class, IAuthenti
     public async Task<AuthResult> AuthenticateWithProviderAsync(
         string provider,
         ExternalUserInfo userInfo,
+        string? deviceInfo = null,
+        string? ipAddress = null,
         CancellationToken cancellationToken = default)
     {
         _logger.LogDebug("Authenticating user with provider {Provider}, ProviderId: {ProviderId}",
@@ -91,7 +93,7 @@ public class ExternalAuthenticationService<TUser> where TUser : class, IAuthenti
 
         _authenticationService.ValidateAccountStatus(user);
 
-        var authResult = await _authenticationService.GenerateTokensAsync(user, cancellationToken);
+        var authResult = await _authenticationService.GenerateTokensAsync(user, deviceInfo, ipAddress, cancellationToken);
 
         _logger.LogInformation("Successfully authenticated user {UserId} via provider {Provider}",
             user.Id, provider);

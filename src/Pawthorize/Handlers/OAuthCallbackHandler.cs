@@ -90,8 +90,12 @@ public class OAuthCallbackHandler<TUser> where TUser : class, IAuthenticatedUser
         var userInfo = await oauthProvider.GetUserInfoAsync(
             tokenResponse.AccessToken, cancellationToken);
 
+        // Extract device and IP information for session tracking
+        var deviceInfo = context.Request.Headers.UserAgent.ToString();
+        var ipAddress = context.Connection.RemoteIpAddress?.ToString();
+
         var authResult = await _externalAuthService.AuthenticateWithProviderAsync(
-            provider, userInfo, cancellationToken);
+            provider, userInfo, deviceInfo, ipAddress, cancellationToken);
 
         var csrfToken = _csrfService.GenerateToken();
 
