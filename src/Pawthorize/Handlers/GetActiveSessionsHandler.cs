@@ -58,12 +58,25 @@ public class GetActiveSessionsHandler<TUser> where TUser : IAuthenticatedUser
             _logger.LogInformation("Retrieved {Count} active sessions for UserId: {UserId}",
                 tokens.Count(), userId);
 
+            // Get current session token hash if present in request
+            string? currentTokenHash = null;
+            var refreshTokenCookie = httpContext.Request.Cookies["refresh_token"];
+            if (!string.IsNullOrEmpty(refreshTokenCookie))
+            {
+                currentTokenHash = Utilities.TokenHasher.HashToken(refreshTokenCookie);
+            }
+
             var response = tokens.Select(t => new
             {
+                SessionId = t.TokenHash,
                 t.UserId,
                 t.CreatedAt,
                 t.ExpiresAt,
-                t.IsExpired
+                t.IsExpired,
+                DeviceInfo = t.DeviceInfo ?? "Unknown",
+                IpAddress = t.IpAddress ?? "Unknown",
+                LastActivityAt = t.LastActivityAt,
+                IsCurrentSession = !string.IsNullOrEmpty(currentTokenHash) && t.TokenHash == currentTokenHash
             }).ToList();
 
             return response.Ok(httpContext);
