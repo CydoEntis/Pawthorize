@@ -9,7 +9,7 @@
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
   [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
 
-  **Latest:** v0.7.1 - Enhanced JWT error handling with detailed debugging in Development mode
+  **Latest:** v0.7.2 - Enhanced session management with device tracking and detailed validation error reporting
 
   [Quick Start](#quick-start) • [Features](#features) • [Documentation](#documentation) • [Examples](#examples) • [Troubleshooting](#troubleshooting)
 </div>
@@ -61,6 +61,7 @@ Pawthorize is a complete, production-ready authentication library for ASP.NET Co
 
 ### Developer Experience
 - ✅ **Enhanced Error Messages (v0.7.1+)** - Detailed JWT error diagnostics in Development mode
+- ✅ **Detailed Validation Errors (v0.7.2+)** - Field-level validation errors with clear messages
 - ✅ **Comprehensive Logging** - `[Pawthorize JWT]` prefixed logs at every authentication step
 - ✅ **Flexible Token Delivery** - Cookies, response body, or hybrid strategies
 - ✅ **Role-Based Authorization** - Automatic role claims in JWT (you manage roles)
@@ -115,11 +116,14 @@ public class UserRepository : IUserRepository<User>
     public Task UpdateAsync(User user, CancellationToken ct) { /* ... */ }
 }
 
-// Refresh token storage
+// Refresh token storage (v0.7.2+: now includes device info and IP address)
 public class RefreshTokenRepository : IRefreshTokenRepository
 {
-    public Task StoreAsync(string tokenHash, string userId, DateTime expiresAt, CancellationToken ct) { /* ... */ }
-    public Task<string?> ValidateAndConsumeAsync(string tokenHash, CancellationToken ct) { /* ... */ }
+    public Task StoreAsync(string tokenHash, string userId, DateTime expiresAt,
+        string? deviceInfo = null, string? ipAddress = null, CancellationToken ct = default) { /* ... */ }
+    public Task<RefreshTokenInfo?> ValidateAsync(string tokenHash, CancellationToken ct) { /* ... */ }
+    public Task RevokeAsync(string tokenHash, CancellationToken ct) { /* ... */ }
+    public Task UpdateLastActivityAsync(string tokenHash, DateTime lastActivityAt, CancellationToken ct) { /* ... */ }
     // ... other methods
 }
 
@@ -210,7 +214,7 @@ app.MapPawthorize();
 app.Run();
 ```
 
-**That's it!** You now have a complete authentication system with 10+ endpoints:
+**That's it!** You now have a complete authentication system with 11+ endpoints:
 
 - `POST /api/auth/register` - Register new user
 - `POST /api/auth/login` - Login with email/password
@@ -220,8 +224,9 @@ app.Run();
 - `POST /api/auth/reset-password` - Reset password with token
 - `POST /api/auth/change-password` - Change password (requires auth)
 - `GET /api/auth/me` - Get current user info
-- `GET /api/auth/sessions` - Get active sessions
+- `GET /api/auth/sessions` - Get active sessions with device info (v0.7.2+)
 - `POST /api/auth/sessions/revoke-others` - Revoke other sessions
+- `POST /api/auth/sessions/revoke` - Revoke specific session (v0.7.2+)
 
 ### 5. Quick Start: Add OAuth (Optional)
 
@@ -477,30 +482,73 @@ builder.Services.AddScoped<IEmailVerificationService, EmailVerificationService>(
 
 ### Session Management
 
-Users can view and revoke active sessions:
+**New in v0.7.2:** Enhanced session tracking with device information, IP addresses, and per-session revocation.
+
+Users can view all active sessions with detailed information:
 
 ```http
 GET /api/auth/sessions
 Authorization: Bearer {accessToken}
 
 Response:
-{
-  "sessions": [
-    {
-      "createdAt": "2024-01-15T10:00:00Z",
-      "lastUsedAt": "2024-01-15T10:30:00Z",
-      "expiresAt": "2024-01-22T10:00:00Z",
-      "isCurrent": true
-    }
-  ]
-}
+[
+  {
+    "sessionId": "abc123...",
+    "userId": "user-123",
+    "deviceInfo": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)...",
+    "ipAddress": "192.168.1.100",
+    "createdAt": "2024-01-15T10:00:00Z",
+    "expiresAt": "2024-01-22T10:00:00Z",
+    "lastActivityAt": "2024-01-15T10:30:00Z",
+    "isExpired": false,
+    "isCurrentSession": true
+  },
+  {
+    "sessionId": "def456...",
+    "userId": "user-123",
+    "deviceInfo": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0)...",
+    "ipAddress": "10.0.0.50",
+    "createdAt": "2024-01-14T08:00:00Z",
+    "expiresAt": "2024-01-21T08:00:00Z",
+    "lastActivityAt": "2024-01-14T09:15:00Z",
+    "isExpired": false,
+    "isCurrentSession": false
+  }
+]
 ```
 
+**Session Information Includes:**
+- `sessionId` - Unique identifier for the session (used for revocation)
+- `deviceInfo` - Browser/device user agent information
+- `ipAddress` - IP address where session was created
+- `createdAt` - When the session was created
+- `expiresAt` - When the session expires
+- `lastActivityAt` - Last time the session was used (updated on token refresh)
+- `isCurrentSession` - Boolean indicating if this is the current session
+- `isExpired` - Whether the session has expired
+
+**Revoke all other sessions:**
 ```http
 POST /api/auth/sessions/revoke-others
 Authorization: Bearer {accessToken}
 
 Revokes all sessions except current one.
+```
+
+**Revoke a specific session (v0.7.2+):**
+```http
+POST /api/auth/sessions/revoke
+Authorization: Bearer {accessToken}
+Content-Type: application/json
+
+{
+  "sessionId": "def456..."
+}
+
+Response:
+{
+  "message": "Session revoked successfully."
+}
 ```
 
 ### Password Policy
@@ -975,15 +1023,39 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for a comprehensive debugging guide
 
 ### Error Response Format
 
-Pawthorize uses ErrorHound for consistent error responses:
+Pawthorize uses ErrorHound for consistent error responses with detailed field-level validation (v0.7.2+):
 
+**Standard Error:**
 ```json
 {
+  "success": false,
   "error": {
     "code": "INVALID_CREDENTIALS",
     "message": "Invalid email or password",
-    "status": 401,
     "details": null
+  },
+  "meta": {
+    "timestamp": "2024-01-15T10:30:00Z",
+    "version": "v1.0"
+  }
+}
+```
+
+**Validation Error (v0.7.2+):**
+```json
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION",
+    "message": "Validation failed",
+    "details": {
+      "Email": ["Email is required", "Email must be valid"],
+      "Password": ["Password must be at least 8 characters", "Password must contain a number"]
+    }
+  },
+  "meta": {
+    "timestamp": "2024-01-15T10:30:00Z",
+    "version": "v1.0"
   }
 }
 ```
