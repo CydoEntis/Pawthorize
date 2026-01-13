@@ -32,10 +32,12 @@ public class AuthenticationService<TUser> where TUser : IAuthenticatedUser
 
     /// <summary>
     /// Generate access and refresh tokens for a user.
-    /// Stores refresh token in database.
+    /// Stores refresh token in database with session metadata.
     /// </summary>
     public virtual async Task<AuthResult> GenerateTokensAsync(
         TUser user,
+        string? deviceInfo = null,
+        string? ipAddress = null,
         CancellationToken cancellationToken = default)
     {
         _logger.LogDebug("Generating tokens for UserId: {UserId}", user.Id);
@@ -57,8 +59,11 @@ public class AuthenticationService<TUser> where TUser : IAuthenticatedUser
                 refreshTokenHash,
                 user.Id,
                 refreshTokenExpiresAt,
+                deviceInfo,
+                ipAddress,
                 cancellationToken);
-            _logger.LogDebug("Refresh token stored in repository for UserId: {UserId}", user.Id);
+            _logger.LogDebug("Refresh token stored in repository for UserId: {UserId} with DeviceInfo: {DeviceInfo}, IpAddress: {IpAddress}",
+                user.Id, deviceInfo ?? "N/A", ipAddress ?? "N/A");
 
             _logger.LogInformation("Token pair generated successfully for UserId: {UserId}", user.Id);
 

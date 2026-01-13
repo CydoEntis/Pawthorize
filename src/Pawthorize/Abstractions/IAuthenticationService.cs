@@ -10,9 +10,9 @@ public interface IAuthenticationService<TUser> where TUser : IAuthenticatedUser
 {
     /// <summary>
     /// Generate access and refresh tokens for a user.
-    /// Stores refresh token in database.
+    /// Stores refresh token in database with session metadata.
     /// </summary>
-    Task<AuthResult> GenerateTokensAsync(TUser user, CancellationToken cancellationToken = default);
+    Task<AuthResult> GenerateTokensAsync(TUser user, string? deviceInfo = null, string? ipAddress = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Validate user account status (email verification, account lock, etc.)
