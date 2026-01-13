@@ -29,14 +29,14 @@ public sealed class PawthorizeResponseOptions
     /// <summary>
     /// Use default formatters for success and error responses.
     /// This ensures consistent API response format across success and error cases.
-    /// Uses ErrorHound's DefaultErrorFormatter which automatically handles ValidationError field errors.
+    /// Uses PawthorizeErrorFormatter which properly handles ValidationError field errors.
     /// </summary>
     public PawthorizeResponseOptions UseDefaultFormatters()
     {
         EnableSuccessHound = true;
         EnableErrorHound = true;
-        // Use ErrorHound's built-in DefaultErrorFormatter (null = use default)
-        ErrorFormatterType = null;
+        // Use Pawthorize's custom error formatter that properly serializes ValidationError field errors
+        ErrorFormatterType = typeof(Formatters.PawthorizeErrorFormatter);
         return this;
     }
 

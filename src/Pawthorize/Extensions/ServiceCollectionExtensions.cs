@@ -527,33 +527,9 @@ public static class ServiceCollectionExtensions
 
         if (targetFormatterType == null)
         {
-            Type? defaultFormatterType = null;
-
-            var possibleTypes = new[]
-            {
-                "ErrorHound.Defaults.DefaultErrorFormatter, ErrorHound",
-                "ErrorHound.Formatters.DefaultErrorFormatter, ErrorHound",
-                "ErrorHound.DefaultErrorFormatter, ErrorHound"
-            };
-
-            foreach (var typeName in possibleTypes)
-            {
-                defaultFormatterType = Type.GetType(typeName);
-                if (defaultFormatterType != null)
-                    break;
-            }
-
-            if (defaultFormatterType != null)
-            {
-                targetFormatterType = defaultFormatterType;
-            }
-            else
-            {
-                throw new InvalidOperationException(
-                    "Could not find ErrorHound's DefaultErrorFormatter. " +
-                    "Please specify a custom formatter using options.UseErrorFormatter<T>(). " +
-                    "Make sure ErrorHound package is installed.");
-            }
+            // Use Pawthorize's custom formatter as the default
+            // This ensures ValidationError field errors are properly serialized
+            targetFormatterType = typeof(Formatters.PawthorizeErrorFormatter);
         }
 
         var addErrorHoundMethod = typeof(ErrorHoundExtensions)
