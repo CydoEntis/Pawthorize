@@ -178,6 +178,8 @@ public static class ServiceCollectionExtensions
                 {
                     OnMessageReceived = context =>
                     {
+                        var logger = context.HttpContext.RequestServices.GetService<ILogger<JwtBearerEvents>>();
+
                         // Try to read token from Authorization header first (default behavior)
                         // If not found and using HttpOnlyCookies mode, try to read from cookie
                         var tokenDelivery = pawthorizeOptions?.TokenDelivery ?? TokenDeliveryStrategy.Hybrid;
@@ -193,21 +195,136 @@ public static class ServiceCollectionExtensions
                                 if (!string.IsNullOrEmpty(accessToken))
                                 {
                                     context.Token = accessToken;
+                                    logger?.LogDebug("[Pawthorize JWT] Token retrieved from access_token cookie");
                                 }
+                                else
+                                {
+                                    logger?.LogWarning("[Pawthorize JWT] No token found in Authorization header or access_token cookie");
+                                }
+                            }
+                        }
+                        else
+                        {
+                            if (string.IsNullOrEmpty(context.Token))
+                            {
+                                logger?.LogWarning("[Pawthorize JWT] No Authorization header found in request to {Path}", context.Request.Path);
+                            }
+                            else
+                            {
+                                logger?.LogDebug("[Pawthorize JWT] Token retrieved from Authorization header");
                             }
                         }
 
                         return Task.CompletedTask;
                     },
+                    OnAuthenticationFailed = context =>
+                    {
+                        var logger = context.HttpContext.RequestServices.GetService<ILogger<JwtBearerEvents>>();
+                        var env = context.HttpContext.RequestServices.GetService<Microsoft.AspNetCore.Hosting.IWebHostEnvironment>();
+                        var isDevelopment = env?.EnvironmentName == "Development";
+
+                        var exceptionType = context.Exception.GetType().Name;
+                        var exceptionMessage = context.Exception.Message;
+
+                        // Log detailed error information
+                        logger?.LogError(context.Exception,
+                            "[Pawthorize JWT] Authentication failed for {Path}. Exception: {ExceptionType}, Message: {Message}",
+                            context.Request.Path, exceptionType, exceptionMessage);
+
+                        // Store detailed error information in HttpContext items for development environments
+                        if (isDevelopment)
+                        {
+                            context.HttpContext.Items["Pawthorize.JwtError"] = new
+                            {
+                                ExceptionType = exceptionType,
+                                Message = exceptionMessage,
+                                InnerException = context.Exception.InnerException?.Message,
+                                TokenSource = context.Request.Headers.ContainsKey("Authorization") ? "Header" : "Cookie",
+                                Path = context.Request.Path.ToString(),
+                                Method = context.Request.Method
+                            };
+                        }
+
+                        return Task.CompletedTask;
+                    },
+                    OnTokenValidated = context =>
+                    {
+                        var logger = context.HttpContext.RequestServices.GetService<ILogger<JwtBearerEvents>>();
+                        var userId = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+                        logger?.LogDebug("[Pawthorize JWT] Token validated successfully for UserId: {UserId} on {Path}",
+                            userId ?? "Unknown", context.Request.Path);
+
+                        return Task.CompletedTask;
+                    },
                     OnChallenge = context =>
                     {
+                        var logger = context.HttpContext.RequestServices.GetService<ILogger<JwtBearerEvents>>();
+                        var env = context.HttpContext.RequestServices.GetService<Microsoft.AspNetCore.Hosting.IWebHostEnvironment>();
+                        var isDevelopment = env?.EnvironmentName == "Development";
+
                         context.HandleResponse();
 
-                        throw new UnauthorizedError(
-                            string.IsNullOrEmpty(context.Error)
+                        // Get detailed error information
+                        var errorDetails = context.HttpContext.Items["Pawthorize.JwtError"] as dynamic;
+                        string errorMessage;
+
+                        if (isDevelopment && errorDetails != null)
+                        {
+                            // Provide detailed error message in development
+                            var exceptionType = errorDetails.ExceptionType?.ToString() ?? "Unknown";
+                            var message = errorDetails.Message?.ToString() ?? "Unknown error";
+
+                            errorMessage = exceptionType switch
+                            {
+                                "SecurityTokenExpiredException" =>
+                                    $"JWT token has expired. Please refresh your token or login again. Details: {message}",
+
+                                "SecurityTokenInvalidSignatureException" =>
+                                    "JWT signature validation failed. This usually means:\n" +
+                                    "1. The JWT Secret in appsettings.json doesn't match the one used to generate the token\n" +
+                                    "2. The token was tampered with\n" +
+                                    $"Details: {message}",
+
+                                "SecurityTokenInvalidIssuerException" =>
+                                    $"JWT Issuer validation failed. The 'iss' claim in the token doesn't match the 'Jwt:Issuer' setting in appsettings.json. Details: {message}",
+
+                                "SecurityTokenInvalidAudienceException" =>
+                                    $"JWT Audience validation failed. The 'aud' claim in the token doesn't match the 'Jwt:Audience' setting in appsettings.json. Details: {message}",
+
+                                "SecurityTokenNotYetValidException" =>
+                                    $"JWT token is not yet valid (nbf claim is in the future). Check system clock synchronization. Details: {message}",
+
+                                "SecurityTokenNoExpirationException" =>
+                                    $"JWT token has no expiration claim. All tokens must have an 'exp' claim. Details: {message}",
+
+                                "SecurityTokenInvalidLifetimeException" =>
+                                    $"JWT token lifetime is invalid. Check that 'nbf' is before 'exp' and both are valid timestamps. Details: {message}",
+
+                                _ when string.IsNullOrEmpty(context.Error) && errorDetails == null =>
+                                    "Authentication required. No valid JWT token found in the Authorization header or cookies.",
+
+                                _ =>
+                                    $"JWT authentication failed: {exceptionType}\n" +
+                                    $"Message: {message}\n" +
+                                    $"Token Source: {errorDetails.TokenSource}\n" +
+                                    $"Path: {errorDetails.Path}"
+                            };
+
+                            logger?.LogWarning("[Pawthorize JWT] Challenge triggered: {ErrorMessage}", errorMessage);
+                        }
+                        else
+                        {
+                            // Generic error message in production
+                            errorMessage = string.IsNullOrEmpty(context.Error)
                                 ? "Authentication required"
-                                : "Invalid or expired token"
-                        );
+                                : "Invalid or expired token";
+
+                            logger?.LogWarning("[Pawthorize JWT] Authentication challenge for {Path}: {Error}",
+                                context.Request.Path, context.Error ?? "No token provided");
+                        }
+
+                        throw new UnauthorizedError(errorMessage);
                     }
                 };
             });

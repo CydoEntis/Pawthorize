@@ -9,7 +9,9 @@
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
   [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
 
-  [Quick Start](#quick-start) • [Features](#features) • [Documentation](#documentation) • [Examples](#examples)
+  **Latest:** v0.7.1 - Enhanced JWT error handling with detailed debugging in Development mode
+
+  [Quick Start](#quick-start) • [Features](#features) • [Documentation](#documentation) • [Examples](#examples) • [Troubleshooting](#troubleshooting)
 </div>
 
 ---
@@ -58,6 +60,8 @@ Pawthorize is a complete, production-ready authentication library for ASP.NET Co
 - ✅ **OAuth State Validation** - CSRF protection for OAuth flows
 
 ### Developer Experience
+- ✅ **Enhanced Error Messages (v0.7.1+)** - Detailed JWT error diagnostics in Development mode
+- ✅ **Comprehensive Logging** - `[Pawthorize JWT]` prefixed logs at every authentication step
 - ✅ **Flexible Token Delivery** - Cookies, response body, or hybrid strategies
 - ✅ **Role-Based Authorization** - Automatic role claims in JWT (you manage roles)
 - ✅ **Customizable Endpoints** - Custom paths or manual endpoint mapping
@@ -91,7 +95,7 @@ public class User : IAuthenticatedUser
     public bool IsLocked { get; set; }
     public DateTime? LockedUntil { get; set; }
 
-    // Account lockout properties (v0.7.0+)
+    // Account lockout properties
     public int FailedLoginAttempts { get; set; } = 0;
     public DateTime? LockoutEnd { get; set; }
 }
@@ -865,11 +869,45 @@ app.MapPost("/api/v1/auth/register", async (
 
 ## 🔧 Troubleshooting
 
+### Enhanced Error Messages (v0.7.1+)
+
+Pawthorize v0.7.1 introduces **significantly improved error handling** for JWT authentication failures:
+
+**In Development Mode:**
+- Detailed error messages with root cause analysis
+- Specific exception types (signature validation, issuer mismatch, etc.)
+- Configuration mismatch details
+- Actionable troubleshooting hints
+
+**Backend Logging:**
+- `[Pawthorize JWT]` prefixed logs at every authentication step
+- Token extraction source (header/cookie)
+- Missing claims with list of available claims
+- Validation success/failure with exception details
+
+**Enable Development Mode:**
+```json
+{
+  "profiles": {
+    "YourApp": {
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
+```
+
+See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for a comprehensive debugging guide.
+
 ### Common Issues
 
-#### "Invalid or expired token"
-- **Cause**: Token expired or clock skew between servers
+#### "Invalid or expired token" or "JWT signature validation failed"
+- **Cause**: Token expired, JWT Secret mismatch, or clock skew between servers
+- **Fix (v0.7.1+)**: Check backend console for detailed `[Pawthorize JWT]` error messages
+- **Fix**: Ensure `Jwt:Secret` in appsettings.json matches exactly (case-sensitive, no trailing spaces)
 - **Fix**: Ensure server clocks are synchronized, check token lifetime configuration
+- **Fix**: Decode token at jwt.io and verify `iss`, `aud`, and `exp` claims
 
 #### "CSRF token validation failed"
 - **Cause**: Missing or incorrect CSRF token in request

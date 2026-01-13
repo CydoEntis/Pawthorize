@@ -29,11 +29,23 @@ public class GetCurrentUserHandler<TUser> where TUser : IAuthenticatedUser
         HttpContext httpContext,
         CancellationToken cancellationToken = default)
     {
+        // Check if user is authenticated first
+        if (!httpContext.User.Identity?.IsAuthenticated ?? true)
+        {
+            _logger.LogWarning("Get current user failed: User is not authenticated. " +
+                "This usually means JWT Bearer authentication middleware is not configured or the token is invalid.");
+            return Results.Unauthorized();
+        }
+
         var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
         if (string.IsNullOrEmpty(userId))
         {
-            _logger.LogWarning("Get current user failed: UserId claim not found in token");
+            var allClaims = string.Join(", ", httpContext.User.Claims.Select(c => $"{c.Type}={c.Value}"));
+            _logger.LogWarning("Get current user failed: UserId claim ({ClaimType}) not found in token. " +
+                "Available claims: {Claims}. " +
+                "Make sure your JWT token includes a '{ClaimType}' claim with the user's ID.",
+                ClaimTypes.NameIdentifier, allClaims, ClaimTypes.NameIdentifier);
             return Results.Unauthorized();
         }
 
