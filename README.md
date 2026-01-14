@@ -9,7 +9,7 @@
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
   [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
 
-  **Latest:** v0.7.2 - Enhanced session management with device tracking and detailed validation error reporting
+  **Latest:** v0.7.3 - Test fixes for enhanced session management
 
   [Quick Start](#quick-start) • [Features](#features) • [Documentation](#documentation) • [Examples](#examples) • [Troubleshooting](#troubleshooting)
 </div>
