@@ -6,6 +6,8 @@ A complete **production-ready reference implementation** demonstrating **Pawthor
 
 - ✅ **Hybrid Token Delivery** - Access tokens in response, refresh tokens in HttpOnly cookies
 - ✅ **Built-in CSRF Protection** - Automatic token generation and validation
+- ✅ **Enhanced Session Management** - Device tracking, IP addresses, per-session revocation (v0.7.2)
+- ✅ **Detailed Validation Errors** - Field-level error reporting (v0.7.2)
 - ✅ **Password Policy Enforcement** - Configurable password strength requirements (v0.7.0)
 - ✅ **Account Lockout Protection** - Brute force protection with failed attempt tracking (v0.7.0)
 - ✅ **Built-in Rate Limiting** - IP-based rate limiting for all endpoints (v0.7.0)
@@ -176,14 +178,38 @@ Creates a new user account.
 - `refresh_token` (HttpOnly, Secure, SameSite=Strict)
 - `XSRF-TOKEN` (Secure, SameSite=Strict, readable by JS)
 
-**Error Response (400 Bad Request):**
+**Error Response (400 Bad Request) - Validation Error:**
 ```json
 {
   "success": false,
   "error": {
-    "code": "DUPLICATE_EMAIL",
-    "message": "Email Already Registered",
-    "details": "A user with email 'user@example.com' already exists."
+    "code": "VALIDATION",
+    "message": "Validation failed",
+    "details": {
+      "Email": [
+        "Email must be a valid email address"
+      ],
+      "Password": [
+        "Password must be at least 8 characters",
+        "Password must contain at least one uppercase letter"
+      ]
+    }
+  },
+  "meta": {
+    "timestamp": "2025-12-29T12:00:00Z",
+    "version": "v0.3"
+  }
+}
+```
+
+**Error Response (409 Conflict) - Duplicate Email:**
+```json
+{
+  "success": false,
+  "error": {
+    "code": "USER_ALREADY_EXISTS",
+    "message": "A user with this email already exists",
+    "details": null
   },
   "meta": {
     "timestamp": "2025-12-29T12:00:00Z",
@@ -324,18 +350,78 @@ X-XSRF-TOKEN: <csrf_token>
 
 **GET** `/auth/sessions`
 
-List all active sessions (refresh tokens) for current user.
+List all active sessions (refresh tokens) for current user with detailed device and IP information.
 
 **Headers:**
 ```
 Authorization: Bearer <access_token>
 ```
 
+**Success Response:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "sessionId": "abc123...",
+      "userId": "user-123",
+      "deviceInfo": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36...",
+      "ipAddress": "192.168.1.100",
+      "createdAt": "2024-01-15T10:00:00Z",
+      "expiresAt": "2024-01-22T10:00:00Z",
+      "lastActivityAt": "2024-01-15T10:30:00Z",
+      "isExpired": false,
+      "isCurrentSession": true
+    },
+    {
+      "sessionId": "def456...",
+      "userId": "user-123",
+      "deviceInfo": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0)",
+      "ipAddress": "10.0.0.50",
+      "createdAt": "2024-01-14T08:00:00Z",
+      "expiresAt": "2024-01-21T08:00:00Z",
+      "lastActivityAt": "2024-01-14T09:15:00Z",
+      "isExpired": false,
+      "isCurrentSession": false
+    }
+  ]
+}
+```
+
 ---
 
-#### 7. Revoke Other Sessions
+#### 7. Revoke Specific Session (v0.7.2+)
 
-**POST** `/auth/revoke-other-sessions`
+**POST** `/auth/sessions/revoke`
+
+Revoke a specific session by its session ID.
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+X-XSRF-TOKEN: <csrf_token>
+```
+
+**Request:**
+```json
+{
+  "sessionId": "def456..."
+}
+```
+
+**Success Response:**
+```json
+{
+  "success": true,
+  "message": "Session revoked successfully."
+}
+```
+
+---
+
+#### 8. Revoke Other Sessions
+
+**POST** `/auth/sessions/revoke-others`
 
 Revoke all other sessions except the current one.
 
@@ -347,7 +433,7 @@ X-XSRF-TOKEN: <csrf_token>
 
 ---
 
-#### 8. Logout
+#### 9. Logout
 
 **POST** `/auth/logout`
 
