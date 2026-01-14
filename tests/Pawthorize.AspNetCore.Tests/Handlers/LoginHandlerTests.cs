@@ -143,7 +143,7 @@ public class LoginHandlerTests
             .Returns(true);
 
         _mockAuthService
-            .Setup(s => s.GenerateTokensAsync(user, It.IsAny<CancellationToken>()))
+            .Setup(s => s.GenerateTokensAsync(user, It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(authResult);
 
         var result = await _handler.HandleAsync(request, _httpContext, CancellationToken.None);
@@ -151,7 +151,7 @@ public class LoginHandlerTests
         result.Should().NotBeNull();
         _mockUserRepository.Verify(r => r.FindByEmailAsync(request.Email, It.IsAny<CancellationToken>()), Times.Once);
         _mockPasswordHasher.Verify(h => h.VerifyPassword(request.Password, user.PasswordHash), Times.Once);
-        _mockAuthService.Verify(s => s.GenerateTokensAsync(user, It.IsAny<CancellationToken>()), Times.Once);
+        _mockAuthService.Verify(s => s.GenerateTokensAsync(user, It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -185,7 +185,7 @@ public class LoginHandlerTests
         Func<Task> act = async () => await _handler.HandleAsync(request, _httpContext, CancellationToken.None);
 
         await act.Should().ThrowAsync<InvalidCredentialsError>();
-        _mockAuthService.Verify(s => s.GenerateTokensAsync(It.IsAny<TestUser>(), It.IsAny<CancellationToken>()), Times.Never);
+        _mockAuthService.Verify(s => s.GenerateTokensAsync(It.IsAny<TestUser>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

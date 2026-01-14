@@ -140,7 +140,7 @@ public class RegisterHandlerTests
             .ReturnsAsync(createdUser);
 
         _mockAuthService
-            .Setup(s => s.GenerateTokensAsync(createdUser, It.IsAny<CancellationToken>()))
+            .Setup(s => s.GenerateTokensAsync(createdUser, It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(authResult);
 
         var result = await _handler.HandleAsync(request, _httpContext, CancellationToken.None);
@@ -150,7 +150,7 @@ public class RegisterHandlerTests
         _mockPasswordHasher.Verify(h => h.HashPassword(request.Password), Times.Once);
         _mockUserFactory.Verify(f => f.CreateUser(request, passwordHash), Times.Once);
         _mockUserRepository.Verify(r => r.CreateAsync(createdUser, It.IsAny<CancellationToken>()), Times.Once);
-        _mockAuthService.Verify(s => s.GenerateTokensAsync(createdUser, It.IsAny<CancellationToken>()), Times.Once);
+        _mockAuthService.Verify(s => s.GenerateTokensAsync(createdUser, It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
         _mockEmailVerificationService.Verify(
             s => s.SendVerificationEmailAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Never
@@ -211,7 +211,7 @@ public class RegisterHandlerTests
             Times.Once
         );
         _mockAuthService.Verify(
-            s => s.GenerateTokensAsync(It.IsAny<TestUser>(), It.IsAny<CancellationToken>()),
+            s => s.GenerateTokensAsync(It.IsAny<TestUser>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()),
             Times.Never
         );
     }
@@ -473,7 +473,7 @@ public class RegisterHandlerTests
             .ReturnsAsync(createdUser);
 
         _mockAuthService
-            .Setup(s => s.GenerateTokensAsync(createdUser, It.IsAny<CancellationToken>()))
+            .Setup(s => s.GenerateTokensAsync(createdUser, It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(authResult);
 
         await _handler.HandleAsync(request, _httpContext, CancellationToken.None);

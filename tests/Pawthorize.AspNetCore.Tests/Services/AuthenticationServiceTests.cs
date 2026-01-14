@@ -98,7 +98,7 @@ public class AuthenticationServiceTests
 
         var cancellationToken = CancellationToken.None;
 
-        var result = await _service.GenerateTokensAsync(user, cancellationToken);
+        var result = await _service.GenerateTokensAsync(user, null, null, cancellationToken);
 
         // The service hashes the token before storing it, so we verify with It.IsAny<string>()
         _mockRefreshTokenRepository.Verify(
@@ -106,6 +106,8 @@ public class AuthenticationServiceTests
                 It.IsAny<string>(),  // Token hash
                 user.Id,
                 It.Is<DateTime>(dt => dt > DateTime.UtcNow),
+                It.IsAny<string?>(),  // Device info
+                It.IsAny<string?>(),  // IP address
                 cancellationToken),
             Times.Once);
     }
@@ -143,13 +145,15 @@ public class AuthenticationServiceTests
 
         var cancellationToken = new CancellationToken();
 
-        await _service.GenerateTokensAsync(user, cancellationToken);
+        await _service.GenerateTokensAsync(user, null, null, cancellationToken);
 
         _mockRefreshTokenRepository.Verify(
             r => r.StoreAsync(
                 It.IsAny<string>(),
                 It.IsAny<string>(),
                 It.IsAny<DateTime>(),
+                It.IsAny<string?>(),  // Device info
+                It.IsAny<string?>(),  // IP address
                 cancellationToken),
             Times.Once);
     }
@@ -415,7 +419,7 @@ public class AuthenticationServiceTests
         act.Should().Throw<AccountLockedError>();
 
         _mockRefreshTokenRepository.Verify(
-            r => r.StoreAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<CancellationToken>()),
+            r => r.StoreAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
