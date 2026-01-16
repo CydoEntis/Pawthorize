@@ -93,7 +93,8 @@ public class ExternalAuthenticationService<TUser> where TUser : class, IAuthenti
 
         _authenticationService.ValidateAccountStatus(user);
 
-        var authResult = await _authenticationService.GenerateTokensAsync(user, deviceInfo, ipAddress, cancellationToken);
+        // OAuth logins default to not using "remember me" - sessions will use the default shorter expiry
+        var authResult = await _authenticationService.GenerateTokensAsync(user, rememberMe: false, deviceInfo, ipAddress, cancellationToken);
 
         _logger.LogInformation("Successfully authenticated user {UserId} via provider {Provider}",
             user.Id, provider);

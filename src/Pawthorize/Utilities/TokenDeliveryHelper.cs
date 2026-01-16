@@ -73,13 +73,16 @@ public static class TokenDeliveryHelper
         CsrfTokenService? csrfService,
         ILogger? logger)
     {
-        logger?.LogDebug("Delivering access and refresh tokens in HttpOnly cookies");
+        logger?.LogDebug("Delivering access and refresh tokens in HttpOnly cookies, RememberMe: {RememberMe}", authResult.IsRememberedSession);
 
         SetCookie(httpContext, "access_token", authResult.AccessToken, authResult.AccessTokenExpiresAt, logger);
-        SetCookie(httpContext, "refresh_token", authResult.RefreshToken!, authResult.RefreshTokenExpiresAt, logger);
 
-        // Set CSRF token if enabled
-        SetCsrfToken(httpContext, options, csrfService, logger);
+        // For refresh token, use session cookie if not remembered and configured to do so
+        var useSessionCookie = !authResult.IsRememberedSession && options.Jwt.UseSessionCookieWhenNotRemembered;
+        SetRefreshTokenCookie(httpContext, authResult.RefreshToken!, authResult.RefreshTokenExpiresAt, useSessionCookie, logger);
+
+        // Set CSRF token if enabled (match session cookie behavior)
+        SetCsrfToken(httpContext, options, csrfService, useSessionCookie, logger);
 
         logger?.LogDebug("Both tokens set in HttpOnly cookies");
 
@@ -97,12 +100,14 @@ public static class TokenDeliveryHelper
         CsrfTokenService? csrfService,
         ILogger? logger)
     {
-        logger?.LogDebug("Delivering tokens in hybrid mode (access token in body, refresh token in cookie)");
+        logger?.LogDebug("Delivering tokens in hybrid mode (access token in body, refresh token in cookie), RememberMe: {RememberMe}", authResult.IsRememberedSession);
 
-        SetCookie(httpContext, "refresh_token", authResult.RefreshToken!, authResult.RefreshTokenExpiresAt, logger);
+        // For refresh token, use session cookie if not remembered and configured to do so
+        var useSessionCookie = !authResult.IsRememberedSession && options.Jwt.UseSessionCookieWhenNotRemembered;
+        SetRefreshTokenCookie(httpContext, authResult.RefreshToken!, authResult.RefreshTokenExpiresAt, useSessionCookie, logger);
 
-        // Set CSRF token if enabled
-        SetCsrfToken(httpContext, options, csrfService, logger);
+        // Set CSRF token if enabled (match session cookie behavior)
+        SetCsrfToken(httpContext, options, csrfService, useSessionCookie, logger);
 
         var hybridResult = new AuthResult
         {
@@ -137,13 +142,53 @@ public static class TokenDeliveryHelper
     }
 
     /// <summary>
+    /// Set the refresh token cookie with optional session cookie behavior.
+    /// When useSessionCookie is true, the cookie has no Expires attribute (deleted on browser close).
+    /// </summary>
+    private static void SetRefreshTokenCookie(HttpContext context, string value, DateTime expires, bool useSessionCookie, ILogger? logger)
+    {
+        if (useSessionCookie)
+        {
+            logger?.LogDebug("Setting refresh_token as session cookie (no expiry, deleted on browser close)");
+
+            context.Response.Cookies.Append("refresh_token", value, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = context.Request.IsHttps,
+                SameSite = SameSiteMode.Strict
+                // No Expires = session cookie
+            });
+        }
+        else
+        {
+            logger?.LogDebug("Setting refresh_token cookie with expiry: {ExpiresAt}", expires);
+
+            context.Response.Cookies.Append("refresh_token", value, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = context.Request.IsHttps,
+                SameSite = SameSiteMode.Strict,
+                Expires = expires
+            });
+        }
+
+        logger?.LogDebug("Refresh token cookie set successfully");
+    }
+
+    /// <summary>
     /// Set CSRF token cookie and response header.
     /// Cookie is NOT HttpOnly so JavaScript can read it for inclusion in request headers.
     /// </summary>
+    /// <param name="context">HTTP context</param>
+    /// <param name="options">Pawthorize options</param>
+    /// <param name="csrfService">CSRF token service</param>
+    /// <param name="useSessionCookie">Whether to use session cookie (matches refresh token behavior)</param>
+    /// <param name="logger">Optional logger</param>
     private static void SetCsrfToken(
         HttpContext context,
         PawthorizeOptions options,
         CsrfTokenService? csrfService,
+        bool useSessionCookie,
         ILogger? logger)
     {
         // Skip if CSRF is disabled or service not provided
@@ -153,25 +198,31 @@ public static class TokenDeliveryHelper
             return;
         }
 
-        logger?.LogDebug("Generating and setting CSRF token");
+        logger?.LogDebug("Generating and setting CSRF token, SessionCookie: {UseSessionCookie}", useSessionCookie);
 
         var csrfToken = csrfService.GenerateToken();
-        var expiresAt = DateTime.UtcNow.AddMinutes(options.Csrf.TokenLifetimeMinutes);
 
-        // Set CSRF cookie (NOT HttpOnly so JS can read it)
-        context.Response.Cookies.Append(options.Csrf.CookieName, csrfToken, new CookieOptions
+        var cookieOptions = new CookieOptions
         {
             HttpOnly = false, // JS needs to read this
             Secure = context.Request.IsHttps, // Only require HTTPS in production
-            SameSite = SameSiteMode.Strict,
-            Expires = expiresAt
-        });
+            SameSite = SameSiteMode.Strict
+        };
+
+        // Only set Expires if not using session cookie
+        if (!useSessionCookie)
+        {
+            cookieOptions.Expires = DateTime.UtcNow.AddMinutes(options.Csrf.TokenLifetimeMinutes);
+        }
+
+        // Set CSRF cookie (NOT HttpOnly so JS can read it)
+        context.Response.Cookies.Append(options.Csrf.CookieName, csrfToken, cookieOptions);
 
         // Also set in response header for SPAs
         context.Response.Headers.Append(options.Csrf.HeaderName, csrfToken);
 
-        logger?.LogDebug("CSRF token set in cookie '{CookieName}' and header '{HeaderName}'",
-            options.Csrf.CookieName, options.Csrf.HeaderName);
+        logger?.LogDebug("CSRF token set in cookie '{CookieName}' and header '{HeaderName}', SessionCookie: {UseSessionCookie}",
+            options.Csrf.CookieName, options.Csrf.HeaderName, useSessionCookie);
     }
 
     /// <summary>

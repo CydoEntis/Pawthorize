@@ -102,7 +102,8 @@ public class RegisterHandler<TUser, TRegisterRequest>
             var deviceInfo = httpContext.Request.Headers.UserAgent.ToString();
             var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString();
 
-            var authResult = await _authService.GenerateTokensAsync(createdUser, deviceInfo, ipAddress, cancellationToken);
+            // Registration uses default session (not remembered) - users can select "remember me" on subsequent logins
+            var authResult = await _authService.GenerateTokensAsync(createdUser, rememberMe: false, deviceInfo, ipAddress, cancellationToken);
             var result = TokenDeliveryHelper.DeliverTokens(authResult, httpContext, _options.TokenDelivery, _options, _csrfService, _logger);
 
             _logger.LogInformation("Registration completed successfully for UserId: {UserId}, Email: {Email}",

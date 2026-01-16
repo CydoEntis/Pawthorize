@@ -55,7 +55,8 @@ public class TokenDeliveryTests
             Issuer = "test-issuer",
             Audience = "test-audience",
             AccessTokenLifetimeMinutes = 15,
-            RefreshTokenLifetimeDays = 7
+            RefreshTokenLifetimeDaysRemembered = 30,
+            RefreshTokenLifetimeHoursDefault = 24
         };
         var mockJwtOptions = new Mock<IOptions<JwtSettings>>();
         mockJwtOptions.Setup(o => o.Value).Returns(jwtSettings);
@@ -140,7 +141,7 @@ public class TokenDeliveryTests
             .Returns(true);
 
         mockAuthService
-            .Setup(s => s.GenerateTokensAsync(user, It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.GenerateTokensAsync(user, It.IsAny<bool>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(authResult);
 
         var result = await handler.HandleAsync(request, httpContext, CancellationToken.None);
@@ -150,7 +151,7 @@ public class TokenDeliveryTests
         httpContext.Response.Headers.ContainsKey("Set-Cookie").Should().BeFalse(
             "ResponseBody mode should not set any cookies");
 
-        mockAuthService.Verify(s => s.GenerateTokensAsync(user, It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
+        mockAuthService.Verify(s => s.GenerateTokensAsync(user, It.IsAny<bool>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -224,7 +225,7 @@ public class TokenDeliveryTests
             .Returns(true);
 
         mockAuthService
-            .Setup(s => s.GenerateTokensAsync(user, It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.GenerateTokensAsync(user, It.IsAny<bool>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(authResult);
 
         var result = await handler.HandleAsync(request, httpContext, CancellationToken.None);
@@ -310,7 +311,7 @@ public class TokenDeliveryTests
             .Returns(true);
 
         mockAuthService
-            .Setup(s => s.GenerateTokensAsync(user, It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.GenerateTokensAsync(user, It.IsAny<bool>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(authResult);
 
         var result = await handler.HandleAsync(request, httpContext, CancellationToken.None);
@@ -407,7 +408,7 @@ public class TokenDeliveryTests
             .ReturnsAsync(user);
 
         mockAuthService
-            .Setup(s => s.GenerateTokensAsync(user, It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.GenerateTokensAsync(user, It.IsAny<bool>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(authResult);
 
         var result = await handler.HandleAsync(request, httpContext, CancellationToken.None);
@@ -493,7 +494,7 @@ public class TokenDeliveryTests
             .ReturnsAsync(user);
 
         mockAuthService
-            .Setup(s => s.GenerateTokensAsync(user, It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.GenerateTokensAsync(user, It.IsAny<bool>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(authResult);
 
         var result = await handler.HandleAsync(request, httpContext, CancellationToken.None);

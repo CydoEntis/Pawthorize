@@ -24,7 +24,8 @@ public class JwtServiceTests
             Issuer = "test-issuer",
             Audience = "test-audience",
             AccessTokenLifetimeMinutes = 15,
-            RefreshTokenLifetimeDays = 7
+            RefreshTokenLifetimeDaysRemembered = 30,
+            RefreshTokenLifetimeHoursDefault = 24
         };
         _mockOptions = new Mock<IOptions<JwtSettings>>();
         _mockOptions.Setup(o => o.Value).Returns(_validSettings);
@@ -374,16 +375,26 @@ public class JwtServiceTests
     }
 
     [Fact]
-    public void GetRefreshTokenExpiration_ShouldReturnCorrectExpiration()
+    public void GetRefreshTokenExpiration_WhenNotRemembered_ShouldReturnDefaultExpiration()
     {
         var service = new JwtService<TestUser>(_mockOptions.Object);
         var beforeCall = DateTime.UtcNow;
 
-        var expiration = service.GetRefreshTokenExpiration();
+        var expiration = service.GetRefreshTokenExpiration(rememberMe: false);
 
-        var afterCall = DateTime.UtcNow;
+        var expectedExpiration = beforeCall.AddHours(24);
+        expiration.Should().BeCloseTo(expectedExpiration, TimeSpan.FromSeconds(1));
+    }
 
-        var expectedExpiration = beforeCall.AddDays(7);
+    [Fact]
+    public void GetRefreshTokenExpiration_WhenRemembered_ShouldReturnLongerExpiration()
+    {
+        var service = new JwtService<TestUser>(_mockOptions.Object);
+        var beforeCall = DateTime.UtcNow;
+
+        var expiration = service.GetRefreshTokenExpiration(rememberMe: true);
+
+        var expectedExpiration = beforeCall.AddDays(30);
         expiration.Should().BeCloseTo(expectedExpiration, TimeSpan.FromSeconds(1));
     }
 

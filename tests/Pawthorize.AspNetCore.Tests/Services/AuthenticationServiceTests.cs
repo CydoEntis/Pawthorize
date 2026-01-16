@@ -27,7 +27,8 @@ public class AuthenticationServiceTests
             Issuer = "test-issuer",
             Audience = "test-audience",
             AccessTokenLifetimeMinutes = 15,
-            RefreshTokenLifetimeDays = 7
+            RefreshTokenLifetimeDaysRemembered = 30,
+            RefreshTokenLifetimeHoursDefault = 24
         };
 
         var mockJwtOptions = new Mock<IOptions<JwtSettings>>();
@@ -98,7 +99,7 @@ public class AuthenticationServiceTests
 
         var cancellationToken = CancellationToken.None;
 
-        var result = await _service.GenerateTokensAsync(user, null, null, cancellationToken);
+        var result = await _service.GenerateTokensAsync(user, false, null, null, cancellationToken);
 
         // The service hashes the token before storing it, so we verify with It.IsAny<string>()
         _mockRefreshTokenRepository.Verify(
@@ -108,12 +109,13 @@ public class AuthenticationServiceTests
                 It.Is<DateTime>(dt => dt > DateTime.UtcNow),
                 It.IsAny<string?>(),  // Device info
                 It.IsAny<string?>(),  // IP address
+                It.IsAny<bool>(),     // IsRememberedSession
                 cancellationToken),
             Times.Once);
     }
 
     [Fact]
-    public async Task GenerateTokensAsync_ShouldSetCorrectExpirationTimes()
+    public async Task GenerateTokensAsync_ShouldSetCorrectExpirationTimes_WhenNotRemembered()
     {
         var user = new TestUser
         {
@@ -123,15 +125,41 @@ public class AuthenticationServiceTests
 
         var beforeGeneration = DateTime.UtcNow;
 
-        var result = await _service.GenerateTokensAsync(user);
+        var result = await _service.GenerateTokensAsync(user, rememberMe: false);
 
         result.AccessTokenExpiresAt.Should().BeCloseTo(
             beforeGeneration.AddMinutes(15),
             TimeSpan.FromSeconds(2));
 
+        // Default (not remembered) uses hours, not days
         result.RefreshTokenExpiresAt.Should().BeCloseTo(
-            beforeGeneration.AddDays(7),
+            beforeGeneration.AddHours(24),
             TimeSpan.FromSeconds(2));
+    }
+
+    [Fact]
+    public async Task GenerateTokensAsync_ShouldSetLongerExpirationTimes_WhenRemembered()
+    {
+        var user = new TestUser
+        {
+            Id = "user123",
+            Email = "test@example.com"
+        };
+
+        var beforeGeneration = DateTime.UtcNow;
+
+        var result = await _service.GenerateTokensAsync(user, rememberMe: true);
+
+        result.AccessTokenExpiresAt.Should().BeCloseTo(
+            beforeGeneration.AddMinutes(15),
+            TimeSpan.FromSeconds(2));
+
+        // Remember me uses days
+        result.RefreshTokenExpiresAt.Should().BeCloseTo(
+            beforeGeneration.AddDays(30),
+            TimeSpan.FromSeconds(2));
+
+        result.IsRememberedSession.Should().BeTrue();
     }
 
     [Fact]
@@ -145,7 +173,7 @@ public class AuthenticationServiceTests
 
         var cancellationToken = new CancellationToken();
 
-        await _service.GenerateTokensAsync(user, null, null, cancellationToken);
+        await _service.GenerateTokensAsync(user, false, null, null, cancellationToken);
 
         _mockRefreshTokenRepository.Verify(
             r => r.StoreAsync(
@@ -154,6 +182,7 @@ public class AuthenticationServiceTests
                 It.IsAny<DateTime>(),
                 It.IsAny<string?>(),  // Device info
                 It.IsAny<string?>(),  // IP address
+                It.IsAny<bool>(),     // IsRememberedSession
                 cancellationToken),
             Times.Once);
     }
@@ -419,7 +448,7 @@ public class AuthenticationServiceTests
         act.Should().Throw<AccountLockedError>();
 
         _mockRefreshTokenRepository.Verify(
-            r => r.StoreAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()),
+            r => r.StoreAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()),
             Times.Never);
     }
 

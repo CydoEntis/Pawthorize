@@ -55,7 +55,7 @@ public class LoginHandler<TUser> where TUser : IAuthenticatedUser
         HttpContext httpContext,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Login attempt initiated for email: {Email}", request.Email);
+        _logger.LogInformation("Login attempt initiated for email: {Email}, RememberMe: {RememberMe}", request.Email, request.RememberMe);
 
         try
         {
@@ -126,13 +126,13 @@ public class LoginHandler<TUser> where TUser : IAuthenticatedUser
             var deviceInfo = httpContext.Request.Headers.UserAgent.ToString();
             var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString();
 
-            var authResult = await _authService.GenerateTokensAsync(user, deviceInfo, ipAddress, cancellationToken);
-            _logger.LogDebug("Tokens generated successfully for UserId: {UserId}", user.Id);
+            var authResult = await _authService.GenerateTokensAsync(user, request.RememberMe, deviceInfo, ipAddress, cancellationToken);
+            _logger.LogDebug("Tokens generated successfully for UserId: {UserId}, RememberMe: {RememberMe}", user.Id, request.RememberMe);
 
             var result = TokenDeliveryHelper.DeliverTokens(authResult, httpContext, _options.TokenDelivery, _options, _csrfService, _logger);
 
-            _logger.LogInformation("Login successful for email: {Email}, UserId: {UserId}",
-                request.Email, user.Id);
+            _logger.LogInformation("Login successful for email: {Email}, UserId: {UserId}, RememberMe: {RememberMe}",
+                request.Email, user.Id, request.RememberMe);
 
             return result;
         }

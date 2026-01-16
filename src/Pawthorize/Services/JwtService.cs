@@ -161,8 +161,10 @@ public class JwtService<TUser> where TUser : IAuthenticatedUser
     /// <summary>
     /// Get the expiration time for a newly generated refresh token.
     /// </summary>
-    public DateTime GetRefreshTokenExpiration() => 
-        DateTime.UtcNow.AddDays(_settings.RefreshTokenLifetimeDays);
+    /// <param name="rememberMe">Whether this is a "Remember Me" session with extended expiry.</param>
+    /// <returns>The expiration DateTime for the refresh token.</returns>
+    public DateTime GetRefreshTokenExpiration(bool rememberMe = false) =>
+        DateTime.UtcNow.Add(_settings.GetRefreshTokenLifetime(rememberMe));
 
     private List<Claim> BuildClaims(TUser user)
     {

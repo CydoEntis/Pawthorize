@@ -12,7 +12,8 @@ public record RefreshTokenInfo(
     DateTime? CreatedAt = null,
     string? DeviceInfo = null,
     string? IpAddress = null,
-    DateTime? LastActivityAt = null)
+    DateTime? LastActivityAt = null,
+    bool IsRememberedSession = false)
 {
     /// <summary>
     /// Check if token has expired

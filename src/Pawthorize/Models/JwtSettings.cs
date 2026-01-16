@@ -12,7 +12,9 @@
 ///     "Issuer": "MyApp",
 ///     "Audience": "MyApp",
 ///     "AccessTokenLifetimeMinutes": 15,
-///     "RefreshTokenLifetimeDays": 7
+///     "RefreshTokenLifetimeDaysRemembered": 30,
+///     "RefreshTokenLifetimeHoursDefault": 24,
+///     "UseSessionCookieWhenNotRemembered": false
 ///   }
 /// }
 /// </remarks>
@@ -58,16 +60,36 @@ public class JwtSettings
     public int AccessTokenLifetimeMinutes { get; set; } = 15;
 
     /// <summary>
-    /// How long refresh tokens are valid (in days).
-    /// Default: 7 days
+    /// How long refresh tokens are valid (in days) when "Remember Me" is selected.
+    /// Default: 30 days
     /// </summary>
     /// <remarks>
-    /// Longer than access tokens because:
-    /// - Stored securely (httpOnly cookie or secure storage)
-    /// - Can be revoked in database
-    /// - Less frequently transmitted
+    /// Used when the user explicitly opts into a longer session.
+    /// These sessions persist across browser restarts and are suitable for trusted devices.
     /// </remarks>
-    public int RefreshTokenLifetimeDays { get; set; } = 7;
+    public int RefreshTokenLifetimeDaysRemembered { get; set; } = 30;
+
+    /// <summary>
+    /// How long refresh tokens are valid (in hours) when "Remember Me" is NOT selected.
+    /// Default: 24 hours
+    /// </summary>
+    /// <remarks>
+    /// Shorter lifetime for sessions where the user didn't opt into "remember me".
+    /// This is ignored if UseSessionCookieWhenNotRemembered is true.
+    /// </remarks>
+    public int RefreshTokenLifetimeHoursDefault { get; set; } = 24;
+
+    /// <summary>
+    /// Whether to use session cookies (no expiry) when "Remember Me" is NOT selected.
+    /// Default: false
+    /// </summary>
+    /// <remarks>
+    /// When true, the refresh token cookie will not have an Expires attribute,
+    /// causing it to be deleted when the browser closes.
+    /// When false, uses RefreshTokenLifetimeHoursDefault for the cookie expiry.
+    /// Note: Session cookies can be lost if the browser crashes or is force-closed.
+    /// </remarks>
+    public bool UseSessionCookieWhenNotRemembered { get; set; } = false;
 
     /// <summary>
     /// Get access token lifetime as TimeSpan (computed from minutes)
@@ -75,7 +97,20 @@ public class JwtSettings
     public TimeSpan AccessTokenLifetime => TimeSpan.FromMinutes(AccessTokenLifetimeMinutes);
 
     /// <summary>
-    /// Get refresh token lifetime as TimeSpan (computed from days)
+    /// Get refresh token lifetime for "Remember Me" sessions as TimeSpan (computed from days)
     /// </summary>
-    public TimeSpan RefreshTokenLifetime => TimeSpan.FromDays(RefreshTokenLifetimeDays);
+    public TimeSpan RefreshTokenLifetimeRemembered => TimeSpan.FromDays(RefreshTokenLifetimeDaysRemembered);
+
+    /// <summary>
+    /// Get refresh token lifetime for default sessions as TimeSpan (computed from hours)
+    /// </summary>
+    public TimeSpan RefreshTokenLifetimeDefault => TimeSpan.FromHours(RefreshTokenLifetimeHoursDefault);
+
+    /// <summary>
+    /// Get refresh token lifetime based on remember me preference.
+    /// </summary>
+    /// <param name="rememberMe">Whether the user selected "Remember Me"</param>
+    /// <returns>The appropriate refresh token lifetime</returns>
+    public TimeSpan GetRefreshTokenLifetime(bool rememberMe) =>
+        rememberMe ? RefreshTokenLifetimeRemembered : RefreshTokenLifetimeDefault;
 }

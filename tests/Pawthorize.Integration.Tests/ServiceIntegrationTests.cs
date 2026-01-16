@@ -46,7 +46,8 @@ public class ServiceIntegrationTests : IDisposable
                 Issuer = "pawthorize-integration-tests",
                 Audience = "pawthorize-integration-tests",
                 AccessTokenLifetimeMinutes = 15,
-                RefreshTokenLifetimeDays = 7
+                RefreshTokenLifetimeDaysRemembered = 30,
+                RefreshTokenLifetimeHoursDefault = 24
             },
             EmailVerification = new EmailVerificationOptions
             {

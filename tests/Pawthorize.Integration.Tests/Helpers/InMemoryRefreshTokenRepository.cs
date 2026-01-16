@@ -13,6 +13,7 @@ public class InMemoryRefreshTokenRepository : IRefreshTokenRepository
         DateTime expiresAt,
         string? deviceInfo = null,
         string? ipAddress = null,
+        bool isRememberedSession = false,
         CancellationToken cancellationToken = default)
     {
         _tokens.Add(new StoredRefreshToken
@@ -24,7 +25,8 @@ public class InMemoryRefreshTokenRepository : IRefreshTokenRepository
             IsRevoked = false,
             DeviceInfo = deviceInfo,
             IpAddress = ipAddress,
-            LastActivityAt = DateTime.UtcNow
+            LastActivityAt = DateTime.UtcNow,
+            IsRememberedSession = isRememberedSession
         });
         return Task.CompletedTask;
     }
@@ -45,7 +47,8 @@ public class InMemoryRefreshTokenRepository : IRefreshTokenRepository
             storedToken.CreatedAt,
             storedToken.DeviceInfo,
             storedToken.IpAddress,
-            storedToken.LastActivityAt);
+            storedToken.LastActivityAt,
+            storedToken.IsRememberedSession);
 
         return Task.FromResult<RefreshTokenInfo?>(tokenInfo);
     }
@@ -86,7 +89,8 @@ public class InMemoryRefreshTokenRepository : IRefreshTokenRepository
                 t.CreatedAt,
                 t.DeviceInfo,
                 t.IpAddress,
-                t.LastActivityAt))
+                t.LastActivityAt,
+                t.IsRememberedSession))
             .ToList();
 
         return Task.FromResult<IEnumerable<RefreshTokenInfo>>(activeTokens);
@@ -129,5 +133,6 @@ public class InMemoryRefreshTokenRepository : IRefreshTokenRepository
         public string? DeviceInfo { get; set; }
         public string? IpAddress { get; set; }
         public DateTime? LastActivityAt { get; set; }
+        public bool IsRememberedSession { get; set; }
     }
 }

@@ -17,8 +17,9 @@ public interface IRefreshTokenRepository
     /// <param name="expiresAt">The expiration date and time of the token.</param>
     /// <param name="deviceInfo">Optional device/browser information (User-Agent).</param>
     /// <param name="ipAddress">Optional IP address of the client.</param>
+    /// <param name="isRememberedSession">Whether this is a "Remember Me" session with extended expiry.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    Task StoreAsync(string tokenHash, string userId, DateTime expiresAt, string? deviceInfo = null, string? ipAddress = null, CancellationToken cancellationToken = default);
+    Task StoreAsync(string tokenHash, string userId, DateTime expiresAt, string? deviceInfo = null, string? ipAddress = null, bool isRememberedSession = false, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Validates a refresh token hash and returns its information if valid.

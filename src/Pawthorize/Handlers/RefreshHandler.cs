@@ -98,6 +98,10 @@ public class RefreshHandler<TUser> where TUser : IAuthenticatedUser
             _authService.ValidateAccountStatus(user);
             _logger.LogDebug("Account status validation passed for UserId: {UserId}", user.Id);
 
+            // Preserve the "Remember Me" setting from the original session
+            var rememberMe = tokenInfo.IsRememberedSession;
+            _logger.LogDebug("Preserving RememberMe setting from original session: {RememberMe}, UserId: {UserId}", rememberMe, user.Id);
+
             // Update last activity time for this session before revoking
             await _refreshTokenRepository.UpdateLastActivityAsync(refreshTokenHash, DateTime.UtcNow, cancellationToken);
             _logger.LogDebug("Updated last activity time for session, UserId: {UserId}", user.Id);
@@ -109,8 +113,8 @@ public class RefreshHandler<TUser> where TUser : IAuthenticatedUser
             var deviceInfo = httpContext.Request.Headers.UserAgent.ToString();
             var ipAddress = httpContext.Connection.RemoteIpAddress?.ToString();
 
-            var authResult = await _authService.GenerateTokensAsync(user, deviceInfo, ipAddress, cancellationToken);
-            _logger.LogDebug("New tokens generated successfully for UserId: {UserId}", user.Id);
+            var authResult = await _authService.GenerateTokensAsync(user, rememberMe, deviceInfo, ipAddress, cancellationToken);
+            _logger.LogDebug("New tokens generated successfully for UserId: {UserId}, RememberMe: {RememberMe}", user.Id, rememberMe);
 
             var result = TokenDeliveryHelper.DeliverTokens(authResult, httpContext, _options.TokenDelivery, _options, _csrfService, _logger);
 

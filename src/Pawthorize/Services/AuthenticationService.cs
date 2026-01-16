@@ -34,13 +34,20 @@ public class AuthenticationService<TUser> where TUser : IAuthenticatedUser
     /// Generate access and refresh tokens for a user.
     /// Stores refresh token in database with session metadata.
     /// </summary>
+    /// <param name="user">The user to generate tokens for.</param>
+    /// <param name="rememberMe">Whether to create a long-lived "Remember Me" session.</param>
+    /// <param name="deviceInfo">Optional device/browser information (User-Agent).</param>
+    /// <param name="ipAddress">Optional IP address of the client.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Authentication result containing tokens and expiry information.</returns>
     public virtual async Task<AuthResult> GenerateTokensAsync(
         TUser user,
+        bool rememberMe = false,
         string? deviceInfo = null,
         string? ipAddress = null,
         CancellationToken cancellationToken = default)
     {
-        _logger.LogDebug("Generating tokens for UserId: {UserId}", user.Id);
+        _logger.LogDebug("Generating tokens for UserId: {UserId}, RememberMe: {RememberMe}", user.Id, rememberMe);
 
         try
         {
@@ -51,9 +58,10 @@ public class AuthenticationService<TUser> where TUser : IAuthenticatedUser
 
             var refreshToken = _jwtService.GenerateRefreshToken();
             var refreshTokenHash = TokenHasher.HashToken(refreshToken);
-            var refreshTokenExpiresAt = DateTime.UtcNow.Add(_options.Jwt.RefreshTokenLifetime);
-            _logger.LogDebug("Refresh token generated for UserId: {UserId}, ExpiresAt: {ExpiresAt}",
-                user.Id, refreshTokenExpiresAt);
+            var refreshTokenLifetime = _options.Jwt.GetRefreshTokenLifetime(rememberMe);
+            var refreshTokenExpiresAt = DateTime.UtcNow.Add(refreshTokenLifetime);
+            _logger.LogDebug("Refresh token generated for UserId: {UserId}, ExpiresAt: {ExpiresAt}, RememberMe: {RememberMe}",
+                user.Id, refreshTokenExpiresAt, rememberMe);
 
             await _refreshTokenRepository.StoreAsync(
                 refreshTokenHash,
@@ -61,11 +69,12 @@ public class AuthenticationService<TUser> where TUser : IAuthenticatedUser
                 refreshTokenExpiresAt,
                 deviceInfo,
                 ipAddress,
+                rememberMe,
                 cancellationToken);
-            _logger.LogDebug("Refresh token stored in repository for UserId: {UserId} with DeviceInfo: {DeviceInfo}, IpAddress: {IpAddress}",
-                user.Id, deviceInfo ?? "N/A", ipAddress ?? "N/A");
+            _logger.LogDebug("Refresh token stored in repository for UserId: {UserId} with DeviceInfo: {DeviceInfo}, IpAddress: {IpAddress}, RememberMe: {RememberMe}",
+                user.Id, deviceInfo ?? "N/A", ipAddress ?? "N/A", rememberMe);
 
-            _logger.LogInformation("Token pair generated successfully for UserId: {UserId}", user.Id);
+            _logger.LogInformation("Token pair generated successfully for UserId: {UserId}, RememberMe: {RememberMe}", user.Id, rememberMe);
 
             return new AuthResult
             {
@@ -73,7 +82,8 @@ public class AuthenticationService<TUser> where TUser : IAuthenticatedUser
                 RefreshToken = refreshToken,
                 AccessTokenExpiresAt = accessTokenExpiresAt,
                 RefreshTokenExpiresAt = refreshTokenExpiresAt,
-                TokenType = "Bearer"
+                TokenType = "Bearer",
+                IsRememberedSession = rememberMe
             };
         }
         catch (Exception ex)

@@ -53,7 +53,8 @@ public class RefreshHandlerTests
             Issuer = "test-issuer",
             Audience = "test-audience",
             AccessTokenLifetimeMinutes = 15,
-            RefreshTokenLifetimeDays = 7
+            RefreshTokenLifetimeDaysRemembered = 30,
+            RefreshTokenLifetimeHoursDefault = 24
         };
         var mockJwtOptions = new Mock<IOptions<JwtSettings>>();
         mockJwtOptions.Setup(o => o.Value).Returns(jwtSettings);
@@ -131,7 +132,7 @@ public class RefreshHandlerTests
             .Returns(Task.CompletedTask);
 
         _mockAuthService
-            .Setup(s => s.GenerateTokensAsync(user, It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.GenerateTokensAsync(user, It.IsAny<bool>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(authResult);
 
         var result = await _handler.HandleAsync(request, _httpContext, CancellationToken.None);
@@ -140,7 +141,7 @@ public class RefreshHandlerTests
         _mockRefreshTokenRepository.Verify(r => r.ValidateAsync(refreshTokenHash, It.IsAny<CancellationToken>()), Times.Once);
         _mockUserRepository.Verify(r => r.FindByIdAsync(user.Id, It.IsAny<CancellationToken>()), Times.Once);
         _mockRefreshTokenRepository.Verify(r => r.RevokeAsync(refreshTokenHash, It.IsAny<CancellationToken>()), Times.Once);
-        _mockAuthService.Verify(s => s.GenerateTokensAsync(user, It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
+        _mockAuthService.Verify(s => s.GenerateTokensAsync(user, It.IsAny<bool>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
@@ -168,7 +169,7 @@ public class RefreshHandlerTests
 
         await act.Should().ThrowAsync<InvalidRefreshTokenError>();
         _mockUserRepository.Verify(r => r.FindByIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
-        _mockAuthService.Verify(s => s.GenerateTokensAsync(It.IsAny<TestUser>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+        _mockAuthService.Verify(s => s.GenerateTokensAsync(It.IsAny<TestUser>(), It.IsAny<bool>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -220,7 +221,7 @@ public class RefreshHandlerTests
         Func<Task> act = async () => await _handler.HandleAsync(request, _httpContext, CancellationToken.None);
 
         await act.Should().ThrowAsync<InvalidRefreshTokenError>();
-        _mockAuthService.Verify(s => s.GenerateTokensAsync(It.IsAny<TestUser>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+        _mockAuthService.Verify(s => s.GenerateTokensAsync(It.IsAny<TestUser>(), It.IsAny<bool>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -260,7 +261,7 @@ public class RefreshHandlerTests
         Func<Task> act = async () => await _handler.HandleAsync(request, _httpContext, CancellationToken.None);
 
         await act.Should().ThrowAsync<AccountLockedError>();
-        _mockAuthService.Verify(s => s.GenerateTokensAsync(It.IsAny<TestUser>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+        _mockAuthService.Verify(s => s.GenerateTokensAsync(It.IsAny<TestUser>(), It.IsAny<bool>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -303,7 +304,7 @@ public class RefreshHandlerTests
                 Func<Task> act = async () => await _handler.HandleAsync(request, _httpContext, CancellationToken.None);
 
                 await act.Should().ThrowAsync<EmailNotVerifiedError>();
-            _mockAuthService.Verify(s => s.GenerateTokensAsync(It.IsAny<TestUser>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
+            _mockAuthService.Verify(s => s.GenerateTokensAsync(It.IsAny<TestUser>(), It.IsAny<bool>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Never);
         }
         finally
         {
@@ -376,7 +377,7 @@ public class RefreshHandlerTests
             .Returns(Task.CompletedTask);
 
         _mockAuthService
-            .Setup(s => s.GenerateTokensAsync(user, It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.GenerateTokensAsync(user, It.IsAny<bool>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .Callback(() => callSequence.Add("GenerateTokens"))
             .ReturnsAsync(authResult);
 
@@ -437,13 +438,13 @@ public class RefreshHandlerTests
             .Returns(Task.CompletedTask);
 
         _mockAuthService
-            .Setup(s => s.GenerateTokensAsync(user, It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.GenerateTokensAsync(user, It.IsAny<bool>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(authResult);
 
         var result = await _handler.HandleAsync(request, _httpContext, CancellationToken.None);
 
         result.Should().NotBeNull();
         _mockRefreshTokenRepository.Verify(r => r.ValidateAsync(refreshTokenHash, It.IsAny<CancellationToken>()), Times.Once);
-        _mockAuthService.Verify(s => s.GenerateTokensAsync(user, It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
+        _mockAuthService.Verify(s => s.GenerateTokensAsync(user, It.IsAny<bool>(), It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 }
