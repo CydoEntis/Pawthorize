@@ -9,7 +9,7 @@
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
   [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
 
-  **Latest:** v0.7.3 - Test fixes for enhanced session management
+  **Latest:** v0.7.4 - Remember Me functionality for session persistence
 
   [Quick Start](#quick-start) • [Features](#features) • [Documentation](#documentation) • [Examples](#examples) • [Troubleshooting](#troubleshooting)
 </div>
@@ -36,6 +36,7 @@ Pawthorize is a complete, production-ready authentication library for ASP.NET Co
 ### Core Authentication
 - ✅ **User Registration & Login** - Email/password with BCrypt hashing
 - ✅ **JWT Token Management** - Access + refresh tokens with automatic rotation
+- ✅ **Remember Me** - Configurable session persistence (v0.7.4+)
 - ✅ **Password Reset Flow** - Secure token-based password recovery
 - ✅ **Email Verification** - Optional email confirmation workflow
 - ✅ **Session Management** - View and revoke active sessions across devices
@@ -116,11 +117,12 @@ public class UserRepository : IUserRepository<User>
     public Task UpdateAsync(User user, CancellationToken ct) { /* ... */ }
 }
 
-// Refresh token storage (v0.7.2+: now includes device info and IP address)
+// Refresh token storage (v0.7.4+: includes device info, IP address, and remember me)
 public class RefreshTokenRepository : IRefreshTokenRepository
 {
     public Task StoreAsync(string tokenHash, string userId, DateTime expiresAt,
-        string? deviceInfo = null, string? ipAddress = null, CancellationToken ct = default) { /* ... */ }
+        string? deviceInfo = null, string? ipAddress = null,
+        bool isRememberedSession = false, CancellationToken ct = default) { /* ... */ }
     public Task<RefreshTokenInfo?> ValidateAsync(string tokenHash, CancellationToken ct) { /* ... */ }
     public Task RevokeAsync(string tokenHash, CancellationToken ct) { /* ... */ }
     public Task UpdateLastActivityAsync(string tokenHash, DateTime lastActivityAt, CancellationToken ct) { /* ... */ }
@@ -182,7 +184,9 @@ public class UserFactory : IUserFactory<User, RegisterRequest>
     "Issuer": "YourApp",
     "Audience": "YourApp.Users",
     "AccessTokenLifetimeMinutes": 15,
-    "RefreshTokenLifetimeDays": 7
+    "RefreshTokenLifetimeDaysRemembered": 30,
+    "RefreshTokenLifetimeHoursDefault": 24,
+    "UseSessionCookieWhenNotRemembered": false
   }
 }
 ```
@@ -480,6 +484,46 @@ builder.Services.AddScoped<IEmailSender, EmailSender>();
 builder.Services.AddScoped<IEmailVerificationService, EmailVerificationService>();
 ```
 
+### Remember Me (v0.7.4+)
+
+Pawthorize supports "Remember Me" functionality that allows users to choose between short-lived and extended sessions:
+
+```json
+POST /api/auth/login
+{
+  "email": "user@example.com",
+  "password": "Password123!",
+  "rememberMe": true
+}
+```
+
+**Session Lifetimes:**
+
+| Setting | Remember Me = false | Remember Me = true |
+|---------|---------------------|-------------------|
+| **Refresh Token** | 24 hours (default) | 30 days (default) |
+| **Cookie Type** | Session cookie* or short expiry | Persistent cookie |
+
+*When `UseSessionCookieWhenNotRemembered` is enabled
+
+**Configuration:**
+```json
+{
+  "Jwt": {
+    "RefreshTokenLifetimeDaysRemembered": 30,
+    "RefreshTokenLifetimeHoursDefault": 24,
+    "UseSessionCookieWhenNotRemembered": false
+  }
+}
+```
+
+**Behavior:**
+- Token refresh preserves the original `rememberMe` setting
+- Registration and OAuth logins default to `rememberMe: false`
+- Session list shows which sessions are "remembered"
+
+See [docs/REMEMBER_ME.md](docs/REMEMBER_ME.md) for detailed documentation.
+
 ### Session Management
 
 **New in v0.7.2:** Enhanced session tracking with device information, IP addresses, and per-session revocation.
@@ -498,10 +542,11 @@ Response:
     "deviceInfo": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)...",
     "ipAddress": "192.168.1.100",
     "createdAt": "2024-01-15T10:00:00Z",
-    "expiresAt": "2024-01-22T10:00:00Z",
+    "expiresAt": "2024-02-14T10:00:00Z",
     "lastActivityAt": "2024-01-15T10:30:00Z",
     "isExpired": false,
-    "isCurrentSession": true
+    "isCurrentSession": true,
+    "isRememberedSession": true
   },
   {
     "sessionId": "def456...",
@@ -509,10 +554,11 @@ Response:
     "deviceInfo": "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0)...",
     "ipAddress": "10.0.0.50",
     "createdAt": "2024-01-14T08:00:00Z",
-    "expiresAt": "2024-01-21T08:00:00Z",
+    "expiresAt": "2024-01-15T08:00:00Z",
     "lastActivityAt": "2024-01-14T09:15:00Z",
     "isExpired": false,
-    "isCurrentSession": false
+    "isCurrentSession": false,
+    "isRememberedSession": false
   }
 ]
 ```
@@ -526,6 +572,7 @@ Response:
 - `lastActivityAt` - Last time the session was used (updated on token refresh)
 - `isCurrentSession` - Boolean indicating if this is the current session
 - `isExpired` - Whether the session has expired
+- `isRememberedSession` - Whether this session used "Remember Me" (v0.7.4+)
 
 **Revoke all other sessions:**
 ```http
@@ -720,11 +767,11 @@ async function register(email, password, name) {
   localStorage.setItem('refreshToken', data.refreshToken);
 }
 
-async function login(email, password) {
+async function login(email, password, rememberMe = false) {
   const response = await fetch('/api/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password })
+    body: JSON.stringify({ email, password, rememberMe })
   });
 
   const data = await response.json();
@@ -761,11 +808,11 @@ async function refreshToken() {
 
 ```javascript
 // client.js - Hybrid mode (access token in body, refresh in cookie)
-async function login(email, password) {
+async function login(email, password, rememberMe = false) {
   const response = await fetch('/api/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, rememberMe }),
     credentials: 'include' // Important: Include cookies
   });
 
