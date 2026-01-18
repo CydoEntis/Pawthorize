@@ -9,7 +9,7 @@
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
   [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
 
-  **Latest:** v0.7.4 - Remember Me functionality for session persistence
+  **Latest:** v0.7.5 - OAuth provider configuration case-insensitivity fix
 
   [Quick Start](#quick-start) • [Features](#features) • [Documentation](#documentation) • [Examples](#examples) • [Troubleshooting](#troubleshooting)
 </div>
@@ -1029,6 +1029,11 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for a comprehensive debugging guide
   - Check `appsettings.json` - ensure `Enabled: true` and credentials are set
   - Verify `options.AddGoogle()` or `options.AddDiscord()` is called in `Program.cs`
   - Restart the application after config changes
+
+#### "The given key 'google' was not present in the dictionary" (Fixed in v0.7.5)
+- **Cause**: Prior to v0.7.5, there was a case-sensitivity mismatch between configuration keys and provider lookup
+- **Fix**: Upgrade to Pawthorize v0.7.5 or later
+- **Note**: As of v0.7.5, provider keys in `appsettings.json` are case-insensitive (`"Google"`, `"google"`, or `"GOOGLE"` all work)
 
 #### "Invalid state" or "State mismatch" error
 - **Cause**: OAuth state token expired or tampered with (CSRF protection)

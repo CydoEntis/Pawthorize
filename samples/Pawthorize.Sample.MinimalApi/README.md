@@ -1069,7 +1069,9 @@ Configuration in `appsettings.json`:
     "Issuer": "PawthorizeSample",
     "Audience": "PawthorizeSample",
     "AccessTokenLifetimeMinutes": 15,
-    "RefreshTokenLifetimeDays": 7
+    "RefreshTokenLifetimeDaysRemembered": 30,
+    "RefreshTokenLifetimeHoursDefault": 24,
+    "UseSessionCookieWhenNotRemembered": false
   }
 }
 ```
@@ -1089,7 +1091,8 @@ Configuration in `appsettings.json`:
 
 **JWT:**
 - `AccessTokenLifetimeMinutes`: `15` - Short-lived access tokens
-- `RefreshTokenLifetimeDays`: `7` - Long-lived refresh tokens
+- `RefreshTokenLifetimeDaysRemembered`: `30` - Refresh token lifetime when "Remember Me" is selected
+- `RefreshTokenLifetimeHoursDefault`: `24` - Refresh token lifetime for normal sessions
 
 **Password Policy (v0.7.0):**
 - `MinLength`: `8` - Minimum password length
