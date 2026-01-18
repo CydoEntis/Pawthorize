@@ -577,6 +577,20 @@ public static class ServiceCollectionExtensions
         {
             services.Configure<Configuration.OAuthOptions>(
                 options.Configuration.GetSection(Configuration.OAuthOptions.SectionName));
+
+            // Normalize provider dictionary keys to lowercase to ensure case-insensitive lookup
+            services.PostConfigure<Configuration.OAuthOptions>(opts =>
+            {
+                var normalizedProviders = new Dictionary<string, Configuration.OAuthProviderConfig>(
+                    StringComparer.OrdinalIgnoreCase);
+
+                foreach (var kvp in opts.Providers)
+                {
+                    normalizedProviders[kvp.Key.ToLowerInvariant()] = kvp.Value;
+                }
+
+                opts.Providers = normalizedProviders;
+            });
         }
 
         // Register HTTP client factory for OAuth providers
