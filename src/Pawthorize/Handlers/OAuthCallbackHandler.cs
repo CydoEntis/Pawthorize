@@ -103,21 +103,9 @@ public class OAuthCallbackHandler<TUser> where TUser : class, IAuthenticatedUser
 
         _logger.LogInformation("Successfully authenticated user via OAuth provider: {Provider}", provider);
 
-        // For OAuth callback, we redirect to returnUrl after setting tokens
-        if (_pawthorizeOptions.TokenDelivery == TokenDeliveryStrategy.ResponseBody)
+        // Set tokens in cookies (for Hybrid/HttpOnlyCookies modes)
+        if (_pawthorizeOptions.TokenDelivery != TokenDeliveryStrategy.ResponseBody)
         {
-            // Return tokens in response body
-            return TokenDeliveryHelper.DeliverTokens(
-                authResult,
-                context,
-                _pawthorizeOptions.TokenDelivery,
-                _pawthorizeOptions,
-                _csrfService,
-                _logger);
-        }
-        else
-        {
-            // Set tokens in cookies and redirect
             TokenDeliveryHelper.DeliverTokens(
                 authResult,
                 context,
@@ -125,8 +113,39 @@ public class OAuthCallbackHandler<TUser> where TUser : class, IAuthenticatedUser
                 _pawthorizeOptions,
                 _csrfService,
                 _logger);
-
-            return Results.Redirect(returnUrl);
         }
+
+        // Build redirect URL for frontend
+        var redirectUrl = BuildFrontendRedirectUrl(authResult, returnUrl);
+
+        _logger.LogInformation("Redirecting to frontend callback: {RedirectUrl}", redirectUrl);
+
+        return Results.Redirect(redirectUrl);
+    }
+
+    private string BuildFrontendRedirectUrl(AuthResult authResult, string returnUrl)
+    {
+        // Use FrontendCallbackUrl if configured, otherwise fall back to returnUrl
+        var baseUrl = _oauthOptions.FrontendCallbackUrl ?? returnUrl;
+
+        // For ResponseBody or Hybrid mode, include access token in URL for SPA consumption
+        if (_pawthorizeOptions.TokenDelivery == TokenDeliveryStrategy.ResponseBody ||
+            _pawthorizeOptions.TokenDelivery == TokenDeliveryStrategy.Hybrid)
+        {
+            var separator = baseUrl.Contains('?') ? "&" : "?";
+            var redirectUrl = $"{baseUrl}{separator}accessToken={Uri.EscapeDataString(authResult.AccessToken)}";
+
+            // Include returnUrl if FrontendCallbackUrl is used and returnUrl was provided
+            if (!string.IsNullOrEmpty(_oauthOptions.FrontendCallbackUrl) &&
+                !string.IsNullOrEmpty(returnUrl) && returnUrl != "/")
+            {
+                redirectUrl += $"&returnUrl={Uri.EscapeDataString(returnUrl)}";
+            }
+
+            return redirectUrl;
+        }
+
+        // For HttpOnlyCookies mode, just redirect (tokens are in cookies)
+        return baseUrl;
     }
 }

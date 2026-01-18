@@ -26,4 +26,11 @@ public class OAuthOptions
     /// Enable PKCE (Proof Key for Code Exchange) by default.
     /// </summary>
     public bool UsePkce { get; set; } = true;
+
+    /// <summary>
+    /// Frontend callback URL for SPA applications.
+    /// After OAuth authentication, users are redirected here with the access token as a query parameter.
+    /// Example: "http://localhost:3000/auth/callback" -> "http://localhost:3000/auth/callback?accessToken=..."
+    /// </summary>
+    public string? FrontendCallbackUrl { get; set; }
 }
