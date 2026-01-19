@@ -63,62 +63,99 @@ public class OAuthCallbackHandler<TUser> where TUser : class, IAuthenticatedUser
     {
         _logger.LogInformation("Received OAuth callback from provider: {Provider}", provider);
 
-        if (!string.IsNullOrEmpty(error))
+        try
         {
-            _logger.LogWarning("OAuth provider {Provider} returned error: {Error}, Description: {Description}",
-                provider, error, errorDescription);
-            throw new OAuthProviderError(provider, error, errorDescription);
-        }
+            // Handle errors from OAuth provider
+            if (!string.IsNullOrEmpty(error))
+            {
+                _logger.LogWarning("OAuth provider {Provider} returned error: {Error}, Description: {Description}",
+                    provider, error, errorDescription);
+                return RedirectWithError("oauth_denied", "Authentication was cancelled or denied.");
+            }
 
-        if (string.IsNullOrEmpty(code) || string.IsNullOrEmpty(state))
+            // Validate required parameters
+            if (string.IsNullOrEmpty(code) || string.IsNullOrEmpty(state))
+            {
+                _logger.LogWarning("OAuth callback missing required parameters: code={Code}, state={State}",
+                    string.IsNullOrEmpty(code) ? "missing" : "present",
+                    string.IsNullOrEmpty(state) ? "missing" : "present");
+                return RedirectWithError("oauth_failed", "Invalid authentication request. Please try again.");
+            }
+
+            var stateData = await _stateTokenService.ValidateAndConsumeStateTokenAsync(state, cancellationToken);
+
+            var oauthProvider = _providerFactory.GetProvider(provider);
+            var config = _oauthOptions.Providers[provider.ToLowerInvariant()];
+            var redirectUri = config.RedirectUri;
+
+            var tokenResponse = await oauthProvider.ExchangeCodeForTokenAsync(
+                code, redirectUri, stateData.CodeVerifier, cancellationToken);
+
+            var userInfo = await oauthProvider.GetUserInfoAsync(
+                tokenResponse.AccessToken, cancellationToken);
+
+            // Extract device and IP information for session tracking
+            var deviceInfo = context.Request.Headers.UserAgent.ToString();
+            var ipAddress = context.Connection.RemoteIpAddress?.ToString();
+
+            var authResult = await _externalAuthService.AuthenticateWithProviderAsync(
+                provider, userInfo, deviceInfo, ipAddress, cancellationToken);
+
+            var csrfToken = _csrfService.GenerateToken();
+
+            var returnUrl = stateData.ReturnUrl ?? "/";
+
+            _logger.LogInformation("Successfully authenticated user via OAuth provider: {Provider}", provider);
+
+            // Set tokens in cookies (for Hybrid/HttpOnlyCookies modes)
+            if (_pawthorizeOptions.TokenDelivery != TokenDeliveryStrategy.ResponseBody)
+            {
+                TokenDeliveryHelper.DeliverTokens(
+                    authResult,
+                    context,
+                    _pawthorizeOptions.TokenDelivery,
+                    _pawthorizeOptions,
+                    _csrfService,
+                    _logger);
+            }
+
+            // Build redirect URL for frontend
+            var redirectUrl = BuildFrontendRedirectUrl(authResult, returnUrl);
+
+            _logger.LogInformation("Redirecting to frontend callback: {RedirectUrl}", redirectUrl);
+
+            return Results.Redirect(redirectUrl);
+        }
+        catch (DuplicateEmailError ex)
         {
-            _logger.LogWarning("OAuth callback missing required parameters: code={Code}, state={State}",
-                string.IsNullOrEmpty(code) ? "missing" : "present",
-                string.IsNullOrEmpty(state) ? "missing" : "present");
-            throw new OAuthStateValidationError("Invalid OAuth callback: missing code or state parameter");
+            // Don't expose that the email exists - use generic message
+            _logger.LogWarning(ex, "OAuth failed: duplicate email for provider {Provider}", provider);
+            return RedirectWithError("oauth_failed", "Unable to complete sign in. Try logging in with your password instead.");
         }
-
-        var stateData = await _stateTokenService.ValidateAndConsumeStateTokenAsync(state, cancellationToken);
-
-        var oauthProvider = _providerFactory.GetProvider(provider);
-        var config = _oauthOptions.Providers[provider.ToLowerInvariant()];
-        var redirectUri = config.RedirectUri;
-
-        var tokenResponse = await oauthProvider.ExchangeCodeForTokenAsync(
-            code, redirectUri, stateData.CodeVerifier, cancellationToken);
-
-        var userInfo = await oauthProvider.GetUserInfoAsync(
-            tokenResponse.AccessToken, cancellationToken);
-
-        // Extract device and IP information for session tracking
-        var deviceInfo = context.Request.Headers.UserAgent.ToString();
-        var ipAddress = context.Connection.RemoteIpAddress?.ToString();
-
-        var authResult = await _externalAuthService.AuthenticateWithProviderAsync(
-            provider, userInfo, deviceInfo, ipAddress, cancellationToken);
-
-        var csrfToken = _csrfService.GenerateToken();
-
-        var returnUrl = stateData.ReturnUrl ?? "/";
-
-        _logger.LogInformation("Successfully authenticated user via OAuth provider: {Provider}", provider);
-
-        // Set tokens in cookies (for Hybrid/HttpOnlyCookies modes)
-        if (_pawthorizeOptions.TokenDelivery != TokenDeliveryStrategy.ResponseBody)
+        catch (OAuthStateValidationError ex)
         {
-            TokenDeliveryHelper.DeliverTokens(
-                authResult,
-                context,
-                _pawthorizeOptions.TokenDelivery,
-                _pawthorizeOptions,
-                _csrfService,
-                _logger);
+            _logger.LogWarning(ex, "OAuth state validation failed for provider {Provider}", provider);
+            return RedirectWithError("oauth_failed", "Authentication session expired. Please try again.");
         }
+        catch (OAuthError ex)
+        {
+            _logger.LogWarning(ex, "OAuth error for provider {Provider}: {Message}", provider, ex.Message);
+            return RedirectWithError("oauth_failed", "Authentication failed. Please try again.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error during OAuth callback for provider {Provider}", provider);
+            return RedirectWithError("oauth_failed", "An unexpected error occurred. Please try again.");
+        }
+    }
 
-        // Build redirect URL for frontend
-        var redirectUrl = BuildFrontendRedirectUrl(authResult, returnUrl);
+    private IResult RedirectWithError(string error, string description)
+    {
+        var baseUrl = _oauthOptions.FrontendCallbackUrl ?? "/";
+        var separator = baseUrl.Contains('?') ? "&" : "?";
+        var redirectUrl = $"{baseUrl}{separator}error={Uri.EscapeDataString(error)}&error_description={Uri.EscapeDataString(description)}";
 
-        _logger.LogInformation("Redirecting to frontend callback: {RedirectUrl}", redirectUrl);
+        _logger.LogInformation("Redirecting to frontend with error: {RedirectUrl}", redirectUrl);
 
         return Results.Redirect(redirectUrl);
     }
