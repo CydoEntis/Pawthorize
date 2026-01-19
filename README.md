@@ -9,7 +9,7 @@
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
   [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
 
-  **Latest:** v0.7.6 - OAuth frontend callback with access token support
+  **Latest:** v0.7.7 - OAuth error handling with frontend redirects
 
   [Quick Start](#quick-start) • [Features](#features) • [Documentation](#documentation) • [Examples](#examples) • [Troubleshooting](#troubleshooting)
 </div>
@@ -864,22 +864,103 @@ async function refreshAccessToken() {
 
 ### Example 3: OAuth Social Login
 
+**Configuration (appsettings.json):**
+```json
+{
+  "Pawthorize": {
+    "TokenDelivery": "Hybrid",
+    "OAuth": {
+      "FrontendCallbackUrl": "http://localhost:3000/auth/callback",
+      "Providers": {
+        "Google": {
+          "Enabled": true,
+          "ClientId": "YOUR_CLIENT_ID",
+          "ClientSecret": "YOUR_CLIENT_SECRET",
+          "RedirectUri": "http://localhost:5000/api/auth/oauth/google/callback"
+        }
+      }
+    }
+  }
+}
+```
+
+**Login Page:**
 ```html
-<!-- Login page -->
 <button onclick="loginWithGoogle()">Sign in with Google</button>
 <button onclick="loginWithDiscord()">Sign in with Discord</button>
 
 <script>
 function loginWithGoogle() {
-  // Redirect to OAuth initiation endpoint
   window.location.href = '/api/auth/oauth/google?returnUrl=/dashboard';
 }
 
 function loginWithDiscord() {
   window.location.href = '/api/auth/oauth/discord?returnUrl=/dashboard';
 }
+</script>
+```
 
-// Link OAuth provider to existing account (user must be logged in)
+**OAuth Callback Page (v0.7.7+):**
+
+After OAuth, users are redirected to your `FrontendCallbackUrl` with either:
+- Success: `?accessToken=eyJ...&returnUrl=/dashboard`
+- Error: `?error=oauth_failed&error_description=Unable+to+complete+sign+in`
+
+```typescript
+// auth/callback.tsx (React example)
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+
+export function OAuthCallback() {
+  const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const accessToken = params.get('accessToken');
+    const returnUrl = params.get('returnUrl') || '/dashboard';
+    const errorParam = params.get('error');
+    const errorDescription = params.get('error_description');
+
+    // Handle error
+    if (errorParam) {
+      setError(errorDescription || 'Authentication failed');
+      return;
+    }
+
+    // Handle success
+    if (accessToken) {
+      localStorage.setItem('accessToken', accessToken);
+      navigate(returnUrl);
+      return;
+    }
+
+    setError('No authentication data received');
+  }, [navigate]);
+
+  if (error) {
+    return (
+      <div>
+        <h1>Authentication Failed</h1>
+        <p>{error}</p>
+        <a href="/login">Try again</a>
+      </div>
+    );
+  }
+
+  return <div>Completing sign in...</div>;
+}
+```
+
+**Error Codes:**
+
+| Error | Description |
+|-------|-------------|
+| `oauth_denied` | User cancelled or denied authentication |
+| `oauth_failed` | Authentication failed (expired session, account conflict, etc.) |
+
+**Link OAuth to Existing Account:**
+```javascript
 async function linkGoogleAccount() {
   const response = await fetch('/api/auth/oauth/google/link', {
     method: 'POST',
@@ -892,14 +973,9 @@ async function linkGoogleAccount() {
 
   const data = await response.json();
   if (data.authUrl) {
-    // Redirect to OAuth provider
     window.location.href = data.authUrl;
   }
 }
-
-// After OAuth callback, tokens are set via cookies or returned in URL
-// User is redirected to /dashboard
-</script>
 ```
 
 ### Example 4: Direct Handler Usage (Maximum Control)
