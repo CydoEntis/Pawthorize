@@ -223,6 +223,23 @@ public static class WebApplicationExtensions
             changePasswordEndpoint.RequireRateLimiting("pawthorize-global");
         }
 
+        var setPasswordEndpoint = group.MapPost(options.SetPasswordPath, async (
+                SetPasswordRequest request,
+                SetPasswordHandler<TUser> handler,
+                HttpContext context,
+                CancellationToken ct) =>
+            {
+                return await handler.HandleAsync(request, context, ct);
+            })
+            .WithName("SetPassword")
+            .RequireAuthorization()
+            .WithOpenApi();
+
+        if (isRateLimitingEnabled)
+        {
+            setPasswordEndpoint.RequireRateLimiting("pawthorize-global");
+        }
+
         var verifyEmailEndpoint = group.MapPost(options.VerifyEmailPath, async (
                 VerifyEmailRequest request,
                 VerifyEmailHandler<TUser> handler,
@@ -329,16 +346,15 @@ public static class WebApplicationExtensions
                 oauthCallbackEndpoint.RequireRateLimiting("pawthorize-oauth");
             }
 
-            // Link Provider - Link OAuth provider to authenticated user
+            // Link Provider - Initiate OAuth flow to link provider to authenticated user
             var linkProviderEndpoint = group.MapPost(options.OAuthLinkPath, async (
                     string provider,
-                    string code,
-                    string state,
+                    string? returnUrl,
                     Handlers.LinkProviderHandler<TUser> handler,
                     HttpContext context,
                     CancellationToken ct) =>
                 {
-                    return await handler.HandleAsync(provider, code, state, context, ct);
+                    return await handler.HandleAsync(provider, returnUrl, context, ct);
                 })
                 .WithName("LinkOAuthProvider")
                 .RequireAuthorization()
@@ -434,16 +450,15 @@ public static class WebApplicationExtensions
             .WithName("OAuthCallback")
             .WithOpenApi();
 
-        // Link Provider - Link OAuth provider to authenticated user
+        // Link Provider - Initiate OAuth flow to link provider to authenticated user
         group.MapPost(options.OAuthLinkPath, async (
                 string provider,
-                string code,
-                string state,
+                string? returnUrl,
                 Handlers.LinkProviderHandler<TUser> handler,
                 HttpContext context,
                 CancellationToken ct) =>
             {
-                return await handler.HandleAsync(provider, code, state, context, ct);
+                return await handler.HandleAsync(provider, returnUrl, context, ct);
             })
             .WithName("LinkOAuthProvider")
             .RequireAuthorization()
@@ -640,6 +655,14 @@ public class PawthorizeEndpointOptions
     /// Full path: {BasePath}/change-password
     /// </summary>
     public string ChangePasswordPath { get; set; } = "/change-password";
+
+    /// <summary>
+    /// Path for set password endpoint (relative to BasePath).
+    /// For OAuth-only users to set their initial password.
+    /// Default: "/set-password"
+    /// Full path: {BasePath}/set-password
+    /// </summary>
+    public string SetPasswordPath { get; set; } = "/set-password";
 
     /// <summary>
     /// Path for verify email endpoint (relative to BasePath).
