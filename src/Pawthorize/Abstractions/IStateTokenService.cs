@@ -12,11 +12,15 @@ public interface IStateTokenService
     /// </summary>
     /// <param name="returnUrl">Optional URL to redirect to after OAuth.</param>
     /// <param name="codeVerifier">Optional PKCE code verifier.</param>
+    /// <param name="action">The action type: "login" (default) or "link".</param>
+    /// <param name="userId">The user ID for link actions.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>The generated state token string.</returns>
     Task<string> GenerateStateTokenAsync(
         string? returnUrl = null,
         string? codeVerifier = null,
+        string action = "login",
+        string? userId = null,
         CancellationToken cancellationToken = default);
 
     /// <summary>

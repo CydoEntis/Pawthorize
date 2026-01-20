@@ -31,13 +31,15 @@ public class StateTokenService<TStateToken> : IStateTokenService
     public async Task<string> GenerateStateTokenAsync(
         string? returnUrl = null,
         string? codeVerifier = null,
+        string action = "login",
+        string? userId = null,
         CancellationToken cancellationToken = default)
     {
         var token = GenerateCryptographicToken(32);
         var createdAt = DateTime.UtcNow;
         var expiresAt = createdAt.AddMinutes(_oauthOptions.StateTokenExpirationMinutes);
 
-        _logger.LogDebug("Generating OAuth state token, expires at {ExpiresAt}", expiresAt);
+        _logger.LogDebug("Generating OAuth state token for action {Action}, expires at {ExpiresAt}", action, expiresAt);
 
         // Create state token using object initializer with casting to access setters
         var stateToken = (TStateToken)Activator.CreateInstance(typeof(TStateToken))!;
@@ -48,10 +50,12 @@ public class StateTokenService<TStateToken> : IStateTokenService
         stateTokenType.GetProperty(nameof(IStateToken.CodeVerifier))?.SetValue(stateToken, codeVerifier);
         stateTokenType.GetProperty(nameof(IStateToken.CreatedAt))?.SetValue(stateToken, createdAt);
         stateTokenType.GetProperty(nameof(IStateToken.ExpiresAt))?.SetValue(stateToken, expiresAt);
+        stateTokenType.GetProperty(nameof(IStateToken.Action))?.SetValue(stateToken, action);
+        stateTokenType.GetProperty(nameof(IStateToken.UserId))?.SetValue(stateToken, userId);
 
         await _stateTokenRepository.CreateAsync(stateToken, cancellationToken);
 
-        _logger.LogInformation("Generated and stored OAuth state token");
+        _logger.LogInformation("Generated and stored OAuth state token for action {Action}", action);
 
         return token;
     }
@@ -98,7 +102,9 @@ public class StateTokenService<TStateToken> : IStateTokenService
             Token = stateToken.Token,
             ReturnUrl = stateToken.ReturnUrl,
             CodeVerifier = stateToken.CodeVerifier,
-            ExpiresAt = stateToken.ExpiresAt
+            ExpiresAt = stateToken.ExpiresAt,
+            Action = stateToken.Action,
+            UserId = stateToken.UserId
         };
     }
 

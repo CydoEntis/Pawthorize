@@ -13,4 +13,6 @@ internal class InternalStateToken : IStateToken
     public string? CodeVerifier { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime ExpiresAt { get; set; }
+    public string Action { get; set; } = "login";
+    public string? UserId { get; set; }
 }
