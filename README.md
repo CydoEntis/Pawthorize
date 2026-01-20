@@ -9,7 +9,7 @@
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
   [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
 
-  **Latest:** v0.7.7 - OAuth error handling with frontend redirects
+  **Latest:** v0.7.8 - CSRF token included in OAuth callback URL
 
   [Quick Start](#quick-start) • [Features](#features) • [Documentation](#documentation) • [Examples](#examples) • [Troubleshooting](#troubleshooting)
 </div>
@@ -900,10 +900,10 @@ function loginWithDiscord() {
 </script>
 ```
 
-**OAuth Callback Page (v0.7.7+):**
+**OAuth Callback Page (v0.7.8+):**
 
 After OAuth, users are redirected to your `FrontendCallbackUrl` with either:
-- Success: `?accessToken=eyJ...&returnUrl=/dashboard`
+- Success: `?accessToken=eyJ...&csrfToken=abc123&returnUrl=/dashboard`
 - Error: `?error=oauth_failed&error_description=Unable+to+complete+sign+in`
 
 ```typescript
@@ -918,6 +918,7 @@ export function OAuthCallback() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const accessToken = params.get('accessToken');
+    const csrfToken = params.get('csrfToken');
     const returnUrl = params.get('returnUrl') || '/dashboard';
     const errorParam = params.get('error');
     const errorDescription = params.get('error_description');
@@ -931,6 +932,15 @@ export function OAuthCallback() {
     // Handle success
     if (accessToken) {
       localStorage.setItem('accessToken', accessToken);
+
+      // Store CSRF token for subsequent state-changing requests (v0.7.8+)
+      if (csrfToken) {
+        localStorage.setItem('csrfToken', csrfToken);
+      }
+
+      // Clean up URL (remove tokens from browser history)
+      window.history.replaceState({}, '', window.location.pathname);
+
       navigate(returnUrl);
       return;
     }
@@ -1084,6 +1094,7 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for a comprehensive debugging guide
 - **Cause**: Missing or incorrect CSRF token in request
 - **Fix**: Include `X-XSRF-TOKEN` header with token from login response
 - **Fix**: Ensure `credentials: 'include'` in fetch requests
+- **Fix (OAuth)**: As of v0.7.8, the CSRF token is included in the OAuth callback URL as `csrfToken` parameter. Store it in localStorage after OAuth login.
 
 #### "Duplicate email error" during OAuth
 - **Cause**: Email from OAuth provider already exists in database with password-based account
