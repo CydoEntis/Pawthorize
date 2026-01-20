@@ -101,7 +101,10 @@ public class OAuthCallbackHandler<TUser> where TUser : class, IAuthenticatedUser
             var authResult = await _externalAuthService.AuthenticateWithProviderAsync(
                 provider, userInfo, deviceInfo, ipAddress, cancellationToken);
 
-            var csrfToken = _csrfService.GenerateToken();
+            // Generate CSRF token for the session - this same token will be:
+            // 1. Set in the CSRF cookie (via DeliverTokens)
+            // 2. Included in the redirect URL (so frontend can store it for subsequent requests)
+            var csrfToken = _pawthorizeOptions.Csrf.Enabled ? _csrfService.GenerateToken() : null;
 
             var returnUrl = stateData.ReturnUrl ?? "/";
 
@@ -116,11 +119,12 @@ public class OAuthCallbackHandler<TUser> where TUser : class, IAuthenticatedUser
                     _pawthorizeOptions.TokenDelivery,
                     _pawthorizeOptions,
                     _csrfService,
-                    _logger);
+                    _logger,
+                    csrfToken);
             }
 
-            // Build redirect URL for frontend
-            var redirectUrl = BuildFrontendRedirectUrl(authResult, returnUrl);
+            // Build redirect URL for frontend (includes CSRF token so frontend can store it)
+            var redirectUrl = BuildFrontendRedirectUrl(authResult, returnUrl, csrfToken);
 
             _logger.LogInformation("Redirecting to frontend callback: {RedirectUrl}", redirectUrl);
 
@@ -160,7 +164,7 @@ public class OAuthCallbackHandler<TUser> where TUser : class, IAuthenticatedUser
         return Results.Redirect(redirectUrl);
     }
 
-    private string BuildFrontendRedirectUrl(AuthResult authResult, string returnUrl)
+    private string BuildFrontendRedirectUrl(AuthResult authResult, string returnUrl, string? csrfToken)
     {
         // Use FrontendCallbackUrl if configured, otherwise fall back to returnUrl
         var baseUrl = _oauthOptions.FrontendCallbackUrl ?? returnUrl;
@@ -172,6 +176,14 @@ public class OAuthCallbackHandler<TUser> where TUser : class, IAuthenticatedUser
             var separator = baseUrl.Contains('?') ? "&" : "?";
             var redirectUrl = $"{baseUrl}{separator}accessToken={Uri.EscapeDataString(authResult.AccessToken)}";
 
+            // Include CSRF token so frontend can store it for subsequent state-changing requests
+            // This is necessary because the CSRF cookie is set on the API domain and cannot be
+            // read by JavaScript on a different frontend domain (cross-origin cookie restrictions)
+            if (!string.IsNullOrEmpty(csrfToken))
+            {
+                redirectUrl += $"&csrfToken={Uri.EscapeDataString(csrfToken)}";
+            }
+
             // Include returnUrl if FrontendCallbackUrl is used and returnUrl was provided
             if (!string.IsNullOrEmpty(_oauthOptions.FrontendCallbackUrl) &&
                 !string.IsNullOrEmpty(returnUrl) && returnUrl != "/")
@@ -182,7 +194,14 @@ public class OAuthCallbackHandler<TUser> where TUser : class, IAuthenticatedUser
             return redirectUrl;
         }
 
-        // For HttpOnlyCookies mode, just redirect (tokens are in cookies)
+        // For HttpOnlyCookies mode, include CSRF token in URL if enabled
+        // (tokens are in cookies, but frontend still needs CSRF token for making requests)
+        if (!string.IsNullOrEmpty(csrfToken))
+        {
+            var separator = baseUrl.Contains('?') ? "&" : "?";
+            return $"{baseUrl}{separator}csrfToken={Uri.EscapeDataString(csrfToken)}";
+        }
+
         return baseUrl;
     }
 }

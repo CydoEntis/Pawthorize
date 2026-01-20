@@ -21,6 +21,7 @@ public static class TokenDeliveryHelper
     /// <param name="options">Pawthorize options for CSRF configuration</param>
     /// <param name="csrfService">CSRF token service for generating tokens</param>
     /// <param name="logger">Optional logger for debugging and monitoring</param>
+    /// <param name="csrfToken">Optional pre-generated CSRF token. If not provided, one will be generated.</param>
     /// <returns>IResult that will be wrapped by SuccessHound middleware</returns>
     public static IResult DeliverTokens(
         AuthResult authResult,
@@ -28,7 +29,8 @@ public static class TokenDeliveryHelper
         TokenDeliveryStrategy strategy,
         PawthorizeOptions options,
         CsrfTokenService? csrfService = null,
-        ILogger? logger = null)
+        ILogger? logger = null,
+        string? csrfToken = null)
     {
         logger?.LogDebug("Delivering tokens using strategy: {Strategy}", strategy);
 
@@ -37,8 +39,8 @@ public static class TokenDeliveryHelper
             var result = strategy switch
             {
                 TokenDeliveryStrategy.ResponseBody => DeliverInBody(authResult, httpContext, logger),
-                TokenDeliveryStrategy.HttpOnlyCookies => DeliverInCookies(authResult, httpContext, options, csrfService, logger),
-                TokenDeliveryStrategy.Hybrid => DeliverHybrid(authResult, httpContext, options, csrfService, logger),
+                TokenDeliveryStrategy.HttpOnlyCookies => DeliverInCookies(authResult, httpContext, options, csrfService, logger, csrfToken),
+                TokenDeliveryStrategy.Hybrid => DeliverHybrid(authResult, httpContext, options, csrfService, logger, csrfToken),
                 _ => throw new InvalidOperationException($"Unknown token delivery strategy: {strategy}")
             };
 
@@ -71,7 +73,8 @@ public static class TokenDeliveryHelper
         HttpContext httpContext,
         PawthorizeOptions options,
         CsrfTokenService? csrfService,
-        ILogger? logger)
+        ILogger? logger,
+        string? csrfToken = null)
     {
         logger?.LogDebug("Delivering access and refresh tokens in HttpOnly cookies, RememberMe: {RememberMe}", authResult.IsRememberedSession);
 
@@ -82,7 +85,7 @@ public static class TokenDeliveryHelper
         SetRefreshTokenCookie(httpContext, authResult.RefreshToken!, authResult.RefreshTokenExpiresAt, useSessionCookie, logger);
 
         // Set CSRF token if enabled (match session cookie behavior)
-        SetCsrfToken(httpContext, options, csrfService, useSessionCookie, logger);
+        SetCsrfToken(httpContext, options, csrfService, useSessionCookie, logger, csrfToken);
 
         logger?.LogDebug("Both tokens set in HttpOnly cookies");
 
@@ -98,7 +101,8 @@ public static class TokenDeliveryHelper
         HttpContext httpContext,
         PawthorizeOptions options,
         CsrfTokenService? csrfService,
-        ILogger? logger)
+        ILogger? logger,
+        string? csrfToken = null)
     {
         logger?.LogDebug("Delivering tokens in hybrid mode (access token in body, refresh token in cookie), RememberMe: {RememberMe}", authResult.IsRememberedSession);
 
@@ -107,7 +111,7 @@ public static class TokenDeliveryHelper
         SetRefreshTokenCookie(httpContext, authResult.RefreshToken!, authResult.RefreshTokenExpiresAt, useSessionCookie, logger);
 
         // Set CSRF token if enabled (match session cookie behavior)
-        SetCsrfToken(httpContext, options, csrfService, useSessionCookie, logger);
+        SetCsrfToken(httpContext, options, csrfService, useSessionCookie, logger, csrfToken);
 
         var hybridResult = new AuthResult
         {
@@ -184,23 +188,27 @@ public static class TokenDeliveryHelper
     /// <param name="csrfService">CSRF token service</param>
     /// <param name="useSessionCookie">Whether to use session cookie (matches refresh token behavior)</param>
     /// <param name="logger">Optional logger</param>
+    /// <param name="preGeneratedToken">Optional pre-generated CSRF token. If not provided, one will be generated.</param>
     private static void SetCsrfToken(
         HttpContext context,
         PawthorizeOptions options,
         CsrfTokenService? csrfService,
         bool useSessionCookie,
-        ILogger? logger)
+        ILogger? logger,
+        string? preGeneratedToken = null)
     {
-        // Skip if CSRF is disabled or service not provided
-        if (!options.Csrf.Enabled || csrfService == null)
+        // Skip if CSRF is disabled or service not provided (unless we have a pre-generated token)
+        if (!options.Csrf.Enabled || (csrfService == null && preGeneratedToken == null))
         {
             logger?.LogDebug("CSRF protection is disabled or service not available, skipping CSRF token");
             return;
         }
 
-        logger?.LogDebug("Generating and setting CSRF token, SessionCookie: {UseSessionCookie}", useSessionCookie);
+        logger?.LogDebug("Setting CSRF token, SessionCookie: {UseSessionCookie}, PreGenerated: {IsPreGenerated}",
+            useSessionCookie, preGeneratedToken != null);
 
-        var csrfToken = csrfService.GenerateToken();
+        // Use pre-generated token if provided, otherwise generate a new one
+        var csrfToken = preGeneratedToken ?? csrfService!.GenerateToken();
 
         var cookieOptions = new CookieOptions
         {
