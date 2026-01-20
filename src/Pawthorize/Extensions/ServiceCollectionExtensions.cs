@@ -360,6 +360,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ForgotPasswordHandler<TUser>>();
         services.AddScoped<ResetPasswordHandler<TUser>>();
         services.AddScoped<ChangePasswordHandler<TUser>>();
+        services.AddScoped<SetPasswordHandler<TUser>>();
         services.AddScoped<VerifyEmailHandler<TUser>>();
         services.AddScoped<GetCurrentUserHandler<TUser>>();
         services.AddScoped<GetActiveSessionsHandler<TUser>>();
@@ -379,6 +380,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IValidator<ForgotPasswordRequest>, ForgotPasswordRequestValidator>();
         services.AddScoped<IValidator<ResetPasswordRequest>, ResetPasswordRequestValidator>();
         services.AddScoped<IValidator<ChangePasswordRequest>, ChangePasswordRequestValidator>();
+        services.AddScoped<IValidator<SetPasswordRequest>, SetPasswordRequestValidator>();
         services.AddScoped<IValidator<VerifyEmailRequest>, VerifyEmailRequestValidator>();
         services.AddScoped<IValidator<RevokeAllOtherSessionsRequest>, RevokeAllOtherSessionsRequestValidator>();
 
