@@ -9,7 +9,7 @@
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
   [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
 
-  **Latest:** v0.7.8 - CSRF token included in OAuth callback URL
+  **Latest:** v0.7.9 - Set password for OAuth users, fixed link provider flow
 
   [Quick Start](#quick-start) • [Features](#features) • [Documentation](#documentation) • [Examples](#examples) • [Troubleshooting](#troubleshooting)
 </div>
@@ -227,7 +227,8 @@ app.Run();
 - `POST /api/auth/forgot-password` - Request password reset
 - `POST /api/auth/reset-password` - Reset password with token
 - `POST /api/auth/change-password` - Change password (requires auth)
-- `GET /api/auth/me` - Get current user info
+- `POST /api/auth/set-password` - Set password for OAuth-only users (v0.7.9+)
+- `GET /api/auth/me` - Get current user info (includes `hasPassword` v0.7.9+)
 - `GET /api/auth/sessions` - Get active sessions with device info (v0.7.2+)
 - `POST /api/auth/sessions/revoke-others` - Revoke other sessions
 - `POST /api/auth/sessions/revoke` - Revoke specific session (v0.7.2+)
@@ -523,6 +524,62 @@ POST /api/auth/login
 - Session list shows which sessions are "remembered"
 
 See [docs/REMEMBER_ME.md](docs/REMEMBER_ME.md) for detailed documentation.
+
+### Set Password for OAuth Users (v0.7.9+)
+
+Users who registered via OAuth (Google, Discord, etc.) can now set a password to enable email/password login:
+
+**Check if user has a password:**
+```http
+GET /api/auth/me
+Authorization: Bearer {accessToken}
+
+Response:
+{
+  "id": "user-123",
+  "email": "user@example.com",
+  "name": "John Doe",
+  "roles": ["User"],
+  "isEmailVerified": true,
+  "hasPassword": false  // NEW in v0.7.9
+}
+```
+
+**Set password (OAuth-only users):**
+```http
+POST /api/auth/set-password
+Authorization: Bearer {accessToken}
+Content-Type: application/json
+
+{
+  "newPassword": "SecurePassword123!",
+  "confirmPassword": "SecurePassword123!"
+}
+
+Response:
+{
+  "success": true,
+  "data": {
+    "message": "Password set successfully. You can now log in with email and password."
+  }
+}
+```
+
+**Error responses:**
+- `400 PASSWORD_ALREADY_SET` - User already has a password (use `/change-password` instead)
+- `400 VALIDATION` - Password doesn't meet policy or passwords don't match
+
+**Frontend integration:**
+```javascript
+// Check if user needs to set password
+const { hasPassword } = await fetch('/api/auth/me', {
+  headers: { 'Authorization': `Bearer ${token}` }
+}).then(r => r.json());
+
+if (!hasPassword) {
+  // Show "Set Password" form instead of "Change Password" form
+}
+```
 
 ### Session Management
 
@@ -1156,9 +1213,10 @@ See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for a comprehensive debugging guide
 #### Cannot unlink last OAuth provider
 - **Cause**: User has no password and trying to unlink their only login method
 - **Fix**:
-  - Require user to set a password first using `/api/auth/change-password`
+  - Require user to set a password first using `/api/auth/set-password` (v0.7.9+)
   - Or link another OAuth provider before unlinking
   - This prevents account lockout
+- **Note**: Use `/api/auth/me` to check `hasPassword` field before showing unlink option
 
 ### Error Response Format
 

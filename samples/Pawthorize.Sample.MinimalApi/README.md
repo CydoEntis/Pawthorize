@@ -8,6 +8,8 @@ A complete **production-ready reference implementation** demonstrating **Pawthor
 - ✅ **Built-in CSRF Protection** - Automatic token generation and validation
 - ✅ **Enhanced Session Management** - Device tracking, IP addresses, per-session revocation (v0.7.2)
 - ✅ **Detailed Validation Errors** - Field-level error reporting (v0.7.2)
+- ✅ **Set Password for OAuth Users** - OAuth-only users can add password login (v0.7.9)
+- ✅ **hasPassword Field** - Check if user has password set via /me endpoint (v0.7.9)
 - ✅ **Password Policy Enforcement** - Configurable password strength requirements (v0.7.0)
 - ✅ **Account Lockout Protection** - Brute force protection with failed attempt tracking (v0.7.0)
 - ✅ **Built-in Rate Limiting** - IP-based rate limiting for all endpoints (v0.7.0)
@@ -273,12 +275,15 @@ Authorization: Bearer <access_token>
     "id": "user-id-123",
     "email": "user@example.com",
     "name": "John Doe",
-    "isEmailVerified": false
+    "isEmailVerified": false,
+    "hasPassword": true
   }
 }
 ```
 
-**Note:** GET requests don't require CSRF token.
+**Note:**
+- GET requests don't require CSRF token.
+- `hasPassword` (v0.7.9+): `true` if user registered with email/password, `false` if OAuth-only.
 
 ---
 
@@ -343,6 +348,52 @@ X-XSRF-TOKEN: <csrf_token>
   "confirmPassword": "NewSecureP@ssw0rd"
 }
 ```
+
+---
+
+#### 5b. Set Password (v0.7.9+)
+
+**POST** `/auth/set-password`
+
+Set password for OAuth-only users who don't have a password yet.
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+X-XSRF-TOKEN: <csrf_token>
+```
+
+**Request:**
+```json
+{
+  "newPassword": "SecureP@ssw0rd",
+  "confirmPassword": "SecureP@ssw0rd"
+}
+```
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "message": "Password set successfully. You can now log in with email and password."
+  }
+}
+```
+
+**Error Response (400 Bad Request) - Password Already Set:**
+```json
+{
+  "success": false,
+  "error": {
+    "code": "PASSWORD_ALREADY_SET",
+    "message": "Password is already set. Use change-password endpoint instead.",
+    "details": null
+  }
+}
+```
+
+**Note:** This endpoint is for users who registered via OAuth and have no password. Users with existing passwords should use `/auth/change-password` instead.
 
 ---
 
