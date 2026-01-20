@@ -59,7 +59,7 @@ public class OAuthInitiateHandler
         }
 
         var stateToken = await _stateTokenService.GenerateStateTokenAsync(
-            returnUrl, codeVerifier, cancellationToken);
+            returnUrl, codeVerifier, cancellationToken: cancellationToken);
 
         var authorizationUrl = await oauthProvider.GetAuthorizationUrlAsync(
             stateToken, redirectUri, codeChallenge, cancellationToken);
