@@ -70,6 +70,7 @@ public class GetCurrentUserHandler<TUser> where TUser : IAuthenticatedUser
                 Name = user.Name,
                 Roles = user.Roles,
                 IsEmailVerified = user.IsEmailVerified,
+                HasPassword = !string.IsNullOrEmpty(user.PasswordHash),
                 AdditionalClaims = user.AdditionalClaims
             };
 
