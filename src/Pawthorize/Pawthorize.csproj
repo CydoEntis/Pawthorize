@@ -2,7 +2,7 @@
     <PropertyGroup>
         <TargetFramework>net8.0</TargetFramework>
         <PackageId>Pawthorize</PackageId>
-        <Version>0.7.7</Version>
+        <Version>0.7.8</Version>
         <Authors>Cydo Entis</Authors>
         <Description>Modern authentication library for ASP.NET Core - simple, secure, and production-ready. Email-based authentication with JWT tokens, OAuth 2.0 social login (Google, Discord), refresh token rotation, CSRF protection, password reset, email verification, and enhanced session management with device tracking. Detailed validation error reporting. ALPHA: Under active development.</Description>
         <PackageTags>authentication;aspnetcore;jwt;minimal-api;oauth;oauth2;google;discord;social-login;password;security;sessions;csrf;authorization;email-auth</PackageTags>
