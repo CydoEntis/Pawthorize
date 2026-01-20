@@ -94,6 +94,12 @@ public class OAuthCallbackHandler<TUser> where TUser : class, IAuthenticatedUser
             var userInfo = await oauthProvider.GetUserInfoAsync(
                 tokenResponse.AccessToken, cancellationToken);
 
+            // Check if this is a "link" action (linking provider to existing account)
+            if (stateData.Action == "link" && !string.IsNullOrEmpty(stateData.UserId))
+            {
+                return await HandleLinkActionAsync(provider, userInfo, stateData, cancellationToken);
+            }
+
             // Extract device and IP information for session tracking
             var deviceInfo = context.Request.Headers.UserAgent.ToString();
             var ipAddress = context.Connection.RemoteIpAddress?.ToString();
@@ -150,6 +156,53 @@ public class OAuthCallbackHandler<TUser> where TUser : class, IAuthenticatedUser
         {
             _logger.LogError(ex, "Unexpected error during OAuth callback for provider {Provider}", provider);
             return RedirectWithError("oauth_failed", "An unexpected error occurred. Please try again.");
+        }
+    }
+
+    /// <summary>
+    /// Handle the link action - link provider to existing user account.
+    /// </summary>
+    private async Task<IResult> HandleLinkActionAsync(
+        string provider,
+        ExternalUserInfo userInfo,
+        StateTokenData stateData,
+        CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("Handling link action for provider {Provider} to user {UserId}",
+            provider, stateData.UserId);
+
+        try
+        {
+            await _externalAuthService.LinkProviderToUserAsync(
+                stateData.UserId!, provider, userInfo, cancellationToken);
+
+            _logger.LogInformation("Successfully linked provider {Provider} to user {UserId}",
+                provider, stateData.UserId);
+
+            // Redirect to frontend with success
+            var returnUrl = stateData.ReturnUrl ?? "/";
+            var baseUrl = _oauthOptions.FrontendCallbackUrl ?? returnUrl;
+            var separator = baseUrl.Contains('?') ? "&" : "?";
+            var redirectUrl = $"{baseUrl}{separator}linked={Uri.EscapeDataString(provider)}";
+
+            // Include returnUrl if FrontendCallbackUrl is used and returnUrl was provided
+            if (!string.IsNullOrEmpty(_oauthOptions.FrontendCallbackUrl) &&
+                !string.IsNullOrEmpty(returnUrl) && returnUrl != "/")
+            {
+                redirectUrl += $"&returnUrl={Uri.EscapeDataString(returnUrl)}";
+            }
+
+            return Results.Redirect(redirectUrl);
+        }
+        catch (OAuthAccountLinkingError ex)
+        {
+            _logger.LogWarning(ex, "Provider {Provider} linking failed: {Message}", provider, ex.Message);
+            return RedirectWithError("provider_already_linked", ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to link provider {Provider} to user {UserId}", provider, stateData.UserId);
+            return RedirectWithError("link_failed", "Failed to link provider. Please try again.");
         }
     }
 
