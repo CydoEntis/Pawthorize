@@ -3,9 +3,10 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 using Pawthorize.Integration.Tests.Helpers;
-using Pawthorize.Models;
+using Pawthorize.Configuration;
+using Pawthorize.Services.Models;
 using Pawthorize.Services;
-using Pawthorize.Utilities;
+using Pawthorize.Internal;
 using Xunit;
 
 namespace Pawthorize.Integration.Tests;

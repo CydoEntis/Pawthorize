@@ -1,5 +1,5 @@
 using Pawthorize.Abstractions;
-using Pawthorize.DTOs;
+using Pawthorize.Endpoints.Register;
 
 namespace Pawthorize.Integration.Tests.Helpers;
 

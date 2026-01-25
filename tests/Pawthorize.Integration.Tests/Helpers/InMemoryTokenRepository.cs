@@ -1,10 +1,12 @@
 using Pawthorize.Abstractions;
+using Pawthorize.Services;
 
 namespace Pawthorize.Integration.Tests.Helpers;
 
-public class InMemoryTokenRepository : ITokenRepository
+public class InMemoryTokenRepository : IEmailChangeTokenRepository
 {
     private readonly List<StoredToken> _tokens = new();
+    private readonly Dictionary<string, string> _emailChangeTokens = new(); // tokenHash -> newEmail
 
     public Task StoreTokenAsync(
         string userId,
@@ -91,7 +93,55 @@ public class InMemoryTokenRepository : ITokenRepository
         return Task.CompletedTask;
     }
 
-    public void Clear() => _tokens.Clear();
+    public Task StoreEmailChangeTokenAsync(
+        string userId,
+        string tokenHash,
+        string newEmail,
+        DateTime expiresAt,
+        CancellationToken cancellationToken = default)
+    {
+        _tokens.Add(new StoredToken
+        {
+            UserId = userId,
+            TokenHash = tokenHash,
+            TokenType = TokenType.EmailChange,
+            ExpiresAt = expiresAt,
+            CreatedAt = DateTime.UtcNow
+        });
+        _emailChangeTokens[tokenHash] = newEmail;
+        return Task.CompletedTask;
+    }
+
+    public Task<EmailChangeTokenInfo?> ConsumeEmailChangeTokenAsync(
+        string tokenHash,
+        CancellationToken cancellationToken = default)
+    {
+        var storedToken = _tokens.FirstOrDefault(t =>
+            t.TokenHash == tokenHash &&
+            t.TokenType == TokenType.EmailChange &&
+            !t.IsInvalidated);
+
+        if (storedToken == null)
+            return Task.FromResult<EmailChangeTokenInfo?>(null);
+
+        if (!_emailChangeTokens.TryGetValue(tokenHash, out var newEmail))
+            return Task.FromResult<EmailChangeTokenInfo?>(null);
+
+        storedToken.IsInvalidated = true;
+        _emailChangeTokens.Remove(tokenHash);
+
+        return Task.FromResult<EmailChangeTokenInfo?>(new EmailChangeTokenInfo(
+            storedToken.UserId,
+            newEmail,
+            storedToken.CreatedAt,
+            storedToken.ExpiresAt));
+    }
+
+    public void Clear()
+    {
+        _tokens.Clear();
+        _emailChangeTokens.Clear();
+    }
 
     private class StoredToken
     {
