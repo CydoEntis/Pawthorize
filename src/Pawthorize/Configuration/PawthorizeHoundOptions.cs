@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Configuration;
+using Providers = Pawthorize.Services.OAuth.Providers;
 
 namespace Pawthorize.Configuration;
 
@@ -98,7 +99,7 @@ public sealed class PawthorizeResponseOptions
     /// <typeparam name="TProvider">Provider type implementing IExternalAuthProvider</typeparam>
     /// <param name="providerName">Provider name (e.g., "github", "facebook")</param>
     public PawthorizeResponseOptions AddCustomOAuthProvider<TProvider>(string providerName)
-        where TProvider : Abstractions.IExternalAuthProvider
+        where TProvider : Services.IExternalAuthProvider
     {
         EnableOAuth = true;
         OAuthProviders.Add(new OAuthProviderRegistration
