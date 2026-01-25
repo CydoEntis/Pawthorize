@@ -2,8 +2,8 @@ using ErrorHound.BuiltIn;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Pawthorize.Configuration;
 using Pawthorize.Errors;
-using Pawthorize.Models;
 using Pawthorize.Services;
 
 namespace Pawthorize.Middleware;

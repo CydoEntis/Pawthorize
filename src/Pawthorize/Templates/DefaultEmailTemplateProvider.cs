@@ -1,4 +1,4 @@
-﻿using System.Reflection;
+using System.Reflection;
 using Pawthorize.Abstractions;
 
 namespace Pawthorize.Templates;
@@ -52,6 +52,41 @@ public class DefaultEmailTemplateProvider : IEmailTemplateProvider
             .Replace("{{AppName}}", _appName)
             .Replace("{{ResetUrl}}", resetUrl)
             .Replace("{{UserEmail}}", userEmail);
+    }
+
+    /// <summary>
+    /// Gets the email change verification template with populated variables.
+    /// </summary>
+    /// <param name="verificationUrl">The verification URL to include in the email.</param>
+    /// <param name="newEmail">The new email address.</param>
+    /// <param name="oldEmail">The current email address.</param>
+    /// <returns>HTML email body.</returns>
+    public string GetEmailChangeVerificationTemplate(string verificationUrl, string newEmail, string oldEmail)
+    {
+        var template = LoadEmbeddedTemplate("EmailChangeVerification.html");
+
+        return template
+            .Replace("{{AppName}}", _appName)
+            .Replace("{{VerificationUrl}}", verificationUrl)
+            .Replace("{{NewEmail}}", newEmail)
+            .Replace("{{OldEmail}}", oldEmail);
+    }
+
+    /// <summary>
+    /// Gets the email change notification template with populated variables.
+    /// </summary>
+    /// <param name="oldEmail">The old email address.</param>
+    /// <param name="newEmail">The new email address.</param>
+    /// <param name="applicationName">The application name.</param>
+    /// <returns>HTML email body.</returns>
+    public string GetEmailChangeNotificationTemplate(string oldEmail, string newEmail, string applicationName)
+    {
+        var template = LoadEmbeddedTemplate("EmailChangeNotification.html");
+
+        return template
+            .Replace("{{AppName}}", applicationName)
+            .Replace("{{OldEmail}}", oldEmail)
+            .Replace("{{NewEmail}}", newEmail);
     }
 
     /// <summary>

@@ -1,4 +1,4 @@
-﻿namespace Pawthorize.Abstractions;
+namespace Pawthorize.Abstractions;
 
 /// <summary>
 /// Repository for storing email verification and password reset tokens.
@@ -87,7 +87,12 @@ public enum TokenType
     /// <summary>
     /// Password reset token (sent during forgot password flow)
     /// </summary>
-    PasswordReset
+    PasswordReset,
+    
+    /// <summary>
+    /// Email change token (sent when user requests to change email)
+    /// </summary>
+    EmailChange
 }
 
 /// <summary>

@@ -1,4 +1,4 @@
-﻿using Pawthorize.Models;
+﻿using Pawthorize.Services.Models;
 
 namespace Pawthorize.Abstractions;
 

@@ -7,12 +7,12 @@
 public interface IAuthenticatedUser
 {
     string Id { get; }
-    string Email { get; }
+    string Email { get; set; }
     string PasswordHash { get; }
     string? Name { get; }
     IEnumerable<string> Roles { get; }
     IDictionary<string, string>? AdditionalClaims { get; }
-    bool IsEmailVerified => true;
+    bool IsEmailVerified { get; set; }
     bool IsLocked => false;
     DateTime? LockedUntil => null;
 
