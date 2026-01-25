@@ -1,4 +1,4 @@
-﻿using System.Linq;
+using System.Linq;
 using ErrorHound.Extensions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -6,11 +6,37 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Pawthorize.Abstractions;
-using Pawthorize.AspNetCore.Handlers;
-using Pawthorize.DTOs;
-using Pawthorize.Handlers;
+using Pawthorize.Configuration;
+// Type aliases for cleaner code
+using ChangeEmail = Pawthorize.Endpoints.ChangeEmail;
+using ChangePassword = Pawthorize.Endpoints.ChangePassword;
+using ForgotPassword = Pawthorize.Endpoints.ForgotPassword;
+using Login = Pawthorize.Endpoints.Login;
+using Logout = Pawthorize.Endpoints.Logout;
+using OAuth = Pawthorize.Endpoints.OAuth;
+using Refresh = Pawthorize.Endpoints.Refresh;
+using Register = Pawthorize.Endpoints.Register;
+using ResetPassword = Pawthorize.Endpoints.ResetPassword;
+using Sessions = Pawthorize.Endpoints.Sessions;
+using SetPassword = Pawthorize.Endpoints.SetPassword;
+using User = Pawthorize.Endpoints.User;
+using VerifyEmail = Pawthorize.Endpoints.VerifyEmail;
+// Namespace imports for extension methods
+using Pawthorize.Endpoints.ChangeEmail;
+using Pawthorize.Endpoints.ChangePassword;
+using Pawthorize.Endpoints.ForgotPassword;
+using Pawthorize.Endpoints.Login;
+using Pawthorize.Endpoints.Logout;
+using Pawthorize.Endpoints.OAuth;
+using Pawthorize.Endpoints.Refresh;
+using Pawthorize.Endpoints.Register;
+using Pawthorize.Endpoints.ResetPassword;
+using Pawthorize.Endpoints.Sessions;
+using Pawthorize.Endpoints.SetPassword;
+using Pawthorize.Endpoints.User;
+using Pawthorize.Endpoints.VerifyEmail;
+using Pawthorize.Internal;
 using Pawthorize.Middleware;
-using Pawthorize.Models;
 
 namespace Pawthorize.Extensions;
 
@@ -49,6 +75,7 @@ public static class WebApplicationExtensions
 
         return app;
     }
+
     /// <summary>
     /// Map all Pawthorize authentication endpoints with auto-detected types.
     /// Types are automatically detected from the AddPawthorize call.
@@ -97,7 +124,7 @@ public static class WebApplicationExtensions
         this WebApplication app,
         Action<PawthorizeEndpointOptions>? configure = null)
         where TUser : class, IAuthenticatedUser
-        where TRegisterRequest : RegisterRequest
+        where TRegisterRequest : Register.RegisterRequest
     {
         var options = new PawthorizeEndpointOptions();
         configure?.Invoke(options);
@@ -110,295 +137,27 @@ public static class WebApplicationExtensions
         var group = app.MapGroup(options.BasePath)
             .WithTags("Authentication");
 
-        var loginEndpoint = group.MapPost(options.LoginPath, async (
-                LoginRequest request,
-                LoginHandler<TUser> handler,
-                HttpContext context,
-                CancellationToken ct) =>
-            {
-                return await handler.HandleAsync(request, context, ct);
-            })
-            .WithName("Login")
-            .WithOpenApi();
-
-        if (isRateLimitingEnabled)
-        {
-            loginEndpoint.RequireRateLimiting("pawthorize-login");
-        }
-
-        var registerEndpoint = group.MapPost(options.RegisterPath, async (
-                TRegisterRequest request,
-                RegisterHandler<TUser, TRegisterRequest> handler,
-                HttpContext context,
-                CancellationToken ct) =>
-            {
-                return await handler.HandleAsync(request, context, ct);
-            })
-            .WithName("Register")
-            .WithOpenApi();
-
-        if (isRateLimitingEnabled)
-        {
-            registerEndpoint.RequireRateLimiting("pawthorize-register");
-        }
-
-        var refreshEndpoint = group.MapPost(options.RefreshPath, async (
-                RefreshTokenRequest request,
-                RefreshHandler<TUser> handler,
-                HttpContext context,
-                CancellationToken ct) =>
-            {
-                return await handler.HandleAsync(request, context, ct);
-            })
-            .WithName("RefreshToken")
-            .WithOpenApi();
-
-        if (isRateLimitingEnabled)
-        {
-            refreshEndpoint.RequireRateLimiting("pawthorize-refresh");
-        }
-
-        var logoutEndpoint = group.MapPost(options.LogoutPath, async (
-                LogoutRequest request,
-                LogoutHandler<TUser> handler,
-                HttpContext context,
-                CancellationToken ct) =>
-            {
-                return await handler.HandleAsync(request, context, ct);
-            })
-            .WithName("Logout")
-            .WithOpenApi();
-
-        if (isRateLimitingEnabled)
-        {
-            logoutEndpoint.RequireRateLimiting("pawthorize-global");
-        }
-
-        var forgotPasswordEndpoint = group.MapPost(options.ForgotPasswordPath, async (
-                ForgotPasswordRequest request,
-                ForgotPasswordHandler<TUser> handler,
-                HttpContext context,
-                CancellationToken ct) =>
-            {
-                return await handler.HandleAsync(request, context, ct);
-            })
-            .WithName("ForgotPassword")
-            .WithOpenApi();
-
-        if (isRateLimitingEnabled)
-        {
-            forgotPasswordEndpoint.RequireRateLimiting("pawthorize-password-reset");
-        }
-
-        var resetPasswordEndpoint = group.MapPost(options.ResetPasswordPath, async (
-                ResetPasswordRequest request,
-                ResetPasswordHandler<TUser> handler,
-                HttpContext context,
-                CancellationToken ct) =>
-            {
-                return await handler.HandleAsync(request, context, ct);
-            })
-            .WithName("ResetPassword")
-            .WithOpenApi();
-
-        if (isRateLimitingEnabled)
-        {
-            resetPasswordEndpoint.RequireRateLimiting("pawthorize-password-reset");
-        }
-
-        var changePasswordEndpoint = group.MapPost(options.ChangePasswordPath, async (
-                ChangePasswordRequest request,
-                ChangePasswordHandler<TUser> handler,
-                HttpContext context,
-                CancellationToken ct) =>
-            {
-                return await handler.HandleAsync(request, context, ct);
-            })
-            .WithName("ChangePassword")
-            .RequireAuthorization()
-            .WithOpenApi();
-
-        if (isRateLimitingEnabled)
-        {
-            changePasswordEndpoint.RequireRateLimiting("pawthorize-global");
-        }
-
-        var setPasswordEndpoint = group.MapPost(options.SetPasswordPath, async (
-                SetPasswordRequest request,
-                SetPasswordHandler<TUser> handler,
-                HttpContext context,
-                CancellationToken ct) =>
-            {
-                return await handler.HandleAsync(request, context, ct);
-            })
-            .WithName("SetPassword")
-            .RequireAuthorization()
-            .WithOpenApi();
-
-        if (isRateLimitingEnabled)
-        {
-            setPasswordEndpoint.RequireRateLimiting("pawthorize-global");
-        }
-
-        var verifyEmailEndpoint = group.MapPost(options.VerifyEmailPath, async (
-                VerifyEmailRequest request,
-                VerifyEmailHandler<TUser> handler,
-                HttpContext context,
-                CancellationToken ct) =>
-            {
-                return await handler.HandleAsync(request, context, ct);
-            })
-            .WithName("VerifyEmail")
-            .WithOpenApi();
-
-        if (isRateLimitingEnabled)
-        {
-            verifyEmailEndpoint.RequireRateLimiting("pawthorize-global");
-        }
-
-        var getCurrentUserEndpoint = group.MapGet(options.GetCurrentUserPath, async (
-                GetCurrentUserHandler<TUser> handler,
-                HttpContext context,
-                CancellationToken ct) =>
-            {
-                return await handler.HandleAsync(context, ct);
-            })
-            .WithName("GetCurrentUser")
-            .RequireAuthorization()
-            .WithOpenApi();
-
-        if (isRateLimitingEnabled)
-        {
-            getCurrentUserEndpoint.RequireRateLimiting("pawthorize-global");
-        }
-
-        var getActiveSessionsEndpoint = group.MapGet(options.GetActiveSessionsPath, async (
-                GetActiveSessionsHandler<TUser> handler,
-                HttpContext context,
-                CancellationToken ct) =>
-            {
-                return await handler.HandleAsync(context, ct);
-            })
-            .WithName("GetActiveSessions")
-            .RequireAuthorization()
-            .WithOpenApi();
-
-        if (isRateLimitingEnabled)
-        {
-            getActiveSessionsEndpoint.RequireRateLimiting("pawthorize-global");
-        }
-
-        var revokeSessionsEndpoint = group.MapPost(options.RevokeAllOtherSessionsPath, async (
-                RevokeAllOtherSessionsRequest? request,
-                RevokeAllOtherSessionsHandler<TUser> handler,
-                HttpContext context,
-                CancellationToken ct) =>
-            {
-                return await handler.HandleAsync(request ?? new RevokeAllOtherSessionsRequest(), context, ct);
-            })
-            .WithName("RevokeAllOtherSessions")
-            .RequireAuthorization()
-            .WithOpenApi();
-
-        if (isRateLimitingEnabled)
-        {
-            revokeSessionsEndpoint.RequireRateLimiting("pawthorize-global");
-        }
+        // Map all endpoints using their feature-specific mapping methods
+        group.MapLogin<TUser>(options, isRateLimitingEnabled);
+        group.MapRegister<TUser, TRegisterRequest>(options, isRateLimitingEnabled);
+        group.MapRefresh<TUser>(options, isRateLimitingEnabled);
+        group.MapLogout<TUser>(options, isRateLimitingEnabled);
+        group.MapForgotPassword<TUser>(options, isRateLimitingEnabled);
+        group.MapResetPassword<TUser>(options, isRateLimitingEnabled);
+        group.MapChangePassword<TUser>(options, isRateLimitingEnabled);
+        group.MapSetPassword<TUser>(options, isRateLimitingEnabled);
+        group.MapVerifyEmail<TUser>(options, isRateLimitingEnabled);
+        group.MapChangeEmail<TUser>(options, isRateLimitingEnabled);
+        group.MapVerifyEmailChange<TUser>(options, isRateLimitingEnabled);
+        group.MapGetCurrentUser<TUser>(options, isRateLimitingEnabled);
+        group.MapGetActiveSessions<TUser>(options, isRateLimitingEnabled);
+        group.MapRevokeSession<TUser>(options, isRateLimitingEnabled);
+        group.MapRevokeAllOtherSessions<TUser>(options, isRateLimitingEnabled);
 
         // Auto-map OAuth endpoints if OAuth is enabled
         if (isOAuthEnabled)
         {
-            // OAuth Initiate - Redirect user to OAuth provider
-            var oauthInitiateEndpoint = group.MapGet(options.OAuthInitiatePath, async (
-                    string provider,
-                    string? returnUrl,
-                    Handlers.OAuthInitiateHandler handler,
-                    CancellationToken ct) =>
-                {
-                    return await handler.HandleAsync(provider, returnUrl, ct);
-                })
-                .WithName("OAuthInitiate")
-                .WithOpenApi();
-
-            if (isRateLimitingEnabled)
-            {
-                oauthInitiateEndpoint.RequireRateLimiting("pawthorize-oauth");
-            }
-
-            // OAuth Callback - Handle OAuth provider callback
-            var oauthCallbackEndpoint = group.MapGet(options.OAuthCallbackPath, async (
-                    string provider,
-                    string? code,
-                    string? state,
-                    string? error,
-                    string? error_description,
-                    Handlers.OAuthCallbackHandler<TUser> handler,
-                    HttpContext context,
-                    CancellationToken ct) =>
-                {
-                    return await handler.HandleAsync(provider, code, state, error, error_description, context, ct);
-                })
-                .WithName("OAuthCallback")
-                .WithOpenApi();
-
-            if (isRateLimitingEnabled)
-            {
-                oauthCallbackEndpoint.RequireRateLimiting("pawthorize-oauth");
-            }
-
-            // Link Provider - Initiate OAuth flow to link provider to authenticated user
-            var linkProviderEndpoint = group.MapPost(options.OAuthLinkPath, async (
-                    string provider,
-                    string? returnUrl,
-                    Handlers.LinkProviderHandler<TUser> handler,
-                    HttpContext context,
-                    CancellationToken ct) =>
-                {
-                    return await handler.HandleAsync(provider, returnUrl, context, ct);
-                })
-                .WithName("LinkOAuthProvider")
-                .RequireAuthorization()
-                .WithOpenApi();
-
-            if (isRateLimitingEnabled)
-            {
-                linkProviderEndpoint.RequireRateLimiting("pawthorize-oauth");
-            }
-
-            // Unlink Provider - Unlink OAuth provider from authenticated user
-            var unlinkProviderEndpoint = group.MapDelete(options.OAuthUnlinkPath, async (
-                    string provider,
-                    Handlers.UnlinkProviderHandler<TUser> handler,
-                    HttpContext context,
-                    CancellationToken ct) =>
-                {
-                    return await handler.HandleAsync(provider, context, ct);
-                })
-                .WithName("UnlinkOAuthProvider")
-                .RequireAuthorization()
-                .WithOpenApi();
-
-            if (isRateLimitingEnabled)
-            {
-                unlinkProviderEndpoint.RequireRateLimiting("pawthorize-global");
-            }
-
-            // List Linked Providers - Get all linked OAuth providers for authenticated user
-            var listLinkedProvidersEndpoint = group.MapGet(options.OAuthLinkedProvidersPath, async (
-                    Handlers.ListLinkedProvidersHandler<TUser> handler,
-                    HttpContext context,
-                    CancellationToken ct) =>
-                {
-                    return await handler.HandleAsync(context, ct);
-                })
-                .WithName("ListLinkedProviders")
-                .RequireAuthorization()
-                .WithOpenApi();
-
-            if (isRateLimitingEnabled)
-            {
-                listLinkedProvidersEndpoint.RequireRateLimiting("pawthorize-global");
-            }
+            group.MapOAuthEndpoints<TUser>(options, isRateLimitingEnabled);
         }
 
         return group;
@@ -422,72 +181,12 @@ public static class WebApplicationExtensions
         var group = app.MapGroup(options.BasePath)
             .WithTags("OAuth Authentication");
 
-        // OAuth Initiate - Redirect user to OAuth provider
-        group.MapGet(options.OAuthInitiatePath, async (
-                string provider,
-                string? returnUrl,
-                Handlers.OAuthInitiateHandler handler,
-                CancellationToken ct) =>
-            {
-                return await handler.HandleAsync(provider, returnUrl, ct);
-            })
-            .WithName("OAuthInitiate")
-            .WithOpenApi();
+        // Check if rate limiting is enabled from metadata
+        var metadata = app.Services.GetService<PawthorizeTypeMetadata>();
+        var isRateLimitingEnabled = metadata?.RateLimitingEnabled ?? true;
 
-        // OAuth Callback - Handle OAuth provider callback
-        group.MapGet(options.OAuthCallbackPath, async (
-                string provider,
-                string? code,
-                string? state,
-                string? error,
-                string? error_description,
-                Handlers.OAuthCallbackHandler<TUser> handler,
-                HttpContext context,
-                CancellationToken ct) =>
-            {
-                return await handler.HandleAsync(provider, code, state, error, error_description, context, ct);
-            })
-            .WithName("OAuthCallback")
-            .WithOpenApi();
-
-        // Link Provider - Initiate OAuth flow to link provider to authenticated user
-        group.MapPost(options.OAuthLinkPath, async (
-                string provider,
-                string? returnUrl,
-                Handlers.LinkProviderHandler<TUser> handler,
-                HttpContext context,
-                CancellationToken ct) =>
-            {
-                return await handler.HandleAsync(provider, returnUrl, context, ct);
-            })
-            .WithName("LinkOAuthProvider")
-            .RequireAuthorization()
-            .WithOpenApi();
-
-        // Unlink Provider - Unlink OAuth provider from authenticated user
-        group.MapDelete(options.OAuthUnlinkPath, async (
-                string provider,
-                Handlers.UnlinkProviderHandler<TUser> handler,
-                HttpContext context,
-                CancellationToken ct) =>
-            {
-                return await handler.HandleAsync(provider, context, ct);
-            })
-            .WithName("UnlinkOAuthProvider")
-            .RequireAuthorization()
-            .WithOpenApi();
-
-        // List Linked Providers - Get all linked OAuth providers for authenticated user
-        group.MapGet(options.OAuthLinkedProvidersPath, async (
-                Handlers.ListLinkedProvidersHandler<TUser> handler,
-                HttpContext context,
-                CancellationToken ct) =>
-            {
-                return await handler.HandleAsync(context, ct);
-            })
-            .WithName("ListLinkedProviders")
-            .RequireAuthorization()
-            .WithOpenApi();
+        // Map OAuth endpoints using feature-specific mapping
+        group.MapOAuthEndpoints<TUser>(options, isRateLimitingEnabled);
 
         return group;
     }
@@ -501,8 +200,8 @@ public static class WebApplicationExtensions
         where TUser : class, IAuthenticatedUser
     {
         return app.MapPost(path, async (
-                LoginRequest request,
-                LoginHandler<TUser> handler,
+                Login.LoginRequest request,
+                Login.LoginHandler<TUser> handler,
                 HttpContext context,
                 CancellationToken ct) =>
             {
@@ -520,11 +219,11 @@ public static class WebApplicationExtensions
         this IEndpointRouteBuilder app,
         string path = "/api/auth/register")
         where TUser : class, IAuthenticatedUser
-        where TRegisterRequest : RegisterRequest
+        where TRegisterRequest : Register.RegisterRequest
     {
         return app.MapPost(path, async (
                 TRegisterRequest request,
-                RegisterHandler<TUser, TRegisterRequest> handler,
+                Register.RegisterHandler<TUser, TRegisterRequest> handler,
                 HttpContext context,
                 CancellationToken ct) =>
             {
@@ -544,8 +243,8 @@ public static class WebApplicationExtensions
         where TUser : class, IAuthenticatedUser
     {
         return app.MapPost(path, async (
-                RefreshTokenRequest request,
-                RefreshHandler<TUser> handler,
+                Refresh.RefreshTokenRequest request,
+                Refresh.RefreshHandler<TUser> handler,
                 HttpContext context,
                 CancellationToken ct) =>
             {
@@ -565,8 +264,8 @@ public static class WebApplicationExtensions
         where TUser : class, IAuthenticatedUser
     {
         return app.MapPost(path, async (
-                LogoutRequest request,
-                LogoutHandler<TUser> handler,
+                Logout.LogoutRequest request,
+                Logout.LogoutHandler<TUser> handler,
                 HttpContext context,
                 CancellationToken ct) =>
             {
@@ -585,12 +284,13 @@ public static class WebApplicationExtensions
     /// <param name="app">Web application</param>
     /// <param name="configure">Optional configuration for endpoint paths</param>
     /// <returns>Route group builder for further configuration</returns>
-    [Obsolete("Use MapPawthorize() instead. The generic types are now auto-detected from AddPawthorize<TUser, TRegisterRequest>().")]
+    [Obsolete(
+        "Use MapPawthorize() instead. The generic types are now auto-detected from AddPawthorize<TUser, TRegisterRequest>().")]
     public static RouteGroupBuilder MapPawthorizeEndpoints<TUser, TRegisterRequest>(
         this WebApplication app,
         Action<PawthorizeEndpointOptions>? configure = null)
         where TUser : class, IAuthenticatedUser
-        where TRegisterRequest : RegisterRequest
+        where TRegisterRequest : Register.RegisterRequest
     {
         return MapPawthorize<TUser, TRegisterRequest>(app, configure);
     }
@@ -672,6 +372,20 @@ public class PawthorizeEndpointOptions
     public string VerifyEmailPath { get; set; } = "/verify-email";
 
     /// <summary>
+    /// Path for change email endpoint (relative to BasePath).
+    /// Default: "/change-email"
+    /// Full path: {BasePath}/change-email
+    /// </summary>
+    public string ChangeEmailPath { get; set; } = "/change-email";
+
+    /// <summary>
+    /// Path for verify email change endpoint (relative to BasePath).
+    /// Default: "/verify-email-change"
+    /// Full path: {BasePath}/verify-email-change
+    /// </summary>
+    public string VerifyEmailChangePath { get; set; } = "/verify-email-change";
+
+    /// <summary>
     /// Path for get current user endpoint (relative to BasePath).
     /// Default: "/me"
     /// Full path: {BasePath}/me
@@ -684,6 +398,13 @@ public class PawthorizeEndpointOptions
     /// Full path: {BasePath}/sessions
     /// </summary>
     public string GetActiveSessionsPath { get; set; } = "/sessions";
+
+    /// <summary>
+    /// Path for revoke specific session endpoint (relative to BasePath).
+    /// Default: "/sessions/revoke"
+    /// Full path: {BasePath}/sessions/revoke
+    /// </summary>
+    public string RevokeSessionPath { get; set; } = "/sessions/revoke";
 
     /// <summary>
     /// Path for revoke all other sessions endpoint (relative to BasePath).

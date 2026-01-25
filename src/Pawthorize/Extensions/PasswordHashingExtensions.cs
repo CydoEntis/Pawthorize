@@ -1,6 +1,6 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Pawthorize.Abstractions;
-using Pawthorize.Models;
+using Pawthorize.Configuration;
 using Pawthorize.Services;
 
 namespace Pawthorize.Extensions;

@@ -10,13 +10,25 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Pawthorize.Abstractions;
-using Pawthorize.AspNetCore.Handlers;
 using Pawthorize.Configuration;
-using Pawthorize.DTOs;
-using Pawthorize.Handlers;
-using Pawthorize.Models;
+using ChangeEmail = Pawthorize.Endpoints.ChangeEmail;
+using ChangePassword = Pawthorize.Endpoints.ChangePassword;
+using ForgotPassword = Pawthorize.Endpoints.ForgotPassword;
+using Login = Pawthorize.Endpoints.Login;
+using Logout = Pawthorize.Endpoints.Logout;
+using OAuth = Pawthorize.Endpoints.OAuth;
+using Refresh = Pawthorize.Endpoints.Refresh;
+using Repositories = Pawthorize.Services.OAuth.Repositories;
+using Register = Pawthorize.Endpoints.Register;
+using ResetPassword = Pawthorize.Endpoints.ResetPassword;
+using Sessions = Pawthorize.Endpoints.Sessions;
+using SetPassword = Pawthorize.Endpoints.SetPassword;
+using User = Pawthorize.Endpoints.User;
+using VerifyEmail = Pawthorize.Endpoints.VerifyEmail;
+using Pawthorize.Internal;
+using Pawthorize.Middleware;
+using Pawthorize.Services.OAuth.Models;
 using Pawthorize.Services;
-using Pawthorize.Validators;
 using SuccessHound.Extensions;
 
 namespace Pawthorize.Extensions;
@@ -39,7 +51,7 @@ public static class ServiceCollectionExtensions
         Action<PawthorizeResponseOptions> configure)
         where TUser : class, IAuthenticatedUser
     {
-        return AddPawthorize<TUser, RegisterRequest>(services, configure);
+        return AddPawthorize<TUser, Register.RegisterRequest>(services, configure);
     }
 
     /// <summary>
@@ -54,7 +66,7 @@ public static class ServiceCollectionExtensions
         this IServiceCollection services,
         Action<PawthorizeResponseOptions> configure)
         where TUser : class, IAuthenticatedUser
-        where TRegisterRequest : RegisterRequest
+        where TRegisterRequest : Register.RegisterRequest
     {
         var responseOptions = new PawthorizeResponseOptions();
         configure.Invoke(responseOptions);
@@ -338,12 +350,14 @@ public static class ServiceCollectionExtensions
     private static void RegisterCoreServices<TUser>(IServiceCollection services)
         where TUser : class, IAuthenticatedUser
     {
-        services.AddScoped<IPasswordHasher, PasswordHasher>();
-        services.AddScoped<JwtService<TUser>>();
-        services.AddScoped<AuthenticationService<TUser>>();
-        services.AddScoped<IPasswordResetService, PasswordResetService>();
-        services.AddScoped<CsrfTokenService>();
-        services.AddScoped<PasswordValidationService>();
+        services.AddScoped<IPasswordHasher, Services.PasswordHasher>();
+        services.AddScoped<Services.JwtService<TUser>>();
+        services.AddScoped<Services.AuthenticationService<TUser>>();
+        services.AddScoped<IPasswordResetService, Services.PasswordResetService>();
+        services.AddScoped<IEmailChangeService, Services.EmailChangeService>();
+        services.AddScoped<IEmailVerificationService, Services.EmailVerificationService>();
+        services.AddScoped<Services.CsrfTokenService>();
+        services.AddScoped<Services.PasswordValidationService>();
     }
 
     /// <summary>
@@ -351,41 +365,46 @@ public static class ServiceCollectionExtensions
     /// </summary>
     private static void RegisterHandlers<TUser, TRegisterRequest>(IServiceCollection services)
         where TUser : class, IAuthenticatedUser
-        where TRegisterRequest : RegisterRequest
+        where TRegisterRequest : Register.RegisterRequest
     {
-        services.AddScoped<LoginHandler<TUser>>();
-        services.AddScoped<RegisterHandler<TUser, TRegisterRequest>>();
-        services.AddScoped<RefreshHandler<TUser>>();
-        services.AddScoped<LogoutHandler<TUser>>();
-        services.AddScoped<ForgotPasswordHandler<TUser>>();
-        services.AddScoped<ResetPasswordHandler<TUser>>();
-        services.AddScoped<ChangePasswordHandler<TUser>>();
-        services.AddScoped<SetPasswordHandler<TUser>>();
-        services.AddScoped<VerifyEmailHandler<TUser>>();
-        services.AddScoped<GetCurrentUserHandler<TUser>>();
-        services.AddScoped<GetActiveSessionsHandler<TUser>>();
-        services.AddScoped<RevokeAllOtherSessionsHandler<TUser>>();
+        services.AddScoped<Login.LoginHandler<TUser>>();
+        services.AddScoped<Register.RegisterHandler<TUser, TRegisterRequest>>();
+        services.AddScoped<Refresh.RefreshHandler<TUser>>();
+        services.AddScoped<Logout.LogoutHandler<TUser>>();
+        services.AddScoped<ForgotPassword.ForgotPasswordHandler<TUser>>();
+        services.AddScoped<ResetPassword.ResetPasswordHandler<TUser>>();
+        services.AddScoped<ChangePassword.ChangePasswordHandler<TUser>>();
+        services.AddScoped<SetPassword.SetPasswordHandler<TUser>>();
+        services.AddScoped<VerifyEmail.VerifyEmailHandler<TUser>>();
+        services.AddScoped<ChangeEmail.ChangeEmailHandler<TUser>>();
+        services.AddScoped<ChangeEmail.VerifyEmailChangeHandler<TUser>>();
+        services.AddScoped<User.GetCurrentUserHandler<TUser>>();
+        services.AddScoped<Sessions.GetActiveSessionsHandler<TUser>>();
+        services.AddScoped<Sessions.RevokeAllOtherSessionsHandler<TUser>>();
+        services.AddScoped<Sessions.RevokeSessionHandler<TUser>>();
     }
 
     /// <summary>
     /// Register FluentValidation validators.
     /// </summary>
     private static void RegisterValidators<TRegisterRequest>(IServiceCollection services)
-        where TRegisterRequest : RegisterRequest
+        where TRegisterRequest : Register.RegisterRequest
     {
-        services.AddScoped<IValidator<LoginRequest>, LoginRequestValidator>();
-        services.AddScoped<IValidator<RefreshTokenRequest>, RefreshTokenRequestValidator>();
-        services.AddScoped<IValidator<LogoutRequest>, LogoutRequestValidator>();
-        services.AddScoped<IValidator<RegisterRequest>, RegisterRequestValidator>();
-        services.AddScoped<IValidator<ForgotPasswordRequest>, ForgotPasswordRequestValidator>();
-        services.AddScoped<IValidator<ResetPasswordRequest>, ResetPasswordRequestValidator>();
-        services.AddScoped<IValidator<ChangePasswordRequest>, ChangePasswordRequestValidator>();
-        services.AddScoped<IValidator<SetPasswordRequest>, SetPasswordRequestValidator>();
-        services.AddScoped<IValidator<VerifyEmailRequest>, VerifyEmailRequestValidator>();
-        services.AddScoped<IValidator<RevokeAllOtherSessionsRequest>, RevokeAllOtherSessionsRequestValidator>();
+        services.AddScoped<IValidator<Login.LoginRequest>, Login.LoginRequestValidator>();
+        services.AddScoped<IValidator<Refresh.RefreshTokenRequest>, Refresh.RefreshTokenRequestValidator>();
+        services.AddScoped<IValidator<Logout.LogoutRequest>, Logout.LogoutRequestValidator>();
+        services.AddScoped<IValidator<Register.RegisterRequest>, Register.RegisterRequestValidator>();
+        services.AddScoped<IValidator<ForgotPassword.ForgotPasswordRequest>, ForgotPassword.ForgotPasswordRequestValidator>();
+        services.AddScoped<IValidator<ResetPassword.ResetPasswordRequest>, ResetPassword.ResetPasswordRequestValidator>();
+        services.AddScoped<IValidator<ChangePassword.ChangePasswordRequest>, ChangePassword.ChangePasswordRequestValidator>();
+        services.AddScoped<IValidator<SetPassword.SetPasswordRequest>, SetPassword.SetPasswordRequestValidator>();
+        services.AddScoped<IValidator<VerifyEmail.VerifyEmailRequest>, VerifyEmail.VerifyEmailRequestValidator>();
+        services.AddScoped<IValidator<ChangeEmail.ChangeEmailRequest>, ChangeEmail.ChangeEmailRequestValidator>();
+        services.AddScoped<IValidator<Sessions.RevokeAllOtherSessionsRequest>, Sessions.RevokeAllOtherSessionsRequestValidator>();
+        services.AddScoped<IValidator<Sessions.RevokeSessionRequest>, Sessions.RevokeSessionRequestValidator>();
 
 
-        if (typeof(TRegisterRequest) != typeof(RegisterRequest))
+        if (typeof(TRegisterRequest) != typeof(Register.RegisterRequest))
         {
             services.AddScoped(typeof(IValidator<TRegisterRequest>), serviceProvider =>
             {
@@ -393,7 +412,7 @@ public static class ServiceCollectionExtensions
                 if (existingValidator != null)
                     return existingValidator;
 
-                return serviceProvider.GetRequiredService<IValidator<RegisterRequest>>();
+                return serviceProvider.GetRequiredService<IValidator<Register.RegisterRequest>>();
             });
         }
     }
@@ -451,73 +470,67 @@ public static class ServiceCollectionExtensions
     }
 
     /// <summary>
-    /// Configure SuccessHound with optional custom formatter.
+    /// Configure SuccessHound 2.0 with optional custom formatter.
     /// </summary>
     private static void ConfigureSuccessHound(IServiceCollection services, Type? formatterType)
     {
         var targetFormatterType = formatterType;
 
+        // Default to SuccessHound 2.0's DefaultSuccessFormatter if none specified
         if (targetFormatterType == null)
         {
-            Type? defaultFormatterType = null;
-
-            var possibleTypes = new[]
-            {
-                "SuccessHound.Defaults.DefaultSuccessFormatter, SuccessHound",
-                "SuccessHound.Formatters.DefaultSuccessFormatter, SuccessHound",
-                "SuccessHound.DefaultSuccessFormatter, SuccessHound"
-            };
-
-            foreach (var typeName in possibleTypes)
-            {
-                defaultFormatterType = Type.GetType(typeName);
-                if (defaultFormatterType != null)
-                    break;
-            }
-
-            if (defaultFormatterType != null)
-            {
-                targetFormatterType = defaultFormatterType;
-            }
-            else
+            targetFormatterType = Type.GetType("SuccessHound.Defaults.DefaultSuccessFormatter, SuccessHound");
+            
+            if (targetFormatterType == null)
             {
                 throw new InvalidOperationException(
                     "Could not find SuccessHound's DefaultSuccessFormatter. " +
                     "Please specify a custom formatter using options.UseSuccessFormatter<T>(). " +
-                    "Make sure SuccessHound package is installed.");
+                    "Make sure SuccessHound 2.0 package is installed.");
             }
         }
 
-        var addSuccessHoundMethod = typeof(SuccessHoundExtensions)
+        // Get AddSuccessHound method from SuccessHound.Extensions
+        var addSuccessHoundMethod = typeof(SuccessHound.Extensions.SuccessHoundExtensions)
             .GetMethods()
-            .FirstOrDefault(m => m.Name == "AddSuccessHound" && m.GetParameters().Length == 2);
+            .FirstOrDefault(m => m.Name == "AddSuccessHound" && 
+                                 m.GetParameters().Length == 2 &&
+                                 m.GetParameters()[0].ParameterType == typeof(IServiceCollection));
 
-        if (addSuccessHoundMethod != null)
+        if (addSuccessHoundMethod == null)
         {
-            var optionsParam = System.Linq.Expressions.Expression.Parameter(
-                addSuccessHoundMethod.GetParameters()[1].ParameterType.GetGenericArguments()[0], "options");
-
-            var useFormatterMethod = optionsParam.Type
-                .GetMethod("UseFormatter")
-                ?.MakeGenericMethod(targetFormatterType);
-
-            if (useFormatterMethod != null)
-            {
-                var callExpression = System.Linq.Expressions.Expression.Call(
-                    optionsParam, useFormatterMethod);
-
-                var lambda = System.Linq.Expressions.Expression.Lambda(
-                    callExpression, optionsParam);
-
-                var configAction = lambda.Compile();
-
-                addSuccessHoundMethod.Invoke(null, new object[] { services, configAction });
-                return;
-            }
+            throw new InvalidOperationException(
+                "Could not find SuccessHound's AddSuccessHound method. " +
+                "Please ensure SuccessHound 2.0 is properly installed.");
         }
 
-        throw new InvalidOperationException(
-            "Could not configure SuccessHound. Please ensure SuccessHound is properly installed.");
+        // Get the options type (Action<SuccessHoundOptions>)
+        var optionsActionType = addSuccessHoundMethod.GetParameters()[1].ParameterType;
+        var optionsType = optionsActionType.GetGenericArguments()[0];
+
+        // Get UseFormatter<T>() method
+        var useFormatterMethod = optionsType
+            .GetMethods()
+            .FirstOrDefault(m => m.Name == "UseFormatter" && 
+                                 m.IsGenericMethod && 
+                                 m.GetGenericArguments().Length == 1);
+
+        if (useFormatterMethod == null)
+        {
+            throw new InvalidOperationException(
+                "Could not find SuccessHound's UseFormatter method. " +
+                "Please ensure SuccessHound 2.0 is properly installed.");
+        }
+
+        // Create Action<SuccessHoundOptions> that calls options.UseFormatter<T>()
+        var optionsParam = System.Linq.Expressions.Expression.Parameter(optionsType, "options");
+        var genericUseFormatter = useFormatterMethod.MakeGenericMethod(targetFormatterType);
+        var callExpression = System.Linq.Expressions.Expression.Call(optionsParam, genericUseFormatter);
+        var lambda = System.Linq.Expressions.Expression.Lambda(optionsActionType, callExpression, optionsParam);
+        var configAction = lambda.Compile();
+
+        // Invoke AddSuccessHound(services, configAction)
+        addSuccessHoundMethod.Invoke(null, new object[] { services, configAction });
     }
 
     /// <summary>
@@ -600,7 +613,7 @@ public static class ServiceCollectionExtensions
 
         // Use internal state token repository if not already registered
         // Users can override by registering their own IStateTokenRepository<TStateToken> before calling AddPawthorize
-        services.TryAddSingleton<IStateTokenRepository<Models.InternalStateToken>, Repositories.InternalStateTokenRepository>();
+        services.TryAddSingleton<IStateTokenRepository<InternalStateToken>, Repositories.InternalStateTokenRepository>();
 
         // Register OAuth provider factory with all registered providers
         services.AddSingleton<IOAuthProviderFactory>(sp =>
@@ -623,7 +636,7 @@ public static class ServiceCollectionExtensions
         });
 
         // Register state token service
-        services.AddScoped<IStateTokenService, Services.StateTokenService<Models.InternalStateToken>>();
+        services.AddScoped<IStateTokenService, Services.StateTokenService<InternalStateToken>>();
 
         // Register external authentication service
         services.AddScoped<Services.ExternalAuthenticationService<TUser>>();
@@ -635,11 +648,11 @@ public static class ServiceCollectionExtensions
         }
 
         // Register OAuth handlers
-        services.AddScoped<Handlers.OAuthInitiateHandler>();
-        services.AddScoped<Handlers.OAuthCallbackHandler<TUser>>();
-        services.AddScoped<Handlers.LinkProviderHandler<TUser>>();
-        services.AddScoped<Handlers.UnlinkProviderHandler<TUser>>();
-        services.AddScoped<Handlers.ListLinkedProvidersHandler<TUser>>();
+        services.AddScoped<OAuth.OAuthInitiateHandler>();
+        services.AddScoped<OAuth.OAuthCallbackHandler<TUser>>();
+        services.AddScoped<OAuth.LinkProviderHandler<TUser>>();
+        services.AddScoped<OAuth.UnlinkProviderHandler<TUser>>();
+        services.AddScoped<OAuth.ListLinkedProvidersHandler<TUser>>();
     }
 
     /// <summary>
