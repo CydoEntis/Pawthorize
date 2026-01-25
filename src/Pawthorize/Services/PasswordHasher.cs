@@ -1,4 +1,4 @@
-﻿using BCrypt.Net;
+using BCrypt.Net;
 using Microsoft.Extensions.Logging;
 using Pawthorize.Abstractions;
 

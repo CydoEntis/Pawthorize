@@ -4,7 +4,7 @@ using Microsoft.Extensions.Options;
 using Pawthorize.Abstractions;
 using Pawthorize.Configuration;
 using Pawthorize.Errors;
-using Pawthorize.Models;
+using Pawthorize.Services.OAuth.Models;
 
 namespace Pawthorize.Services;
 

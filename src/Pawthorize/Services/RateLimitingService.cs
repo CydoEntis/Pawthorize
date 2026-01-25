@@ -1,17 +1,15 @@
-using System.Globalization;
-using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Pawthorize.Configuration;
-using Microsoft.AspNetCore.Builder;
+using System.Threading.RateLimiting;
 
 namespace Pawthorize.Services;
 
 /// <summary>
-/// Service responsible for configuring ASP.NET Core rate limiting for Pawthorize endpoints.
-/// Integrates with the built-in rate limiting middleware (.NET 7+).
+/// Service for configuring ASP.NET Core rate limiting for Pawthorize endpoints.
 /// </summary>
 public class RateLimitingService
 {
@@ -23,189 +21,16 @@ public class RateLimitingService
     }
 
     /// <summary>
-    /// Configure rate limiting for Pawthorize endpoints.
-    /// Creates named policies that can be applied to endpoints or reused by users.
-    /// </summary>
-    public void ConfigureRateLimiting(
-        IServiceCollection services,
-        PawthorizeRateLimitingOptions options)
-    {
-        if (!options.Enabled)
-        {
-            _logger?.LogInformation("Rate limiting is disabled via configuration");
-            return;
-        }
-
-        _logger?.LogInformation("Configuring rate limiting with {Strategy} strategy and {PartitionBy} partitioning",
-            options.Strategy, options.PartitionBy);
-
-        services.AddRateLimiter(rateLimiterOptions =>
-        {
-            // Configure global rejection behavior
-            rateLimiterOptions.RejectionStatusCode = options.RateLimitStatusCode;
-
-            rateLimiterOptions.OnRejected = async (context, cancellationToken) =>
-            {
-                context.HttpContext.Response.StatusCode = options.RateLimitStatusCode;
-
-                TimeSpan? retryAfter = null;
-                if (options.IncludeRetryAfterHeader && context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfterValue))
-                {
-                    retryAfter = retryAfterValue;
-                    context.HttpContext.Response.Headers.RetryAfter =
-                        ((int)retryAfterValue.TotalSeconds).ToString(NumberFormatInfo.InvariantInfo);
-                }
-
-                _logger?.LogWarning(
-                    "Rate limit exceeded for {Endpoint} from {IP}",
-                    context.HttpContext.Request.Path,
-                    GetClientIp(context.HttpContext));
-
-                await context.HttpContext.Response.WriteAsJsonAsync(new
-                {
-                    error = "Rate limit exceeded",
-                    message = "Too many requests. Please try again later.",
-                    retryAfter = retryAfter?.TotalSeconds
-                }, cancellationToken);
-            };
-
-            // Create named policies for each endpoint type
-            AddPolicy(rateLimiterOptions, "pawthorize-global", options.Global, options);
-            AddPolicy(rateLimiterOptions, "pawthorize-login", options.Login, options);
-            AddPolicy(rateLimiterOptions, "pawthorize-register", options.Register, options);
-            AddPolicy(rateLimiterOptions, "pawthorize-password-reset", options.PasswordReset, options);
-            AddPolicy(rateLimiterOptions, "pawthorize-refresh", options.Refresh, options);
-            AddPolicy(rateLimiterOptions, "pawthorize-oauth", options.OAuth, options);
-
-            // Add custom policies
-            foreach (var (policyName, policy) in options.CustomPolicies)
-            {
-                AddPolicy(rateLimiterOptions, $"pawthorize-{policyName}", policy, options);
-            }
-
-            _logger?.LogInformation(
-                "Rate limiting configured with {PolicyCount} policies. Default limits: Login={LoginLimit}/{LoginWindow}, Register={RegisterLimit}/{RegisterWindow}",
-                6 + options.CustomPolicies.Count,
-                options.Login.PermitLimit,
-                options.Login.Window,
-                options.Register.PermitLimit,
-                options.Register.Window);
-        });
-    }
-
-    /// <summary>
-    /// Add a named rate limiting policy.
-    /// </summary>
-    private void AddPolicy(
-        RateLimiterOptions rateLimiterOptions,
-        string policyName,
-        RateLimitPolicy policy,
-        PawthorizeRateLimitingOptions globalOptions)
-    {
-        rateLimiterOptions.AddPolicy(policyName, context =>
-        {
-            var partitionKey = GetPartitionKey(context, globalOptions.PartitionBy);
-
-            return globalOptions.Strategy switch
-            {
-                RateLimitingStrategy.FixedWindow => RateLimitPartition.GetFixedWindowLimiter(
-                    partitionKey,
-                    _ => new FixedWindowRateLimiterOptions
-                    {
-                        PermitLimit = policy.PermitLimit,
-                        Window = policy.Window,
-                        QueueLimit = policy.QueueLimit
-                    }),
-
-                RateLimitingStrategy.SlidingWindow => RateLimitPartition.GetSlidingWindowLimiter(
-                    partitionKey,
-                    _ => new SlidingWindowRateLimiterOptions
-                    {
-                        PermitLimit = policy.PermitLimit,
-                        Window = policy.Window,
-                        QueueLimit = policy.QueueLimit,
-                        SegmentsPerWindow = 8 // Divide window into 8 segments for better accuracy
-                    }),
-
-                RateLimitingStrategy.TokenBucket => RateLimitPartition.GetTokenBucketLimiter(
-                    partitionKey,
-                    _ => new TokenBucketRateLimiterOptions
-                    {
-                        TokenLimit = policy.PermitLimit,
-                        TokensPerPeriod = policy.TokensPerPeriod ?? policy.PermitLimit,
-                        ReplenishmentPeriod = policy.ReplenishmentPeriod ?? policy.Window,
-                        QueueLimit = policy.QueueLimit
-                    }),
-
-                _ => throw new NotSupportedException($"Rate limiting strategy '{globalOptions.Strategy}' is not supported")
-            };
-        });
-    }
-
-    /// <summary>
-    /// Get the partition key based on the partitioning strategy.
-    /// </summary>
-    private string GetPartitionKey(HttpContext context, RateLimitPartitionBy partitionBy)
-    {
-        return partitionBy switch
-        {
-            RateLimitPartitionBy.IpAddress => GetClientIp(context),
-
-            RateLimitPartitionBy.UserId => context.User.Identity?.IsAuthenticated == true
-                ? context.User.FindFirst("sub")?.Value ?? GetClientIp(context)
-                : GetClientIp(context),
-
-            RateLimitPartitionBy.Hybrid => context.User.Identity?.IsAuthenticated == true
-                ? $"user:{context.User.FindFirst("sub")?.Value}"
-                : $"ip:{GetClientIp(context)}",
-
-            _ => GetClientIp(context)
-        };
-    }
-
-    /// <summary>
-    /// Extract client IP address from HttpContext.
-    /// Handles proxy headers (X-Forwarded-For, X-Real-IP).
-    /// </summary>
-    private string GetClientIp(HttpContext context)
-    {
-        // Check X-Forwarded-For header (set by proxies/load balancers)
-        var forwardedFor = context.Request.Headers["X-Forwarded-For"].FirstOrDefault();
-        if (!string.IsNullOrEmpty(forwardedFor))
-        {
-            // X-Forwarded-For can contain multiple IPs: "client, proxy1, proxy2"
-            // Use the first one (original client)
-            var ips = forwardedFor.Split(',', StringSplitOptions.RemoveEmptyEntries);
-            if (ips.Length > 0)
-            {
-                return ips[0].Trim();
-            }
-        }
-
-        // Check X-Real-IP header (alternative proxy header)
-        var realIp = context.Request.Headers["X-Real-IP"].FirstOrDefault();
-        if (!string.IsNullOrEmpty(realIp))
-        {
-            return realIp.Trim();
-        }
-
-        // Fall back to RemoteIpAddress
-        return context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
-    }
-
-    /// <summary>
-    /// Validate rate limiting configuration.
+    /// Validate rate limiting configuration options.
     /// </summary>
     public void ValidateConfiguration(PawthorizeRateLimitingOptions options)
     {
-        if (!options.Enabled)
+        if (options == null)
         {
-            _logger?.LogWarning(
-                "Rate limiting is DISABLED. Your application is vulnerable to brute force attacks, " +
-                "credential stuffing, and denial of service attacks. Enable rate limiting in production.");
-            return;
+            throw new ArgumentNullException(nameof(options), "Rate limiting options cannot be null.");
         }
 
+        // Validate policy limits
         ValidatePolicy("Global", options.Global);
         ValidatePolicy("Login", options.Login);
         ValidatePolicy("Register", options.Register);
@@ -213,52 +38,162 @@ public class RateLimitingService
         ValidatePolicy("Refresh", options.Refresh);
         ValidatePolicy("OAuth", options.OAuth);
 
-        foreach (var (name, policy) in options.CustomPolicies)
+        // Validate custom policies
+        foreach (var customPolicy in options.CustomPolicies)
         {
-            ValidatePolicy(name, policy);
+            ValidatePolicy($"Custom:{customPolicy.Key}", customPolicy.Value);
         }
 
-        // Warn if login limits are too permissive
-        if (options.Login.PermitLimit > 20)
+        // Validate token bucket configuration if using TokenBucket strategy
+        if (options.Strategy == RateLimitingStrategy.TokenBucket)
         {
-            _logger?.LogWarning(
-                "Login rate limit is very high ({Limit} requests per {Window}). " +
-                "Consider a lower limit (e.g., 5-10 per 5 minutes) for better security against brute force attacks.",
-                options.Login.PermitLimit,
-                options.Login.Window);
-        }
-
-        // Warn if using UserId partitioning (doesn't protect unauthenticated endpoints)
-        if (options.PartitionBy == RateLimitPartitionBy.UserId)
-        {
-            _logger?.LogWarning(
-                "Rate limiting is configured to partition by UserId. " +
-                "This DOES NOT protect unauthenticated endpoints like login and registration. " +
-                "Consider using IpAddress or Hybrid partitioning for better security.");
+            foreach (var policy in new[] { options.Global, options.Login, options.Register, options.PasswordReset, options.Refresh, options.OAuth })
+            {
+                if (policy.TokensPerPeriod == null || policy.ReplenishmentPeriod == null)
+                {
+                    _logger?.LogWarning(
+                        "TokenBucket strategy requires TokensPerPeriod and ReplenishmentPeriod to be set for all policies.");
+                }
+            }
         }
     }
 
-    /// <summary>
-    /// Validate a single rate limit policy.
-    /// </summary>
-    private void ValidatePolicy(string name, RateLimitPolicy policy)
+    private void ValidatePolicy(string policyName, RateLimitPolicy policy)
     {
+        if (policy == null)
+        {
+            throw new ArgumentNullException(nameof(policy), $"Rate limit policy '{policyName}' cannot be null.");
+        }
+
         if (policy.PermitLimit <= 0)
         {
-            throw new InvalidOperationException(
-                $"Rate limit policy '{name}' has invalid PermitLimit: {policy.PermitLimit}. Must be greater than 0.");
+            throw new ArgumentException(
+                $"Rate limit policy '{policyName}' must have PermitLimit > 0. Current value: {policy.PermitLimit}",
+                nameof(policy));
         }
 
         if (policy.Window <= TimeSpan.Zero)
         {
-            throw new InvalidOperationException(
-                $"Rate limit policy '{name}' has invalid Window: {policy.Window}. Must be greater than 0.");
+            throw new ArgumentException(
+                $"Rate limit policy '{policyName}' must have Window > TimeSpan.Zero. Current value: {policy.Window}",
+                nameof(policy));
+        }
+    }
+
+    /// <summary>
+    /// Configure ASP.NET Core rate limiting services with Pawthorize policies.
+    /// </summary>
+    public void ConfigureRateLimiting(IServiceCollection services, PawthorizeRateLimitingOptions options)
+    {
+        if (!options.Enabled)
+        {
+            _logger?.LogInformation("Rate limiting is disabled. Skipping rate limiter configuration.");
+            return;
         }
 
-        if (policy.QueueLimit < 0)
+        services.AddRateLimiter(rateLimiterOptions =>
         {
-            throw new InvalidOperationException(
-                $"Rate limit policy '{name}' has invalid QueueLimit: {policy.QueueLimit}. Must be >= 0.");
-        }
+            // Configure global policy
+            rateLimiterOptions.AddPolicy<string>("pawthorize-global", CreatePartitioner(options, options.Global));
+
+            // Configure login policy
+            rateLimiterOptions.AddPolicy<string>("pawthorize-login", CreatePartitioner(options, options.Login));
+
+            // Configure register policy
+            rateLimiterOptions.AddPolicy<string>("pawthorize-register", CreatePartitioner(options, options.Register));
+
+            // Configure password reset policy
+            rateLimiterOptions.AddPolicy<string>("pawthorize-password-reset", CreatePartitioner(options, options.PasswordReset));
+
+            // Configure refresh policy
+            rateLimiterOptions.AddPolicy<string>("pawthorize-refresh", CreatePartitioner(options, options.Refresh));
+
+            // Configure OAuth policy
+            rateLimiterOptions.AddPolicy<string>("pawthorize-oauth", CreatePartitioner(options, options.OAuth));
+
+            // Configure custom policies
+            foreach (var customPolicy in options.CustomPolicies)
+            {
+                rateLimiterOptions.AddPolicy<string>(customPolicy.Key, CreatePartitioner(options, customPolicy.Value));
+            }
+
+            // Configure global rate limiter options
+            rateLimiterOptions.GlobalLimiter = null; // We use per-policy limiters
+            rateLimiterOptions.OnRejected = async (context, cancellationToken) =>
+            {
+                context.HttpContext.Response.StatusCode = options.RateLimitStatusCode;
+
+                if (options.IncludeRetryAfterHeader)
+                {
+                    if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+                    {
+                        context.HttpContext.Response.Headers.RetryAfter = ((int)retryAfter.TotalSeconds).ToString();
+                    }
+                    else
+                    {
+                        context.HttpContext.Response.Headers.RetryAfter = "60";
+                    }
+                }
+
+                await context.HttpContext.Response.WriteAsync(
+                    "Rate limit exceeded. Please try again later.",
+                    cancellationToken);
+            };
+        });
+
+        _logger?.LogInformation("Rate limiting configured with {PolicyCount} policies.",
+            6 + options.CustomPolicies.Count);
+    }
+
+    private Func<HttpContext, RateLimitPartition<string>> CreatePartitioner(
+        PawthorizeRateLimitingOptions options,
+        RateLimitPolicy policy)
+    {
+        return options.PartitionBy switch
+        {
+            RateLimitPartitionBy.IpAddress => ctx =>
+            {
+                var ipAddress = ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: ipAddress,
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = policy.PermitLimit,
+                        Window = policy.Window,
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                        QueueLimit = policy.QueueLimit
+                    });
+            },
+            RateLimitPartitionBy.UserId => ctx =>
+            {
+                var userId = ctx.User?.Identity?.Name ?? ctx.Connection.Id;
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: userId,
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = policy.PermitLimit,
+                        Window = policy.Window,
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                        QueueLimit = policy.QueueLimit
+                    });
+            },
+            RateLimitPartitionBy.Hybrid => ctx =>
+            {
+                // Use UserId if authenticated, otherwise use IP address
+                var partitionKey = ctx.User?.Identity?.IsAuthenticated == true
+                    ? $"user:{ctx.User.Identity.Name}"
+                    : $"ip:{ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown"}";
+                return RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: partitionKey,
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = policy.PermitLimit,
+                        Window = policy.Window,
+                        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                        QueueLimit = policy.QueueLimit
+                    });
+            },
+            _ => throw new ArgumentOutOfRangeException(nameof(options.PartitionBy), options.PartitionBy, "Unknown partition strategy")
+        };
     }
 }

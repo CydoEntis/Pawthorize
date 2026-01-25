@@ -1,4 +1,4 @@
-﻿using System.IdentityModel.Tokens.Jwt;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
@@ -6,12 +6,14 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Pawthorize.Abstractions;
-using Pawthorize.Models;
+using Pawthorize.Configuration;
+using Pawthorize.Services.Models;
 
 namespace Pawthorize.Services;
 
 /// <summary>
-/// Service for generating and validating JWT tokens.
+/// Service for generating and validating JWT access and refresh tokens.
+/// Handles token signing, expiration, and claim extraction from user data.
 /// </summary>
 /// <typeparam name="TUser">User type implementing IAuthenticatedUser</typeparam>
 public class JwtService<TUser> where TUser : IAuthenticatedUser

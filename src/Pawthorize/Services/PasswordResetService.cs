@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Options;
 using Pawthorize.Abstractions;
-using Pawthorize.Models;
-using Pawthorize.Utilities;
+using Pawthorize.Configuration;
+using Pawthorize.Internal;
 
 namespace Pawthorize.Services;
 

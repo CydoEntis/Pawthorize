@@ -3,7 +3,10 @@ using Microsoft.Extensions.Options;
 using Pawthorize.Abstractions;
 using Pawthorize.Configuration;
 using Pawthorize.Errors;
-using Pawthorize.Models;
+using Pawthorize.Endpoints.Register;
+using Pawthorize.Services.Models;
+using Pawthorize.Services.OAuth.Models;
+using Pawthorize.Services;
 
 namespace Pawthorize.Services;
 
@@ -190,7 +193,7 @@ public class ExternalAuthenticationService<TUser> where TUser : class, IAuthenti
     {
         // Try to get user factory from DI container
         // We try RegisterRequest factory first, as it's the most common
-        var userFactoryType = typeof(IUserFactory<,>).MakeGenericType(typeof(TUser), typeof(DTOs.RegisterRequest));
+        var userFactoryType = typeof(IUserFactory<,>).MakeGenericType(typeof(TUser), typeof(RegisterRequest));
         var userFactory = _serviceProvider.GetService(userFactoryType);
 
         if (userFactory == null)
@@ -201,7 +204,7 @@ public class ExternalAuthenticationService<TUser> where TUser : class, IAuthenti
         }
 
         // Create register request from OAuth user info
-        var registerRequest = new DTOs.RegisterRequest
+        var registerRequest = new RegisterRequest
         {
             Email = userInfo.Email!,
             Password = string.Empty, // OAuth users don't have passwords initially

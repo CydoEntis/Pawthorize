@@ -1,16 +1,19 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Pawthorize.Abstractions;
+using Pawthorize.Configuration;
 using Pawthorize.Errors;
-using Pawthorize.Models;
-using Pawthorize.Utilities;
+using Pawthorize.Services.Models;
+using Pawthorize.Internal;
 
 namespace Pawthorize.Services;
 
 /// <summary>
 /// Core authentication service with reusable operations.
-/// Used by all auth handlers (Login, Register, OAuth, MagicLink, etc.)
+/// Handles token generation, account validation, and session management.
+/// Used by all authentication endpoints (Login, Register, OAuth, etc.)
 /// </summary>
+/// <typeparam name="TUser">User type implementing IAuthenticatedUser</typeparam>
 public class AuthenticationService<TUser> where TUser : IAuthenticatedUser
 {
     private readonly JwtService<TUser> _jwtService;
