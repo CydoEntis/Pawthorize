@@ -1,7 +1,7 @@
 {
   "info": {
-    "name": "Pawthorize Sample API",
-    "description": "Sample collection for testing Pawthorize with Hybrid mode and CSRF protection.\n\nThis collection automatically handles:\n- CSRF token extraction from cookies\n- Access token storage and injection\n- Cookie management\n\nSimply run the requests in order and Postman will handle all authentication automatically.",
+    "name": "Pawthorize API - Complete Test Collection",
+    "description": "Comprehensive Postman collection for testing all Pawthorize authentication endpoints.\n\n## Features\n- ✅ Automatic CSRF token management\n- ✅ Automatic access token injection\n- ✅ Cookie handling\n- ✅ Organized by feature folders\n- ✅ Comprehensive test scripts\n- ✅ Environment variables for tokens\n\n## Setup\n1. Start the sample API: `cd samples/Pawthorize.Sample.MinimalApi && dotnet run`\n2. Import this collection into Postman\n3. Update `baseUrl` if needed (default: http://localhost:5022)\n4. Run requests in order within each folder\n\n## Token Variables\nSome endpoints require manual token setup:\n- `resetToken`: Get from password reset email\n- `verificationToken`: Get from email verification email\n- `emailChangeToken`: Get from email change verification email\n\n## Testing Flow\n1. **Setup** → Register or Login\n2. **Authentication** → Test auth endpoints\n3. **Password Management** → Test password flows\n4. **Email Management** → Test email verification/change\n5. **Sessions** → Test session management\n6. **OAuth** → Test OAuth flows (if enabled)\n7. **Test Scenarios** → Edge cases and error handling",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "event": [
@@ -18,9 +18,7 @@
           "        key: 'X-XSRF-TOKEN',",
           "        value: csrfToken",
           "    });",
-          "    console.log('✅ CSRF token added to header:', csrfToken);",
-          "} else {",
-          "    console.log('ℹ️ No CSRF token found (expected for login/register)');",
+          "    console.log('✅ CSRF token added to header');",
           "}",
           "",
           "// Automatically add access token to Authorization header if available",
@@ -41,14 +39,11 @@
       "script": {
         "type": "text/javascript",
         "exec": [
-          "// Log response for debugging",
-          "console.log('Response status:', pm.response.code);",
-          "",
           "// Extract CSRF token from cookie and save to collection variable",
           "const xsrfCookie = pm.cookies.get('XSRF-TOKEN');",
           "if (xsrfCookie) {",
           "    pm.collectionVariables.set('csrfToken', xsrfCookie);",
-          "    console.log('✅ CSRF token extracted and saved:', xsrfCookie);",
+          "    console.log('✅ CSRF token extracted and saved');",
           "}"
         ]
       }
@@ -77,398 +72,1228 @@
     },
     {
       "key": "testPassword",
-      "value": "Test123!",
+      "value": "Test123!@#",
       "type": "string"
+    },
+    {
+      "key": "resetToken",
+      "value": "",
+      "type": "string",
+      "description": "Password reset token from email (set manually)"
+    },
+    {
+      "key": "verificationToken",
+      "value": "",
+      "type": "string",
+      "description": "Email verification token from email (set manually)"
+    },
+    {
+      "key": "emailChangeToken",
+      "value": "",
+      "type": "string",
+      "description": "Email change verification token from email (set manually)"
+    },
+    {
+      "key": "sessionId",
+      "value": "",
+      "type": "string",
+      "description": "Session ID from Get Active Sessions response (set automatically)"
+    },
+    {
+      "key": "oauthProvider",
+      "value": "google",
+      "type": "string",
+      "description": "OAuth provider name (google, discord)"
     }
   ],
   "item": [
     {
-      "name": "1. Register",
-      "event": [
+      "name": "📋 Setup & Instructions",
+      "item": [
         {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "// Save access token from response (Hybrid mode)",
-              "if (pm.response.code === 200) {",
-              "    const jsonData = pm.response.json();",
-              "    if (jsonData.data && jsonData.data.accessToken) {",
-              "        pm.collectionVariables.set('accessToken', jsonData.data.accessToken);",
-              "        console.log('✅ Access token saved from registration');",
-              "    }",
-              "    ",
-              "    // Extract and save CSRF token",
-              "    const xsrfCookie = pm.cookies.get('XSRF-TOKEN');",
-              "    if (xsrfCookie) {",
-              "        pm.collectionVariables.set('csrfToken', xsrfCookie);",
-              "        console.log('✅ CSRF token saved from registration');",
-              "    }",
-              "    ",
-              "    pm.test('CSRF cookie is set', function() {",
-              "        pm.expect(xsrfCookie).to.not.be.undefined;",
-              "    });",
-              "}"
-            ],
-            "type": "text/javascript"
-          }
+          "name": "README - Collection Instructions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/",
+              "host": ["{{baseUrl}}"],
+              "path": [""]
+            },
+            "description": "**This is a placeholder request for documentation.**\n\n## Collection Structure\n\nThis collection is organized into folders:\n\n1. **Setup & Instructions** - This folder\n2. **Authentication** - Login, Register, Refresh, Logout\n3. **Password Management** - Change, Set, Reset, Forgot\n4. **Email Management** - Verify, Change Email\n5. **Sessions** - Get Current User, Active Sessions, Revoke\n6. **OAuth** - OAuth provider flows (if enabled)\n7. **Test Scenarios** - Edge cases and error handling\n\n## Quick Start\n\n1. **Register a new user** (in Authentication folder)\n2. **Login** (in Authentication folder)\n3. **Test other endpoints** in any order\n\n## Important Notes\n\n- **CSRF Protection**: POST/PUT/DELETE requests automatically include CSRF token\n- **GET requests**: Don't require CSRF token\n- **Token Variables**: Some tokens (reset, verification) must be set manually from emails\n- **Cookies**: Postman automatically sends cookies from previous requests\n\n## Testing Email Flows\n\nFor endpoints that send emails (forgot password, verify email, change email):\n1. Check the sample app console/logs for the email content\n2. Extract the token from the email URL\n3. Set the appropriate collection variable (`resetToken`, `verificationToken`, `emailChangeToken`)\n4. Use the token in the corresponding endpoint"
+          },
+          "response": []
         }
-      ],
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{testPassword}}\",\n  \"name\": \"Test User\"\n}"
-        },
-        "url": {
-          "raw": "{{baseUrl}}/api/auth/register",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "auth", "register"]
-        },
-        "description": "Register a new user account.\n\n**Expected Response (Hybrid mode):**\n- Access token in response body\n- Refresh token in HttpOnly cookie\n- CSRF token in XSRF-TOKEN cookie"
-      },
-      "response": []
+      ]
     },
     {
-      "name": "2. Login",
-      "event": [
+      "name": "🔐 Authentication",
+      "item": [
         {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "// Save access token from response (Hybrid mode)",
-              "if (pm.response.code === 200) {",
-              "    const jsonData = pm.response.json();",
-              "    if (jsonData.data && jsonData.data.accessToken) {",
-              "        pm.collectionVariables.set('accessToken', jsonData.data.accessToken);",
-              "        console.log('✅ Access token saved from login');",
-              "    }",
-              "    ",
-              "    // Extract and save CSRF token",
-              "    const xsrfCookie = pm.cookies.get('XSRF-TOKEN');",
-              "    if (xsrfCookie) {",
-              "        pm.collectionVariables.set('csrfToken', xsrfCookie);",
-              "        console.log('✅ CSRF token saved from login');",
-              "    }",
-              "    ",
-              "    pm.test('CSRF cookie is set', function() {",
-              "        pm.expect(xsrfCookie).to.not.be.undefined;",
-              "    });",
-              "    ",
-              "    // Verify refresh token cookie was set",
-              "    const refreshCookie = pm.cookies.get('refresh_token');",
-              "    pm.test('Refresh token cookie is set', function() {",
-              "        pm.expect(refreshCookie).to.not.be.undefined;",
-              "    });",
-              "}"
+          "name": "1. Register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    ",
+                  "    // Save access token from response (Hybrid mode)",
+                  "    if (jsonData.data && jsonData.data.accessToken) {",
+                  "        pm.collectionVariables.set('accessToken', jsonData.data.accessToken);",
+                  "        console.log('✅ Access token saved from registration');",
+                  "    }",
+                  "    ",
+                  "    // Extract and save CSRF token",
+                  "    const xsrfCookie = pm.cookies.get('XSRF-TOKEN');",
+                  "    if (xsrfCookie) {",
+                  "        pm.collectionVariables.set('csrfToken', xsrfCookie);",
+                  "        console.log('✅ CSRF token saved from registration');",
+                  "    }",
+                  "    ",
+                  "    pm.test('Access token is returned', function() {",
+                  "        pm.expect(jsonData.data).to.have.property('accessToken');",
+                  "    });",
+                  "    ",
+                  "    pm.test('CSRF cookie is set', function() {",
+                  "        pm.expect(xsrfCookie).to.not.be.undefined;",
+                  "    });",
+                  "    ",
+                  "    pm.test('Refresh token cookie is set', function() {",
+                  "        const refreshCookie = pm.cookies.get('refresh_token');",
+                  "        pm.expect(refreshCookie).to.not.be.undefined;",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
-            "type": "text/javascript"
-          }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{testPassword}}\",\n  \"name\": \"Test User\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "register"]
+            },
+            "description": "Register a new user account.\n\n**Expected Response (Hybrid mode):**\n- Access token in response body\n- Refresh token in HttpOnly cookie\n- CSRF token in XSRF-TOKEN cookie\n\n**Note:** After registration, you're automatically logged in."
+          },
+          "response": []
+        },
+        {
+          "name": "2. Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    ",
+                  "    // Save access token from response (Hybrid mode)",
+                  "    if (jsonData.data && jsonData.data.accessToken) {",
+                  "        pm.collectionVariables.set('accessToken', jsonData.data.accessToken);",
+                  "        console.log('✅ Access token saved from login');",
+                  "    }",
+                  "    ",
+                  "    // Extract and save CSRF token",
+                  "    const xsrfCookie = pm.cookies.get('XSRF-TOKEN');",
+                  "    if (xsrfCookie) {",
+                  "        pm.collectionVariables.set('csrfToken', xsrfCookie);",
+                  "        console.log('✅ CSRF token saved from login');",
+                  "    }",
+                  "    ",
+                  "    pm.test('Access token is returned', function() {",
+                  "        pm.expect(jsonData.data).to.have.property('accessToken');",
+                  "    });",
+                  "    ",
+                  "    pm.test('CSRF cookie is set', function() {",
+                  "        pm.expect(xsrfCookie).to.not.be.undefined;",
+                  "    });",
+                  "    ",
+                  "    pm.test('Refresh token cookie is set', function() {",
+                  "        const refreshCookie = pm.cookies.get('refresh_token');",
+                  "        pm.expect(refreshCookie).to.not.be.undefined;",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"{{testPassword}}\",\n  \"rememberMe\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Login with email and password.\n\n**Request Body:**\n- `email`: User's email address\n- `password`: User's password\n- `rememberMe`: Optional, creates longer-lived session if true\n\n**Expected Response (Hybrid mode):**\n- Access token in response body\n- Refresh token in HttpOnly cookie\n- CSRF token in XSRF-TOKEN cookie"
+          },
+          "response": []
+        },
+        {
+          "name": "3. Get Current User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    ",
+                  "    pm.test('User data is returned', function() {",
+                  "        pm.expect(jsonData.data).to.have.property('email');",
+                  "        pm.expect(jsonData.data).to.have.property('id');",
+                  "    });",
+                  "    ",
+                  "    pm.test('User email matches', function() {",
+                  "        pm.expect(jsonData.data.email).to.equal(pm.collectionVariables.get('testEmail'));",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me"]
+            },
+            "description": "Get current authenticated user information.\n\n**Requires:**\n- Valid access token (automatically added from collection variable)\n\n**Note:** GET requests don't require CSRF token.\n\n**Response includes:**\n- User ID, email, name\n- Email verification status\n- Roles (if any)\n- Additional claims (if any)"
+          },
+          "response": []
+        },
+        {
+          "name": "4. Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    ",
+                  "    // Save new access token",
+                  "    if (jsonData.data && jsonData.data.accessToken) {",
+                  "        pm.collectionVariables.set('accessToken', jsonData.data.accessToken);",
+                  "        console.log('✅ New access token saved from refresh');",
+                  "    }",
+                  "    ",
+                  "    // Extract and save rotated CSRF token",
+                  "    const xsrfCookie = pm.cookies.get('XSRF-TOKEN');",
+                  "    if (xsrfCookie) {",
+                  "        pm.collectionVariables.set('csrfToken', xsrfCookie);",
+                  "        console.log('✅ Rotated CSRF token saved from refresh');",
+                  "    }",
+                  "    ",
+                  "    pm.test('New access token is returned', function() {",
+                  "        pm.expect(jsonData.data).to.have.property('accessToken');",
+                  "    });",
+                  "    ",
+                  "    pm.test('CSRF token rotated', function() {",
+                  "        pm.expect(xsrfCookie).to.not.be.undefined;",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/refresh",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "refresh"]
+            },
+            "description": "Refresh access token using refresh token from cookie.\n\n**Requires:**\n- Refresh token cookie (automatically sent by Postman)\n- CSRF token (automatically added by collection script)\n\n**Expected Response:**\n- New access token\n- CSRF token rotated (new XSRF-TOKEN cookie)\n- New refresh token cookie (token rotation)\n\n**Note:** The refreshToken field in body can be empty - the cookie is used."
+          },
+          "response": []
+        },
+        {
+          "name": "5. Logout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    // Clear tokens from collection",
+                  "    pm.collectionVariables.set('accessToken', '');",
+                  "    pm.collectionVariables.set('csrfToken', '');",
+                  "    console.log('✅ Access token and CSRF token cleared from collection');",
+                  "    ",
+                  "    pm.test('Logout successful', function() {",
+                  "        const jsonData = pm.response.json();",
+                  "        pm.expect(jsonData).to.have.property('message');",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "logout"]
+            },
+            "description": "Logout and revoke refresh token.\n\n**Requires:**\n- Refresh token cookie (automatically sent)\n- CSRF token (automatically added)\n\n**Expected:**\n- All cookies cleared (refresh_token, XSRF-TOKEN)\n- Refresh token invalidated on server\n- Collection variables cleared\n\n**Note:** The refreshToken field in body can be empty - the cookie is used."
+          },
+          "response": []
         }
-      ],
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"identifier\": \"{{testEmail}}\",\n  \"password\": \"{{testPassword}}\"\n}"
-        },
-        "url": {
-          "raw": "{{baseUrl}}/api/auth/login",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "auth", "login"]
-        },
-        "description": "Login with email and password.\n\n**Expected Response (Hybrid mode):**\n- Access token in response body\n- Refresh token in HttpOnly cookie\n- CSRF token in XSRF-TOKEN cookie"
-      },
-      "response": []
+      ]
     },
     {
-      "name": "3. Get Current User",
-      "event": [
+      "name": "🔑 Password Management",
+      "item": [
         {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test('Status code is 200', function() {",
-              "    pm.response.to.have.status(200);",
-              "});",
-              "",
-              "pm.test('User data is returned', function() {",
-              "    const jsonData = pm.response.json();",
-              "    pm.expect(jsonData.data).to.have.property('email');",
-              "});"
+          "name": "1. Change Password",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.test('Password changed successfully', function() {",
+                  "        pm.expect(jsonData).to.have.property('message');",
+                  "    });",
+                  "    ",
+                  "    console.log('✅ Password changed - update testPassword variable if needed');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
-            "type": "text/javascript"
-          }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"{{testPassword}}\",\n  \"newPassword\": \"NewTest123!@#\",\n  \"confirmPassword\": \"NewTest123!@#\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/change-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "change-password"]
+            },
+            "description": "Change password for authenticated user.\n\n**Requires:**\n- Valid access token (automatically added)\n- CSRF token (automatically added)\n- Current password for verification\n\n**Request Body:**\n- `currentPassword`: User's current password\n- `newPassword`: New password (must meet policy requirements)\n- `confirmPassword`: Must match newPassword\n\n**Note:** After changing password, all refresh tokens are revoked for security."
+          },
+          "response": []
+        },
+        {
+          "name": "2. Set Password (OAuth Users)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.test('Password set successfully', function() {",
+                  "        pm.expect(jsonData).to.have.property('message');",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"newPassword\": \"{{testPassword}}\",\n  \"confirmPassword\": \"{{testPassword}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/set-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "set-password"]
+            },
+            "description": "Set a password for OAuth-only users who don't have a password yet.\n\n**Requires:**\n- Valid access token (automatically added)\n- CSRF token (automatically added)\n- User must not already have a password\n\n**Request Body:**\n- `newPassword`: New password (must meet policy requirements)\n- `confirmPassword`: Must match newPassword\n\n**Use Case:**\n- Users who signed up with OAuth only\n- Want to add password-based login option"
+          },
+          "response": []
+        },
+        {
+          "name": "3. Forgot Password",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.test('Password reset email sent', function() {",
+                  "        pm.expect(jsonData).to.have.property('message');",
+                  "    });",
+                  "    ",
+                  "    console.log('ℹ️ Check sample app console/logs for password reset email');",
+                  "    console.log('ℹ️ Extract token from email URL and set resetToken variable');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testEmail}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/forgot-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "forgot-password"]
+            },
+            "description": "Request password reset email.\n\n**Note:** This is a public endpoint - no auth required.\n**Note:** CSRF token not required (safe endpoint).\n\n**Request Body:**\n- `email`: User's email address\n\n**Expected:**\n- Password reset email sent (check sample app console/logs)\n- Email contains reset token URL\n\n**Next Step:**\n1. Check sample app console for email content\n2. Extract token from email URL\n3. Set `resetToken` collection variable\n4. Use Reset Password endpoint"
+          },
+          "response": []
+        },
+        {
+          "name": "4. Reset Password",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.test('Password reset successful', function() {",
+                  "        pm.expect(jsonData).to.have.property('message');",
+                  "    });",
+                  "    ",
+                  "    console.log('✅ Password reset - all refresh tokens revoked');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{resetToken}}\",\n  \"newPassword\": \"{{testPassword}}\",\n  \"confirmPassword\": \"{{testPassword}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/reset-password",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "reset-password"]
+            },
+            "description": "Reset password using token from email.\n\n**Note:** This is a public endpoint - no auth required.\n**Note:** CSRF token not required (token provides security).\n\n**Request Body:**\n- `token`: Password reset token from email (set `resetToken` variable)\n- `newPassword`: New password (must meet policy requirements)\n- `confirmPassword`: Must match newPassword\n\n**Expected:**\n- Password updated\n- All refresh tokens revoked for security\n- User must login again\n\n**Setup:**\n1. Run Forgot Password endpoint first\n2. Extract token from email (check sample app console)\n3. Set `resetToken` collection variable\n4. Run this endpoint"
+          },
+          "response": []
         }
-      ],
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{baseUrl}}/api/auth/me",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "auth", "me"]
-        },
-        "description": "Get current authenticated user.\n\n**Requires:**\n- Valid access token (automatically added from collection variable)\n\n**Note:** GET requests don't require CSRF token."
-      },
-      "response": []
+      ]
     },
     {
-      "name": "4. Refresh Token",
-      "event": [
+      "name": "📧 Email Management",
+      "item": [
         {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "// Save new access token",
-              "if (pm.response.code === 200) {",
-              "    const jsonData = pm.response.json();",
-              "    if (jsonData.data && jsonData.data.accessToken) {",
-              "        pm.collectionVariables.set('accessToken', jsonData.data.accessToken);",
-              "        console.log('✅ New access token saved from refresh');",
-              "    }",
-              "    ",
-              "    // Extract and save rotated CSRF token",
-              "    const xsrfCookie = pm.cookies.get('XSRF-TOKEN');",
-              "    if (xsrfCookie) {",
-              "        pm.collectionVariables.set('csrfToken', xsrfCookie);",
-              "        console.log('✅ Rotated CSRF token saved from refresh');",
-              "    }",
-              "    ",
-              "    pm.test('CSRF token rotated', function() {",
-              "        pm.expect(xsrfCookie).to.not.be.undefined;",
-              "    });",
-              "}"
+          "name": "1. Verify Email",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.test('Email verified successfully', function() {",
+                  "        pm.expect(jsonData).to.have.property('message');",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
-            "type": "text/javascript"
-          }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{verificationToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/verify-email",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "verify-email"]
+            },
+            "description": "Verify email address using token from email.\n\n**Note:** This is a public endpoint - no auth required.\n**Note:** CSRF token not required (token provides security).\n\n**Request Body:**\n- `token`: Email verification token from email (set `verificationToken` variable)\n\n**Setup:**\n1. Register a new user (or check if verification email was sent)\n2. Extract token from email (check sample app console)\n3. Set `verificationToken` collection variable\n4. Run this endpoint"
+          },
+          "response": []
+        },
+        {
+          "name": "2. Change Email",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.test('Email change initiated', function() {",
+                  "        pm.expect(jsonData).to.have.property('message');",
+                  "    });",
+                  "    ",
+                  "    console.log('ℹ️ Check sample app console/logs for verification email');",
+                  "    console.log('ℹ️ Extract token from email URL and set emailChangeToken variable');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"newEmail\": \"newemail@example.com\",\n  \"password\": \"{{testPassword}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/change-email",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "change-email"]
+            },
+            "description": "Request email change (sends verification email to new address).\n\n**Requires:**\n- Valid access token (automatically added)\n- CSRF token (automatically added)\n- Current password (if RequirePasswordConfirmation is enabled)\n\n**Request Body:**\n- `newEmail`: New email address to change to\n- `password`: Current password (if required by configuration)\n\n**Expected:**\n- Verification email sent to new address\n- Security notification sent to old address\n- Email change pending until verified\n\n**Next Step:**\n1. Check sample app console for verification email\n2. Extract token from email URL\n3. Set `emailChangeToken` collection variable\n4. Use Verify Email Change endpoint"
+          },
+          "response": []
+        },
+        {
+          "name": "3. Verify Email Change",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.test('Email change verified', function() {",
+                  "        pm.expect(jsonData).to.have.property('message');",
+                  "    });",
+                  "    ",
+                  "    console.log('✅ Email changed - user must login again');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/verify-email-change?token={{emailChangeToken}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "verify-email-change"],
+              "query": [
+                {
+                  "key": "token",
+                  "value": "{{emailChangeToken}}",
+                  "description": "Email change verification token from email"
+                }
+              ]
+            },
+            "description": "Verify email change using token from email.\n\n**Note:** This is a public endpoint - no auth required.\n**Note:** GET request - token passed as query parameter.\n**Note:** CSRF token not required (token provides security).\n\n**Query Parameter:**\n- `token`: Email change verification token from email (set `emailChangeToken` variable)\n\n**Expected:**\n- Email address updated\n- All refresh tokens revoked for security\n- User must login again with new email\n\n**Setup:**\n1. Run Change Email endpoint first\n2. Extract token from verification email (check sample app console)\n3. Set `emailChangeToken` collection variable\n4. Run this endpoint"
+          },
+          "response": []
         }
-      ],
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"refreshToken\": \"\"\n}"
-        },
-        "url": {
-          "raw": "{{baseUrl}}/api/auth/refresh",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "auth", "refresh"]
-        },
-        "description": "Refresh access token using refresh token from cookie.\n\n**Requires:**\n- Refresh token cookie (automatically sent)\n- CSRF token (automatically added by collection script)\n\n**Expected Response:**\n- New access token\n- CSRF token rotated\n- New refresh token cookie"
-      },
-      "response": []
+      ]
     },
     {
-      "name": "5. Change Password",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"currentPassword\": \"{{testPassword}}\",\n  \"newPassword\": \"NewTest123!\",\n  \"confirmPassword\": \"NewTest123!\"\n}"
-        },
-        "url": {
-          "raw": "{{baseUrl}}/api/auth/change-password",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "auth", "change-password"]
-        },
-        "description": "Change password for authenticated user.\n\n**Requires:**\n- Valid access token (automatically added)\n- CSRF token (automatically added)"
-      },
-      "response": []
-    },
-    {
-      "name": "6. Get Active Sessions",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{baseUrl}}/api/auth/sessions",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "auth", "sessions"]
-        },
-        "description": "Get all active sessions for the current user.\n\n**Requires:**\n- Valid access token (automatically added)\n\n**Note:** GET requests don't require CSRF token."
-      },
-      "response": []
-    },
-    {
-      "name": "7. Revoke Other Sessions",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"refreshToken\": \"\"\n}"
-        },
-        "url": {
-          "raw": "{{baseUrl}}/api/auth/sessions/revoke-others",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "auth", "sessions", "revoke-others"]
-        },
-        "description": "Revoke all other sessions except the current one.\n\n**Requires:**\n- Valid access token (automatically added)\n- Refresh token cookie (automatically sent)\n- CSRF token (automatically added)"
-      },
-      "response": []
-    },
-    {
-      "name": "8. Logout",
-      "event": [
+      "name": "🖥️ Sessions",
+      "item": [
         {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "// Clear tokens from collection",
-              "if (pm.response.code === 200) {",
-              "    pm.collectionVariables.set('accessToken', '');",
-              "    pm.collectionVariables.set('csrfToken', '');",
-              "    console.log('✅ Access token and CSRF token cleared from collection');",
-              "    ",
-              "    // Verify cookies were cleared",
-              "    pm.test('Cookies cleared after logout', function() {",
-              "        // Note: Postman may still show cookies - check browser or server logs",
-              "        console.log('ℹ️ Check that refresh_token and XSRF-TOKEN cookies were cleared');",
-              "    });",
-              "}"
+          "name": "1. Get Active Sessions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    ",
+                  "    pm.test('Sessions array is returned', function() {",
+                  "        pm.expect(jsonData.data).to.have.property('sessions');",
+                  "        pm.expect(jsonData.data.sessions).to.be.an('array');",
+                  "    });",
+                  "    ",
+                  "    // Save first session ID for revoke test",
+                  "    if (jsonData.data.sessions && jsonData.data.sessions.length > 0) {",
+                  "        const firstSession = jsonData.data.sessions[0];",
+                  "        if (firstSession.sessionId) {",
+                  "            pm.collectionVariables.set('sessionId', firstSession.sessionId);",
+                  "            console.log('✅ Session ID saved:', firstSession.sessionId);",
+                  "        }",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/sessions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "sessions"]
+            },
+            "description": "Get all active sessions for the current user.\n\n**Requires:**\n- Valid access token (automatically added)\n\n**Note:** GET requests don't require CSRF token.\n\n**Response includes:**\n- Session ID (token hash)\n- Device information\n- IP address\n- Last activity time\n- Created time\n- Remember me status\n\n**Note:** First session ID is automatically saved to `sessionId` variable for Revoke Session test."
+          },
+          "response": []
+        },
+        {
+          "name": "2. Revoke Session",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.test('Session revoked successfully', function() {",
+                  "        pm.expect(jsonData).to.have.property('message');",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
-            "type": "text/javascript"
-          }
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sessionId\": \"{{sessionId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/sessions/revoke",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "sessions", "revoke"]
+            },
+            "description": "Revoke a specific session by session ID.\n\n**Requires:**\n- Valid access token (automatically added)\n- CSRF token (automatically added)\n- Session ID from Get Active Sessions\n\n**Request Body:**\n- `sessionId`: Session ID to revoke (from Get Active Sessions response)\n\n**Note:** Session ID is automatically set from Get Active Sessions response.\n**Note:** You can only revoke your own sessions."
+          },
+          "response": []
+        },
+        {
+          "name": "3. Revoke All Other Sessions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.test('Other sessions revoked', function() {",
+                  "        pm.expect(jsonData).to.have.property('message');",
+                  "    });",
+                  "    ",
+                  "    console.log('✅ All other sessions revoked - current session remains active');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/sessions/revoke-others",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "sessions", "revoke-others"]
+            },
+            "description": "Revoke all other sessions except the current one.\n\n**Requires:**\n- Valid access token (automatically added)\n- Refresh token cookie (automatically sent)\n- CSRF token (automatically added)\n\n**Request Body:**\n- `refreshToken`: Can be empty - current session identified by cookie\n\n**Expected:**\n- All other sessions revoked\n- Current session remains active\n- Useful for security (logout all other devices)"
+          },
+          "response": []
         }
-      ],
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"refreshToken\": \"\"\n}"
-        },
-        "url": {
-          "raw": "{{baseUrl}}/api/auth/logout",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "auth", "logout"]
-        },
-        "description": "Logout and revoke refresh token.\n\n**Requires:**\n- Refresh token cookie (automatically sent)\n- CSRF token (automatically added)\n\n**Expected:**\n- All cookies cleared (refresh_token, XSRF-TOKEN)"
-      },
-      "response": []
+      ]
     },
     {
-      "name": "9. Forgot Password",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"email\": \"{{testEmail}}\"\n}"
-        },
-        "url": {
-          "raw": "{{baseUrl}}/api/auth/forgot-password",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "auth", "forgot-password"]
-        },
-        "description": "Request password reset email.\n\n**Note:** This is a public endpoint - no auth required.\n**Note:** CSRF token not required (safe endpoint)."
-      },
-      "response": []
-    },
-    {
-      "name": "Test - GET Root",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{baseUrl}}/",
-          "host": ["{{baseUrl}}"],
-          "path": [""]
-        },
-        "description": "Test endpoint to verify API is running."
-      },
-      "response": []
-    },
-    {
-      "name": "Test - CSRF Protection (Should Fail)",
-      "event": [
+      "name": "🔗 OAuth (if enabled)",
+      "item": [
         {
-          "listen": "prerequest",
-          "script": {
-            "exec": [
-              "// Remove CSRF token header to test protection",
-              "pm.request.headers.remove('X-XSRF-TOKEN');",
-              "console.log('⚠️ CSRF token removed - this request should fail with 403');"
-            ],
-            "type": "text/javascript"
-          }
+          "name": "1. OAuth Initiate",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 302 (redirect)', function() {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([302, 200]);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 302) {",
+                  "    const location = pm.response.headers.get('Location');",
+                  "    pm.test('Redirect to OAuth provider', function() {",
+                  "        pm.expect(location).to.include('oauth');",
+                  "    });",
+                  "    ",
+                  "    console.log('✅ Redirect URL:', location);",
+                  "    console.log('ℹ️ Open this URL in browser to complete OAuth flow');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/oauth/{{oauthProvider}}?returnUrl=http://localhost:3000/callback",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "oauth", "{{oauthProvider}}"],
+              "query": [
+                {
+                  "key": "returnUrl",
+                  "value": "http://localhost:3000/callback",
+                  "description": "Optional: URL to redirect after OAuth callback"
+                }
+              ]
+            },
+            "description": "Initiate OAuth flow - redirects to OAuth provider.\n\n**Note:** This is a public endpoint - no auth required.\n**Note:** GET request - no CSRF token needed.\n\n**Path Parameter:**\n- `provider`: OAuth provider name (google, discord) - set via `oauthProvider` variable\n\n**Query Parameter:**\n- `returnUrl`: Optional - URL to redirect after OAuth callback\n\n**Expected:**\n- 302 redirect to OAuth provider\n- User authenticates with provider\n- Provider redirects to callback endpoint\n\n**Note:** In Postman, you'll see the redirect URL. Open it in a browser to complete the flow."
+          },
+          "response": []
         },
         {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test('Request blocked without CSRF token', function() {",
-              "    pm.expect(pm.response.code).to.equal(403);",
-              "});",
-              "",
-              "pm.test('Error message indicates CSRF failure', function() {",
-              "    const jsonData = pm.response.json();",
-              "    pm.expect(jsonData.error.code).to.include('FORBIDDEN');",
-              "});"
+          "name": "2. OAuth Callback",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/oauth/{{oauthProvider}}/callback?code=CODE&state=STATE",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "oauth", "{{oauthProvider}}", "callback"],
+              "query": [
+                {
+                  "key": "code",
+                  "value": "CODE",
+                  "description": "Authorization code from OAuth provider"
+                },
+                {
+                  "key": "state",
+                  "value": "STATE",
+                  "description": "State token for CSRF protection"
+                }
+              ]
+            },
+            "description": "Handle OAuth provider callback.\n\n**Note:** This endpoint is typically called by the OAuth provider, not directly from Postman.\n**Note:** This is a public endpoint - no auth required.\n\n**Query Parameters:**\n- `code`: Authorization code from OAuth provider\n- `state`: State token for CSRF protection\n- `error`: Optional - error from provider\n- `error_description`: Optional - error description\n\n**Expected:**\n- User logged in (if account exists or auto-registration enabled)\n- Redirect to returnUrl with access token\n\n**Testing:**\n- Use OAuth Initiate endpoint and follow redirect in browser\n- Provider will call this callback automatically"
+          },
+          "response": []
+        },
+        {
+          "name": "3. Link OAuth Provider",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    ",
+                  "    pm.test('AuthUrl is returned', function() {",
+                  "        pm.expect(jsonData.data).to.have.property('authUrl');",
+                  "    });",
+                  "    ",
+                  "    if (jsonData.data && jsonData.data.authUrl) {",
+                  "        console.log('✅ Auth URL:', jsonData.data.authUrl);",
+                  "        console.log('ℹ️ Open this URL in browser to complete OAuth linking');",
+                  "    }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
-            "type": "text/javascript"
-          }
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/oauth/{{oauthProvider}}/link?returnUrl=http://localhost:3000/callback",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "oauth", "{{oauthProvider}}", "link"],
+              "query": [
+                {
+                  "key": "returnUrl",
+                  "value": "http://localhost:3000/callback",
+                  "description": "Optional: URL to redirect after OAuth callback"
+                }
+              ]
+            },
+            "description": "Link an OAuth provider to authenticated user.\n\n**Requires:**\n- Valid access token (automatically added)\n- CSRF token (automatically added)\n\n**Path Parameter:**\n- `provider`: OAuth provider name (google, discord) - set via `oauthProvider` variable\n\n**Query Parameter:**\n- `returnUrl`: Optional - URL to redirect after OAuth callback\n\n**Expected Response:**\n- 200 OK with `authUrl` in response body\n- Frontend should redirect user to `authUrl`\n- User authorizes provider\n- Provider linked to account\n- OAuth callback redirects to returnUrl\n\n**Note:** The handler returns an authorization URL, not a direct redirect. Your frontend should redirect to the returned `authUrl`."
+          },
+          "response": []
+        },
+        {
+          "name": "4. Unlink OAuth Provider",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.test('Provider unlinked', function() {",
+                  "        pm.expect(jsonData).to.have.property('message');",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/oauth/{{oauthProvider}}/unlink",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "oauth", "{{oauthProvider}}", "unlink"]
+            },
+            "description": "Unlink an OAuth provider from authenticated user.\n\n**Requires:**\n- Valid access token (automatically added)\n- CSRF token (automatically added)\n\n**Path Parameter:**\n- `provider`: OAuth provider name (google, discord) - set via `oauthProvider` variable\n\n**Expected:**\n- Provider unlinked from account\n- User can still login with password or other providers\n\n**Note:** User must have at least one login method (password or another provider) remaining."
+          },
+          "response": []
+        },
+        {
+          "name": "5. List Linked Providers",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    ",
+                  "    pm.test('Providers array is returned', function() {",
+                  "        pm.expect(jsonData).to.have.property('providers');",
+                  "        pm.expect(jsonData.providers).to.be.an('array');",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/oauth/linked",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "oauth", "linked"]
+            },
+            "description": "Get all linked OAuth providers for authenticated user.\n\n**Requires:**\n- Valid access token (automatically added)\n\n**Note:** GET requests don't require CSRF token.\n\n**Response includes:**\n- Provider name\n- Provider email\n- Provider username\n- Linked date"
+          },
+          "response": []
         }
-      ],
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"refreshToken\": \"\"\n}"
+      ]
+    },
+    {
+      "name": "🧪 Test Scenarios",
+      "item": [
+        {
+          "name": "Health Check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('API is running', function() {",
+                  "    pm.expect(pm.response.code).to.equal(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/",
+              "host": ["{{baseUrl}}"],
+              "path": [""]
+            },
+            "description": "Test endpoint to verify API is running."
+          },
+          "response": []
         },
-        "url": {
-          "raw": "{{baseUrl}}/api/auth/refresh",
-          "host": ["{{baseUrl}}"],
-          "path": ["api", "auth", "refresh"]
+        {
+          "name": "CSRF Protection Test (Should Fail)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Remove CSRF token header to test protection",
+                  "pm.request.headers.remove('X-XSRF-TOKEN');",
+                  "console.log('⚠️ CSRF token removed - this request should fail with 403');"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Request blocked without CSRF token', function() {",
+                  "    pm.expect(pm.response.code).to.equal(403);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 403) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.test('Error message indicates CSRF failure', function() {",
+                  "        pm.expect(jsonData.error).to.exist;",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/refresh",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "refresh"]
+            },
+            "description": "Test that CSRF protection is working.\n\n**Expected:** 403 Forbidden (CSRF token missing)\n\n**Note:** This request deliberately removes the CSRF token to verify protection is enabled."
+          },
+          "response": []
         },
-        "description": "Test that CSRF protection is working.\n\n**Expected:** 403 Forbidden (CSRF token missing)\n\n**Note:** This request deliberately removes the CSRF token to verify protection is enabled."
-      },
-      "response": []
+        {
+          "name": "Unauthorized Access Test (Should Fail)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Clear access token to test unauthorized access",
+                  "pm.collectionVariables.set('accessToken', '');",
+                  "pm.request.headers.remove('Authorization');",
+                  "console.log('⚠️ Access token removed - this request should fail with 401');"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Request blocked without access token', function() {",
+                  "    pm.expect(pm.response.code).to.equal(401);",
+                  "});",
+                  "",
+                  "// Restore access token for other tests",
+                  "// (You'll need to login again to get a valid token)"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me"]
+            },
+            "description": "Test that authorization is required for protected endpoints.\n\n**Expected:** 401 Unauthorized (no access token)\n\n**Note:** This request deliberately removes the access token to verify authorization is enforced."
+          },
+          "response": []
+        },
+        {
+          "name": "Invalid Credentials Test (Should Fail)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Request fails with invalid credentials', function() {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([400, 401]);",
+                  "});",
+                  "",
+                  "if (pm.response.code !== 200) {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.test('Error message indicates invalid credentials', function() {",
+                  "        pm.expect(jsonData.error).to.exist;",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"nonexistent@example.com\",\n  \"password\": \"WrongPassword123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Test login with invalid credentials.\n\n**Expected:** 400/401 Bad Request/Unauthorized (invalid credentials)\n\n**Note:** This tests error handling for invalid login attempts."
+          },
+          "response": []
+        },
+        {
+          "name": "Rate Limiting Test",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// This test makes multiple rapid requests to test rate limiting",
+                  "// Note: You may need to run this multiple times quickly",
+                  "",
+                  "if (pm.response.code === 429) {",
+                  "    pm.test('Rate limit exceeded', function() {",
+                  "        pm.expect(pm.response.code).to.equal(429);",
+                  "    });",
+                  "    ",
+                  "    const retryAfter = pm.response.headers.get('Retry-After');",
+                  "    if (retryAfter) {",
+                  "        console.log('✅ Retry-After header:', retryAfter, 'seconds');",
+                  "    }",
+                  "} else {",
+                  "    console.log('ℹ️ Rate limit not hit yet - try running this request multiple times quickly');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{testEmail}}\",\n  \"password\": \"WrongPassword123!\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Test rate limiting by making multiple rapid requests.\n\n**Expected:** 429 Too Many Requests (after exceeding rate limit)\n\n**Note:** Run this request multiple times quickly (5+ times) to trigger rate limiting.\n**Note:** Default login rate limit: 5 requests per 5 minutes per IP."
+          },
+          "response": []
+        }
+      ]
     }
   ]
 }

@@ -1,11 +1,13 @@
 using System.Collections.Concurrent;
 using Pawthorize.Abstractions;
+using Pawthorize.Services;
 
 namespace Pawthorize.Sample.MinimalApi.Repositories;
 
-public class InMemoryTokenRepository : ITokenRepository
+public class InMemoryTokenRepository : IEmailChangeTokenRepository
 {
     private readonly ConcurrentDictionary<string, StoredToken> _tokens = new();
+    private readonly ConcurrentDictionary<string, string> _emailChangeTokens = new(); // tokenHash -> newEmail
 
     public Task StoreTokenAsync(
         string userId,
@@ -99,6 +101,57 @@ public class InMemoryTokenRepository : ITokenRepository
         }
 
         return Task.CompletedTask;
+    }
+
+    public Task StoreEmailChangeTokenAsync(
+        string userId,
+        string tokenHash,
+        string newEmail,
+        DateTime expiresAt,
+        CancellationToken cancellationToken = default)
+    {
+        var storedToken = new StoredToken
+        {
+            TokenHash = tokenHash,
+            UserId = userId,
+            Type = TokenType.EmailChange,
+            CreatedAt = DateTime.UtcNow,
+            ExpiresAt = expiresAt,
+            IsInvalidated = false
+        };
+
+        _tokens[tokenHash] = storedToken;
+        _emailChangeTokens[tokenHash] = newEmail;
+        return Task.CompletedTask;
+    }
+
+    public Task<EmailChangeTokenInfo?> ConsumeEmailChangeTokenAsync(
+        string tokenHash,
+        CancellationToken cancellationToken = default)
+    {
+        if (!_tokens.TryGetValue(tokenHash, out var storedToken))
+            return Task.FromResult<EmailChangeTokenInfo?>(null);
+
+        if (storedToken.Type != TokenType.EmailChange)
+            return Task.FromResult<EmailChangeTokenInfo?>(null);
+
+        if (storedToken.IsInvalidated)
+            return Task.FromResult<EmailChangeTokenInfo?>(null);
+
+        if (!_emailChangeTokens.TryGetValue(tokenHash, out var newEmail))
+            return Task.FromResult<EmailChangeTokenInfo?>(null);
+
+        // Invalidate the token atomically
+        storedToken.IsInvalidated = true;
+        _emailChangeTokens.TryRemove(tokenHash, out _);
+
+        var tokenInfo = new EmailChangeTokenInfo(
+            storedToken.UserId,
+            newEmail,
+            storedToken.CreatedAt,
+            storedToken.ExpiresAt);
+
+        return Task.FromResult<EmailChangeTokenInfo?>(tokenInfo);
     }
 
     private class StoredToken

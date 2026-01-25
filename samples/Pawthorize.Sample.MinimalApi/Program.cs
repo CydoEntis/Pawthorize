@@ -1,11 +1,11 @@
 using Pawthorize.Abstractions;
-using Pawthorize.DTOs;
 using Pawthorize.Extensions;
+using Pawthorize.Endpoints.Register;
+using Pawthorize.Services;
 using Pawthorize.Sample.MinimalApi.Factories;
 using Pawthorize.Sample.MinimalApi.Models;
 using Pawthorize.Sample.MinimalApi.Repositories;
 using Pawthorize.Sample.MinimalApi.Services;
-using Pawthorize.Services;
 using Pawthorize.Templates;
 
 var builder = WebApplication.CreateBuilder(args);

@@ -1,5 +1,5 @@
-﻿using Pawthorize.Abstractions;
-using Pawthorize.DTOs;
+using Pawthorize.Abstractions;
+using Pawthorize.Endpoints.Register;
 using Pawthorize.Sample.MinimalApi.Models;
 
 namespace Pawthorize.Sample.MinimalApi.Factories;
