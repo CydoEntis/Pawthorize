@@ -68,7 +68,6 @@ public class GetCurrentUserHandler<TUser> where TUser : IAuthenticatedUser
             {
                 Id = user.Id,
                 Email = user.Email,
-                Name = user.Name,
                 Roles = user.Roles,
                 IsEmailVerified = user.IsEmailVerified,
                 HasPassword = !string.IsNullOrEmpty(user.PasswordHash),
