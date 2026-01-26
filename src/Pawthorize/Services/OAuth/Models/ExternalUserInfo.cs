@@ -21,9 +21,21 @@ public class ExternalUserInfo
     public bool EmailVerified { get; init; }
 
     /// <summary>
-    /// The user's display name.
+    /// The user's display name (full name for Google, global_name for Discord).
     /// </summary>
     public string? Name { get; init; }
+
+    /// <summary>
+    /// Given name / first name (from OpenID Connect 'given_name' claim).
+    /// Available from: Google, potentially future OpenID providers.
+    /// </summary>
+    public string? GivenName { get; init; }
+
+    /// <summary>
+    /// Family name / last name (from OpenID Connect 'family_name' claim).
+    /// Available from: Google, potentially future OpenID providers.
+    /// </summary>
+    public string? FamilyName { get; init; }
 
     /// <summary>
     /// The user's username (if applicable).
