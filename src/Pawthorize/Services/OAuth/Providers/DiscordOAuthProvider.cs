@@ -81,6 +81,8 @@ public class DiscordOAuthProvider : OAuthProviderBase
             Email = email,
             EmailVerified = emailVerified,
             Name = globalName ?? displayUsername,
+            GivenName = null,        // Discord doesn't provide structured names
+            FamilyName = null,       // Discord doesn't provide structured names
             Username = displayUsername,
             ProfilePictureUrl = profilePictureUrl
         };

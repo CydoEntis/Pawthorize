@@ -54,6 +54,8 @@ public class GoogleOAuthProvider : OAuthProviderBase
         }
 
         var name = userData.TryGetValue("name", out var nameElement) ? nameElement.GetString() : null;
+        var givenName = userData.TryGetValue("given_name", out var givenElement) ? givenElement.GetString() : null;
+        var familyName = userData.TryGetValue("family_name", out var familyElement) ? familyElement.GetString() : null;
         var picture = userData.TryGetValue("picture", out var pictureElement) ? pictureElement.GetString() : null;
 
         _logger.LogInformation("Successfully retrieved Google user info for user {ProviderId}", providerId);
@@ -64,6 +66,8 @@ public class GoogleOAuthProvider : OAuthProviderBase
             Email = email,
             EmailVerified = emailVerified,
             Name = name,
+            GivenName = givenName,
+            FamilyName = familyName,
             Username = null,
             ProfilePictureUrl = picture
         };
