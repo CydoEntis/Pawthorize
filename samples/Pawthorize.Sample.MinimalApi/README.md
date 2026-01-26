@@ -1,6 +1,6 @@
 # Pawthorize Sample - Minimal API
 
-A complete **production-ready reference implementation** demonstrating **Pawthorize** authentication library with ASP.NET Core Minimal APIs.
+A complete **production-ready reference implementation** demonstrating **Pawthorize v0.8.0** authentication library with ASP.NET Core Minimal APIs.
 
 ## Features Demonstrated
 
@@ -10,6 +10,7 @@ A complete **production-ready reference implementation** demonstrating **Pawthor
 - ✅ **Detailed Validation Errors** - Field-level error reporting (v0.7.2)
 - ✅ **Set Password for OAuth Users** - OAuth-only users can add password login (v0.7.9)
 - ✅ **hasPassword Field** - Check if user has password set via /me endpoint (v0.7.9)
+- ✅ **Email Change** - Secure email address change with verification (v0.8.0)
 - ✅ **Password Policy Enforcement** - Configurable password strength requirements (v0.7.0)
 - ✅ **Account Lockout Protection** - Brute force protection with failed attempt tracking (v0.7.0)
 - ✅ **Built-in Rate Limiting** - IP-based rate limiting for all endpoints (v0.7.0)
@@ -34,6 +35,25 @@ This sample demonstrates **best practices** for modern web applications:
 - ✅ **Convenient**: Access tokens available for API calls
 - ✅ **CSRF Protected**: Built-in protection against cross-site request forgery
 - ✅ **Best Practice**: Recommended for SPAs and modern web apps
+
+## What's New in v0.8.0
+
+### Email Change Feature
+Users can now securely change their email address:
+- `POST /auth/change-email` - Request email change (sends verification)
+- `GET /auth/verify-email-change` - Verify new email with token
+
+### Vertical Slice Architecture
+Pawthorize v0.8.0 introduces a new internal architecture with vertical slices per feature. This doesn't affect how you use the library, but if you were referencing internal types:
+
+**Namespace changes:**
+- `Pawthorize.Models` → `Pawthorize.Services.Models` (for `AuthResult`, `RefreshTokenInfo`)
+- OAuth models moved to `Pawthorize.Services.OAuth.Models`
+- Internal service interfaces moved from `Pawthorize.Abstractions` to `Pawthorize.Services`
+
+**Consumer interfaces unchanged:** `IUserRepository`, `IRefreshTokenRepository`, `IAuthenticatedUser` stay in `Pawthorize.Abstractions`.
+
+See [UPGRADE_GUIDE_0.8.0.md](../../UPGRADE_GUIDE_0.8.0.md) for migration details.
 
 ## Prerequisites
 
@@ -394,6 +414,99 @@ X-XSRF-TOKEN: <csrf_token>
 ```
 
 **Note:** This endpoint is for users who registered via OAuth and have no password. Users with existing passwords should use `/auth/change-password` instead.
+
+---
+
+#### 5c. Request Email Change (v0.8.0+)
+
+**POST** `/auth/change-email`
+
+Request to change the user's email address. Sends a verification email to the new address.
+
+**Headers:**
+```
+Authorization: Bearer <access_token>
+X-XSRF-TOKEN: <csrf_token>
+```
+
+**Request:**
+```json
+{
+  "newEmail": "newemail@example.com"
+}
+```
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "message": "Verification email sent to newemail@example.com"
+  }
+}
+```
+
+**Error Response (400 Bad Request) - Same Email:**
+```json
+{
+  "success": false,
+  "error": {
+    "code": "SAME_EMAIL",
+    "message": "New email is the same as current email",
+    "details": null
+  }
+}
+```
+
+**Error Response (409 Conflict) - Email Exists:**
+```json
+{
+  "success": false,
+  "error": {
+    "code": "EMAIL_EXISTS",
+    "message": "Email is already in use by another account",
+    "details": null
+  }
+}
+```
+
+---
+
+#### 5d. Verify Email Change (v0.8.0+)
+
+**GET** `/auth/verify-email-change?token={verificationToken}`
+
+Verify the new email address using the token sent via email.
+
+**Query Parameters:**
+- `token`: The verification token from the email link
+
+**Success Response (200 OK):**
+```json
+{
+  "success": true,
+  "data": {
+    "message": "Email changed successfully"
+  }
+}
+```
+
+**Error Response (400 Bad Request) - Invalid Token:**
+```json
+{
+  "success": false,
+  "error": {
+    "code": "INVALID_TOKEN",
+    "message": "Invalid or expired verification token",
+    "details": null
+  }
+}
+```
+
+**Notes:**
+- A verification email is sent to the new email address
+- A notification email is sent to the old email address (security alert)
+- The token expires based on `EmailChange.TokenLifetimeMinutes` configuration
 
 ---
 
@@ -1074,6 +1187,11 @@ Configuration in `appsettings.json`:
       "BaseUrl": "http://localhost:5022",
       "ApplicationName": "Pawthorize Sample"
     },
+    "EmailChange": {
+      "BaseUrl": "http://localhost:5022",
+      "TokenLifetimeMinutes": 60,
+      "RequireEmailVerification": true
+    },
     "Csrf": {
       "Enabled": true,
       "CookieName": "XSRF-TOKEN",
@@ -1144,6 +1262,11 @@ Configuration in `appsettings.json`:
 - `AccessTokenLifetimeMinutes`: `15` - Short-lived access tokens
 - `RefreshTokenLifetimeDaysRemembered`: `30` - Refresh token lifetime when "Remember Me" is selected
 - `RefreshTokenLifetimeHoursDefault`: `24` - Refresh token lifetime for normal sessions
+
+**Email Change (v0.8.0):**
+- `BaseUrl`: `"http://localhost:5022"` - Base URL for verification links
+- `TokenLifetimeMinutes`: `60` - Verification token lifetime (1 hour)
+- `RequireEmailVerification`: `true` - Require verification of new email
 
 **Password Policy (v0.7.0):**
 - `MinLength`: `8` - Minimum password length
