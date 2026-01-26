@@ -100,7 +100,8 @@ public class RegisterHandlerTests
         {
             Email = "newuser@example.com",
             Password = "Password123!",
-            Name = "Test User"
+            FirstName = "Test",
+            LastName = "User"
         };
 
         var passwordHash = "hashed_password";
@@ -109,7 +110,8 @@ public class RegisterHandlerTests
             Id = "user123",
             Email = request.Email,
             PasswordHash = passwordHash,
-            Name = request.Name,
+            FirstName = request.FirstName,
+            LastName = request.LastName,
             IsEmailVerified = true
         };
 
@@ -168,7 +170,8 @@ public class RegisterHandlerTests
         {
             Email = "newuser@example.com",
             Password = "Password123!",
-            Name = "Test User"
+            FirstName = "Test",
+            LastName = "User"
         };
 
         var passwordHash = "hashed_password";
@@ -177,7 +180,8 @@ public class RegisterHandlerTests
             Id = "user123",
             Email = request.Email,
             PasswordHash = passwordHash,
-            Name = request.Name,
+            FirstName = request.FirstName,
+            LastName = request.LastName,
             IsEmailVerified = false
         };
 
@@ -225,7 +229,8 @@ public class RegisterHandlerTests
         {
             Email = "existing@example.com",
             Password = "Password123!",
-            Name = "Test User"
+            FirstName = "Test",
+            LastName = "User"
         };
 
         _mockValidator
@@ -250,7 +255,8 @@ public class RegisterHandlerTests
         {
             Email = "invalid-email",
             Password = "Password123!",
-            Name = "Test User"
+            FirstName = "Test",
+            LastName = "User"
         };
 
         var validationFailures = new List<ValidationFailure>
@@ -275,7 +281,8 @@ public class RegisterHandlerTests
         {
             Email = "user@example.com",
             Password = "weak",
-            Name = "Test User"
+            FirstName = "Test",
+            LastName = "User"
         };
 
         var validationFailures = new List<ValidationFailure>
@@ -303,7 +310,8 @@ public class RegisterHandlerTests
         {
             Email = "user@example.com",
             Password = "password123!",
-            Name = "Test User"
+            FirstName = "Test",
+            LastName = "User"
         };
 
         var validationFailures = new List<ValidationFailure>
@@ -327,7 +335,8 @@ public class RegisterHandlerTests
         {
             Email = "user@example.com",
             Password = "Password123",
-            Name = "Test User"
+            FirstName = "Test",
+            LastName = "User"
         };
 
         var validationFailures = new List<ValidationFailure>
@@ -353,7 +362,8 @@ public class RegisterHandlerTests
         {
             Email = "user@example.com",
             Password = "Password123!",
-            Name = "Test User"
+            FirstName = "Test",
+            LastName = "User"
         };
 
         var passwordHash = "hashed_password";
@@ -362,7 +372,8 @@ public class RegisterHandlerTests
             Id = "user123",
             Email = request.Email,
             PasswordHash = passwordHash,
-            Name = request.Name
+            FirstName = request.FirstName,
+            LastName = request.LastName
         };
 
         var handlerWithoutEmailService = new RegisterHandler<TestUser, RegisterRequest>(
@@ -410,7 +421,8 @@ public class RegisterHandlerTests
         {
             Email = string.Empty,
             Password = "Password123!",
-            Name = "Test User"
+            FirstName = "Test",
+            LastName = "User"
         };
 
         var validationFailures = new List<ValidationFailure>
@@ -434,7 +446,8 @@ public class RegisterHandlerTests
         {
             Email = "user@example.com",
             Password = "Password123!",
-            Name = "Test User"
+            FirstName = "Test",
+            LastName = "User"
         };
 
         var passwordHash = "hashed_password";
@@ -443,7 +456,8 @@ public class RegisterHandlerTests
             Id = "user123",
             Email = request.Email,
             PasswordHash = passwordHash,
-            Name = request.Name
+            FirstName = request.FirstName,
+            LastName = request.LastName
         };
 
         var authResult = new AuthResult
@@ -482,7 +496,7 @@ public class RegisterHandlerTests
 
         _mockUserFactory.Verify(
             f => f.CreateUser(
-                It.Is<RegisterRequest>(r => r.Email == request.Email && r.Password == request.Password && r.Name == request.Name),
+                It.Is<RegisterRequest>(r => r.Email == request.Email && r.Password == request.Password && r.FirstName == request.FirstName && r.LastName == request.LastName),
                 passwordHash
             ),
             Times.Once

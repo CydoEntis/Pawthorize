@@ -66,7 +66,8 @@ public class JwtServiceTests
         {
             Id = "user123",
             Email = "test@example.com",
-            Name = "John Doe",
+            FirstName = "John",
+            LastName = "Doe",
             Roles = new List<string> { "Admin", "User" },
             AdditionalClaims = new Dictionary<string, string>
             {
@@ -95,7 +96,8 @@ public class JwtServiceTests
         {
             Id = "user123",
             Email = "test@example.com",
-            Name = null
+            FirstName = null,
+            LastName = null
         };
 
         var token = service.GenerateAccessToken(user);
@@ -219,7 +221,8 @@ public class JwtServiceTests
         {
             Id = "user123",
             Email = "test@example.com",
-            Name = "John Doe"
+            FirstName = "John",
+            LastName = "Doe"
         };
         var token = service.GenerateAccessToken(user);
 

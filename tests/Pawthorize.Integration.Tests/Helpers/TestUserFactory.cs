@@ -12,7 +12,8 @@ public class TestUserFactory : IUserFactory<TestUser, RegisterRequest>
             Id = Guid.NewGuid().ToString(),
             Email = request.Email,
             PasswordHash = passwordHash,
-            Name = request.Name,
+            FirstName = request.FirstName,
+            LastName = request.LastName,
             IsEmailVerified = false,
             IsLocked = false
         };

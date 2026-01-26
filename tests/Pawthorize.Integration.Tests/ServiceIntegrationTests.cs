@@ -110,7 +110,8 @@ public class ServiceIntegrationTests : IDisposable
         var user = new TestUser
         {
             Email = "newuser@test.com",
-            Name = "Test User",
+            FirstName = "Test",
+            LastName = "User",
             PasswordHash = _passwordHasher.HashPassword("SecurePass123!"),
             IsEmailVerified = false
         };

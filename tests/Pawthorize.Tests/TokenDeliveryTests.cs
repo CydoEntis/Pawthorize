@@ -368,14 +368,16 @@ public class TokenDeliveryTests
         {
             Email = "newuser@example.com",
             Password = "Password123!",
-            Name = "New User"
+            FirstName = "New",
+            LastName = "User"
         };
 
         var user = new TestUser
         {
             Id = "newuser123",
             Email = "newuser@example.com",
-            Name = "New User",
+            FirstName = "New",
+            LastName = "User",
             PasswordHash = "hashed_password",
             IsEmailVerified = false
         };
@@ -454,14 +456,16 @@ public class TokenDeliveryTests
         {
             Email = "newuser@example.com",
             Password = "Password123!",
-            Name = "New User"
+            FirstName = "New",
+            LastName = "User"
         };
 
         var user = new TestUser
         {
             Id = "newuser123",
             Email = "newuser@example.com",
-            Name = "New User",
+            FirstName = "New",
+            LastName = "User",
             PasswordHash = "hashed_password",
             IsEmailVerified = false
         };
