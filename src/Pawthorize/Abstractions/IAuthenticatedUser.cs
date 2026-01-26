@@ -9,7 +9,6 @@ public interface IAuthenticatedUser
     string Id { get; }
     string Email { get; set; }
     string PasswordHash { get; }
-    string? Name { get; }
     IEnumerable<string> Roles { get; }
     IDictionary<string, string>? AdditionalClaims { get; }
     bool IsEmailVerified { get; set; }
