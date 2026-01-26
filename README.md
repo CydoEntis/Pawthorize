@@ -9,10 +9,60 @@
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
   [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
 
-  **Latest:** v0.7.9 - Set password for OAuth users, fixed link provider flow
+  **Latest:** v0.9.0 - Production-ready release with structured name support (FirstName/LastName)
 
   [Quick Start](#quick-start) • [Features](#features) • [Documentation](#documentation) • [Examples](#examples) • [Troubleshooting](#troubleshooting)
 </div>
+
+---
+
+## ⚠️ Upgrading to v0.9.0
+
+**v0.9.0 includes breaking changes to registration.** If you're upgrading from v0.8.x, please review the changes below.
+
+**Breaking Changes:**
+- **RegisterRequest:** `Name` property replaced with `FirstName` and `LastName`
+- **UserFactory:** Must handle `FirstName` and `LastName` instead of single `Name` field
+- **OAuth Integration:** Providers now extract structured names (Google: given_name/family_name, Discord: username as FirstName)
+
+**Migration Required:**
+1. Update your `UserFactory<TUser, RegisterRequest>` implementation to use `request.FirstName` and `request.LastName`
+2. Update your User model to store first/last names separately (or combine them as needed)
+3. Update any frontend registration forms to collect first and last names separately
+
+**Example Migration:**
+```csharp
+// OLD (v0.8.x)
+public User CreateUser(RegisterRequest request, string passwordHash)
+{
+    return new User
+    {
+        Email = request.Email,
+        PasswordHash = passwordHash,
+        Name = request.Name  // Single field
+    };
+}
+
+// NEW (v0.9.0)
+public User CreateUser(RegisterRequest request, string passwordHash)
+{
+    return new User
+    {
+        Email = request.Email,
+        PasswordHash = passwordHash,
+        FirstName = request.FirstName,  // Separate fields
+        LastName = request.LastName
+    };
+}
+```
+
+**Why This Change?**
+- Consistent data structure between email/password and OAuth registration
+- Better support for personalization and formal communications
+- Aligns with industry-standard user data models
+- OAuth providers (Google, Discord) already provide structured names
+
+If you were using v0.7.x or earlier, see the [v0.8.0 Upgrade Guide](UPGRADE_GUIDE_0.8.0.md) for namespace changes.
 
 ---
 
@@ -34,17 +84,19 @@ Pawthorize is a complete, production-ready authentication library for ASP.NET Co
 ## ✨ Features
 
 ### Core Authentication
-- ✅ **User Registration & Login** - Email/password with BCrypt hashing
+- ✅ **User Registration & Login** - Email/password with BCrypt hashing and structured names (FirstName/LastName)
 - ✅ **JWT Token Management** - Access + refresh tokens with automatic rotation
-- ✅ **Remember Me** - Configurable session persistence (v0.7.4+)
+- ✅ **Remember Me** - Configurable session persistence
 - ✅ **Password Reset Flow** - Secure token-based password recovery
 - ✅ **Email Verification** - Optional email confirmation workflow
+- ✅ **Email Change** - Secure email address change with verification
 - ✅ **Session Management** - View and revoke active sessions across devices
 - ✅ **Account Security** - Account locking, email verification requirements
 
 ### OAuth 2.0 Social Login
-- ✅ **Google OAuth** - Sign in with Google
-- ✅ **Discord OAuth** - Sign in with Discord
+- ✅ **Google OAuth** - Sign in with Google (extracts given_name/family_name)
+- ✅ **Discord OAuth** - Sign in with Discord (extracts username as FirstName)
+- ✅ **Structured Name Support** - OAuth providers automatically populate FirstName/LastName
 - ✅ **Account Linking** - Connect multiple OAuth providers to one account
 - ✅ **Auto-Registration** - Automatically create accounts on first OAuth login
 - ✅ **PKCE Support** - Enhanced security for OAuth flows (RFC 7636)
@@ -90,7 +142,8 @@ public class User : IAuthenticatedUser
     public string Id { get; set; } = Guid.NewGuid().ToString();
     public string Email { get; set; } = string.Empty;
     public string PasswordHash { get; set; } = string.Empty;
-    public string? Name { get; set; }
+    public string FirstName { get; set; } = string.Empty;
+    public string LastName { get; set; } = string.Empty;
     public IEnumerable<string> Roles { get; set; } = new List<string>();
     public IDictionary<string, string>? AdditionalClaims { get; set; }
     public bool IsEmailVerified { get; set; }
@@ -138,7 +191,8 @@ public class UserFactory : IUserFactory<User, RegisterRequest>
         {
             Email = request.Email,
             PasswordHash = passwordHash,
-            Name = request.Name
+            FirstName = request.FirstName,
+            LastName = request.LastName
         };
     }
 }
@@ -218,7 +272,7 @@ app.MapPawthorize();
 app.Run();
 ```
 
-**That's it!** You now have a complete authentication system with 11+ endpoints:
+**That's it!** You now have a complete authentication system with 13+ endpoints:
 
 - `POST /api/auth/register` - Register new user
 - `POST /api/auth/login` - Login with email/password
@@ -228,6 +282,8 @@ app.Run();
 - `POST /api/auth/reset-password` - Reset password with token
 - `POST /api/auth/change-password` - Change password (requires auth)
 - `POST /api/auth/set-password` - Set password for OAuth-only users (v0.7.9+)
+- `POST /api/auth/change-email` - Request email change (v0.8.0+)
+- `GET /api/auth/verify-email-change` - Verify new email address (v0.8.0+)
 - `GET /api/auth/me` - Get current user info (includes `hasPassword` v0.7.9+)
 - `GET /api/auth/sessions` - Get active sessions with device info (v0.7.2+)
 - `POST /api/auth/sessions/revoke-others` - Revoke other sessions
@@ -368,7 +424,8 @@ public class User : IAuthenticatedUser
     public string Id { get; set; }
     public string Email { get; set; }
     public string PasswordHash { get; set; }
-    public string? Name { get; set; }
+    public string FirstName { get; set; }
+    public string LastName { get; set; }
 
     // Populate this property based on your role system
     public IEnumerable<string> Roles { get; set; } = new List<string>();
@@ -380,6 +437,8 @@ public class User : IAuthenticatedUser
 var user = new User
 {
     Email = "admin@example.com",
+    FirstName = "Admin",
+    LastName = "User",
     Roles = new List<string> { "Admin", "Manager" } // Your role management logic
 };
 
@@ -538,10 +597,11 @@ Response:
 {
   "id": "user-123",
   "email": "user@example.com",
-  "name": "John Doe",
+  "firstName": "John",
+  "lastName": "Doe",
   "roles": ["User"],
   "isEmailVerified": true,
-  "hasPassword": false  // NEW in v0.7.9
+  "hasPassword": false
 }
 ```
 
@@ -578,6 +638,110 @@ const { hasPassword } = await fetch('/api/auth/me', {
 
 if (!hasPassword) {
   // Show "Set Password" form instead of "Change Password" form
+}
+```
+
+### OAuth Structured Names (v0.9.0+)
+
+Pawthorize automatically extracts structured names from OAuth providers to provide consistent user data:
+
+**Google OAuth:**
+- Extracts `given_name` → `FirstName`
+- Extracts `family_name` → `LastName`
+- Falls back to parsing `name` field if individual fields unavailable
+
+**Discord OAuth:**
+- Extracts `username` → `FirstName`
+- Sets `LastName` to empty string (Discord doesn't provide last names)
+
+**Auto-Registration:**
+When a user signs in with OAuth for the first time, Pawthorize automatically creates a user account with the extracted first and last names. Your `IUserFactory<TUser, RegisterRequest>` implementation will receive a `RegisterRequest` with populated `FirstName` and `LastName` fields.
+
+**Account Linking:**
+When linking an OAuth provider to an existing account, the structured name information is stored in the linking metadata for reference.
+
+**Benefits:**
+- Consistent data structure between OAuth and email/password registration
+- Better support for personalization ("Welcome back, John!")
+- Enables formal communications (emails, receipts, etc.)
+- Aligns with industry-standard user data models
+
+### Email Change (v0.8.0+)
+
+Users can securely change their email address with a verification flow:
+
+**Step 1: Request email change:**
+```http
+POST /api/auth/change-email
+Authorization: Bearer {accessToken}
+Content-Type: application/json
+
+{
+  "newEmail": "newemail@example.com"
+}
+
+Response:
+{
+  "success": true,
+  "data": {
+    "message": "Verification email sent to newemail@example.com"
+  }
+}
+```
+
+**Step 2: User clicks verification link in email:**
+```http
+GET /api/auth/verify-email-change?token={verificationToken}
+
+Response:
+{
+  "success": true,
+  "data": {
+    "message": "Email changed successfully"
+  }
+}
+```
+
+**Configuration:**
+```json
+{
+  "Pawthorize": {
+    "EmailChange": {
+      "BaseUrl": "https://yourapp.com",
+      "TokenLifetimeMinutes": 60,
+      "RequireEmailVerification": true
+    }
+  }
+}
+```
+
+**Email notifications:**
+- Verification email sent to the new email address
+- Notification email sent to the old email address (security alert)
+
+**Error responses:**
+- `400 SAME_EMAIL` - New email is the same as current email
+- `400 EMAIL_EXISTS` - New email is already in use by another account
+- `400 VALIDATION` - Invalid email format
+- `400 INVALID_TOKEN` - Verification token is invalid or expired
+
+**Frontend integration:**
+```javascript
+async function changeEmail(newEmail) {
+  const response = await fetch('/api/auth/change-email', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+      'Content-Type': 'application/json',
+      'X-XSRF-TOKEN': localStorage.getItem('csrfToken')
+    },
+    credentials: 'include',
+    body: JSON.stringify({ newEmail })
+  });
+
+  if (response.ok) {
+    alert('Check your new email for a verification link');
+  }
 }
 ```
 
@@ -812,11 +976,11 @@ app.Run();
 
 ```javascript
 // client.js
-async function register(email, password, name) {
+async function register(email, password, firstName, lastName) {
   const response = await fetch('/api/auth/register', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password, name })
+    body: JSON.stringify({ email, password, firstName, lastName })
   });
 
   const data = await response.json();
@@ -921,6 +1085,8 @@ async function refreshAccessToken() {
 
 ### Example 3: OAuth Social Login
 
+OAuth providers automatically extract structured names (FirstName/LastName) from user profiles, providing consistent data with email/password registration.
+
 **Configuration (appsettings.json):**
 ```json
 {
@@ -928,12 +1094,19 @@ async function refreshAccessToken() {
     "TokenDelivery": "Hybrid",
     "OAuth": {
       "FrontendCallbackUrl": "http://localhost:3000/auth/callback",
+      "AllowAutoRegistration": true,
       "Providers": {
         "Google": {
           "Enabled": true,
           "ClientId": "YOUR_CLIENT_ID",
           "ClientSecret": "YOUR_CLIENT_SECRET",
           "RedirectUri": "http://localhost:5000/api/auth/oauth/google/callback"
+        },
+        "Discord": {
+          "Enabled": true,
+          "ClientId": "YOUR_CLIENT_ID",
+          "ClientSecret": "YOUR_CLIENT_SECRET",
+          "RedirectUri": "http://localhost:5000/api/auth/oauth/discord/callback"
         }
       }
     }
@@ -957,11 +1130,13 @@ function loginWithDiscord() {
 </script>
 ```
 
-**OAuth Callback Page (v0.7.8+):**
+**OAuth Callback Page:**
 
 After OAuth, users are redirected to your `FrontendCallbackUrl` with either:
 - Success: `?accessToken=eyJ...&csrfToken=abc123&returnUrl=/dashboard`
 - Error: `?error=oauth_failed&error_description=Unable+to+complete+sign+in`
+
+**Note:** When users sign in with OAuth for the first time, Pawthorize automatically creates an account with their first and last names extracted from the OAuth provider (Google: given_name/family_name, Discord: username as FirstName).
 
 ```typescript
 // auth/callback.tsx (React example)
