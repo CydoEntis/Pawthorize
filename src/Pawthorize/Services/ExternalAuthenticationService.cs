@@ -7,6 +7,7 @@ using Pawthorize.Endpoints.Register;
 using Pawthorize.Services.Models;
 using Pawthorize.Services.OAuth.Models;
 using Pawthorize.Services;
+using Pawthorize.Internal;
 
 namespace Pawthorize.Services;
 
@@ -191,27 +192,50 @@ public class ExternalAuthenticationService<TUser> where TUser : class, IAuthenti
         ExternalUserInfo userInfo,
         CancellationToken cancellationToken)
     {
-        // Try to get user factory from DI container
-        // We try RegisterRequest factory first, as it's the most common
+        // Get user factory (same one used for email/password registration)
         var userFactoryType = typeof(IUserFactory<,>).MakeGenericType(typeof(TUser), typeof(RegisterRequest));
         var userFactory = _serviceProvider.GetService(userFactoryType);
 
         if (userFactory == null)
         {
             throw new InvalidOperationException(
-                "OAuth auto-registration requires an IUserFactory<TUser, RegisterRequest> implementation to be registered in DI. " +
-                "Either register IUserFactory<TUser, RegisterRequest> or disable auto-registration in OAuth settings (set AllowAutoRegistration = false).");
+                "OAuth auto-registration requires IUserFactory<TUser, RegisterRequest> to be registered in DI. " +
+                "Either register IUserFactory<TUser, RegisterRequest> or disable auto-registration " +
+                "(set AllowAutoRegistration = false in OAuth settings).");
         }
 
-        // Create register request from OAuth user info
+        // Extract FirstName and LastName from provider
+        string firstName;
+        string lastName;
+
+        if (!string.IsNullOrWhiteSpace(userInfo.GivenName) || !string.IsNullOrWhiteSpace(userInfo.FamilyName))
+        {
+            // Provider gave us structured names (e.g., Google)
+            firstName = userInfo.GivenName ?? string.Empty;
+            lastName = userInfo.FamilyName ?? string.Empty;
+        }
+        else if (!string.IsNullOrWhiteSpace(userInfo.Name))
+        {
+            // Provider only gave full name (e.g., Discord) - split it
+            (firstName, lastName) = NameHelper.SplitName(userInfo.Name);
+        }
+        else
+        {
+            // No name data available - use empty strings
+            firstName = string.Empty;
+            lastName = string.Empty;
+        }
+
+        // Create RegisterRequest with structured names
         var registerRequest = new RegisterRequest
         {
             Email = userInfo.Email!,
-            Password = string.Empty, // OAuth users don't have passwords initially
-            Name = userInfo.Name
+            Password = string.Empty,  // OAuth users don't have passwords initially
+            FirstName = firstName,
+            LastName = lastName
         };
 
-        // Use dynamic to call CreateUser method
+        // Use same factory as email/password registration
         dynamic factory = userFactory;
         var user = factory.CreateUser(registerRequest, string.Empty) as TUser;
 
@@ -222,7 +246,8 @@ public class ExternalAuthenticationService<TUser> where TUser : class, IAuthenti
 
         await _userRepository.CreateAsync(user, cancellationToken);
 
-        _logger.LogInformation("Created new user {UserId} from external provider info", user.Id);
+        _logger.LogInformation("Created new user {UserId} from external provider info with FirstName={FirstName}, LastName={LastName}",
+            user.Id, firstName, lastName);
 
         return user;
     }
@@ -243,6 +268,8 @@ public class ExternalAuthenticationService<TUser> where TUser : class, IAuthenti
             Metadata = new Dictionary<string, string>
             {
                 ["name"] = userInfo.Name ?? string.Empty,
+                ["givenName"] = userInfo.GivenName ?? string.Empty,
+                ["familyName"] = userInfo.FamilyName ?? string.Empty,
                 ["profilePictureUrl"] = userInfo.ProfilePictureUrl ?? string.Empty,
                 ["emailVerified"] = userInfo.EmailVerified.ToString()
             }
