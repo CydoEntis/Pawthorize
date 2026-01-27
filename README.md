@@ -16,56 +16,6 @@
 
 ---
 
-## ⚠️ Upgrading to v0.9.0
-
-**v0.9.0 includes breaking changes to registration.** If you're upgrading from v0.8.x, please review the changes below.
-
-**Breaking Changes:**
-- **RegisterRequest:** `Name` property replaced with `FirstName` and `LastName`
-- **UserFactory:** Must handle `FirstName` and `LastName` instead of single `Name` field
-- **OAuth Integration:** Providers now extract structured names (Google: given_name/family_name, Discord: username as FirstName)
-
-**Migration Required:**
-1. Update your `UserFactory<TUser, RegisterRequest>` implementation to use `request.FirstName` and `request.LastName`
-2. Update your User model to store first/last names separately (or combine them as needed)
-3. Update any frontend registration forms to collect first and last names separately
-
-**Example Migration:**
-```csharp
-// OLD (v0.8.x)
-public User CreateUser(RegisterRequest request, string passwordHash)
-{
-    return new User
-    {
-        Email = request.Email,
-        PasswordHash = passwordHash,
-        Name = request.Name  // Single field
-    };
-}
-
-// NEW (v0.9.0)
-public User CreateUser(RegisterRequest request, string passwordHash)
-{
-    return new User
-    {
-        Email = request.Email,
-        PasswordHash = passwordHash,
-        FirstName = request.FirstName,  // Separate fields
-        LastName = request.LastName
-    };
-}
-```
-
-**Why This Change?**
-- Consistent data structure between email/password and OAuth registration
-- Better support for personalization and formal communications
-- Aligns with industry-standard user data models
-- OAuth providers (Google, Discord) already provide structured names
-
-If you were using v0.7.x or earlier, see the [v0.8.0 Upgrade Guide](UPGRADE_GUIDE_0.8.0.md) for namespace changes.
-
----
-
 ## 📦 What is Pawthorize?
 
 Pawthorize is a complete, production-ready authentication library for ASP.NET Core that handles everything from user registration to OAuth 2.0 social login. Built for **Minimal APIs** and designed to get you from zero to secure authentication in minutes, not hours.
