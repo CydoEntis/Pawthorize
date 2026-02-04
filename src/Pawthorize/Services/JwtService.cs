@@ -179,6 +179,11 @@ public class JwtService<TUser> where TUser : IAuthenticatedUser
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 
+        if (!string.IsNullOrEmpty(user.FirstName) || !string.IsNullOrEmpty(user.LastName))
+        {
+            claims.Add(new Claim(ClaimTypes.Name, $"{user.FirstName} {user.LastName}".Trim()));
+        }
+
         var rolesList = user.Roles.ToList();
         if (rolesList.Count > 0)
         {
