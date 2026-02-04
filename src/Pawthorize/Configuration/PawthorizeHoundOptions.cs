@@ -94,6 +94,21 @@ public sealed class PawthorizeResponseOptions
     }
 
     /// <summary>
+    /// Enable GitHub OAuth authentication.
+    /// Requires configuration in appsettings.json under Pawthorize:OAuth:Providers:GitHub.
+    /// </summary>
+    public PawthorizeResponseOptions AddGitHub()
+    {
+        EnableOAuth = true;
+        OAuthProviders.Add(new OAuthProviderRegistration
+        {
+            ProviderName = "github",
+            ProviderType = typeof(Providers.GitHubOAuthProvider)
+        });
+        return this;
+    }
+
+    /// <summary>
     /// Add a custom OAuth provider.
     /// </summary>
     /// <typeparam name="TProvider">Provider type implementing IExternalAuthProvider</typeparam>

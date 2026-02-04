@@ -19,6 +19,7 @@ builder.Services.AddPawthorize<User>(options =>
     options.UseDefaultFormatters();
     options.AddGoogle();
     options.AddDiscord();
+    options.AddGitHub();
 });
 
 // Register repository implementations (in production, use database-backed repositories)
@@ -86,7 +87,7 @@ customAuthGroup.MapPost("/send-verification", (string phone) => new
 app.MapGet("/", () => new
 {
     Message = "Pawthorize Sample API - Authentication with OAuth 2.0",
-    Version = "0.7.4",
+    Version = "0.9.1",
     Documentation = "/swagger",
     Endpoints = new
     {
@@ -105,7 +106,7 @@ app.MapGet("/", () => new
         },
         OAuth = new[]
         {
-            "GET    /api/auth/oauth/{provider} - Initiate OAuth flow (google, discord)",
+            "GET    /api/auth/oauth/{provider} - Initiate OAuth flow (google, discord, github)",
             "GET    /api/auth/oauth/{provider}/callback - OAuth callback handler",
             "POST   /api/auth/oauth/{provider}/link - Link OAuth provider (requires auth)",
             "DELETE /api/auth/oauth/{provider}/unlink - Unlink OAuth provider (requires auth)",
