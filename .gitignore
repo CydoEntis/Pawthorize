@@ -47,12 +47,19 @@ bld/
 *.tmp
 .DS_Store
 
-# AppSettings (keep only appsettings.json, ignore environment-specific ones)
-appsettings.*.json
+# Environment-specific appsettings
 appsettings.Development.json
 appsettings.Production.json
 appsettings.Staging.json
 appsettings.Local.json
 
-# Documentation and samples (if you don't want to commit these)
-docs/
+# Markdown — ignore generated/temporary docs, whitelist project docs
+*.md
+!README.md
+!CLAUDE.md
+!AGENTS.md
+!docs/*.md
+!pawthorize-*.md
+
+# Python port (experimental, not part of NuGet release)
+python-port/
