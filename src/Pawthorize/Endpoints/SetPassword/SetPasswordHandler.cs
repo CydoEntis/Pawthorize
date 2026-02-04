@@ -34,8 +34,11 @@ public class SetPasswordHandler<TUser> where TUser : IAuthenticatedUser
     }
 
     /// <summary>
-    /// Handle set password request for OAuth-only users.
+    /// Sets a password for users who authenticated exclusively via OAuth and have no password yet.
     /// </summary>
+    /// <exception cref="NotAuthenticatedError">User is not authenticated.</exception>
+    /// <exception cref="UserNotFoundError">User record not found.</exception>
+    /// <exception cref="PasswordAlreadySetError">User already has a password set.</exception>
     public async Task<IResult> HandleAsync(
         SetPasswordRequest request,
         HttpContext httpContext,
@@ -50,7 +53,7 @@ public class SetPasswordHandler<TUser> where TUser : IAuthenticatedUser
             if (string.IsNullOrEmpty(userId))
             {
                 _logger.LogWarning("Set password failed: User not authenticated");
-                throw new InvalidCredentialsError("User not authenticated");
+                throw new NotAuthenticatedError();
             }
 
             _logger.LogDebug("Set password request for UserId: {UserId}", userId);
@@ -68,7 +71,6 @@ public class SetPasswordHandler<TUser> where TUser : IAuthenticatedUser
 
             _logger.LogDebug("User found for UserId: {UserId}, Email: {Email}", user.Id, user.Email);
 
-            // Check if user already has a password
             if (!string.IsNullOrEmpty(user.PasswordHash))
             {
                 _logger.LogWarning("Set password failed: User already has a password for UserId: {UserId}", user.Id);

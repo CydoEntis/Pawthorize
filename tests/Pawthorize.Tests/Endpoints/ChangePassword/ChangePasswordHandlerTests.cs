@@ -150,7 +150,7 @@ public class ChangePasswordHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_WithNoAuthenticatedUser_ShouldThrowInvalidCredentialsError()
+    public async Task HandleAsync_WithNoAuthenticatedUser_ShouldThrowNotAuthenticatedError()
     {
         var request = new ChangePasswordRequest
         {
@@ -163,7 +163,7 @@ public class ChangePasswordHandlerTests
 
         Func<Task> act = async () => await _handler.HandleAsync(request, _httpContext, CancellationToken.None);
 
-        await act.Should().ThrowAsync<InvalidCredentialsError>();
+        await act.Should().ThrowAsync<NotAuthenticatedError>();
         _mockUserRepository.Verify(r => r.FindByIdAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 

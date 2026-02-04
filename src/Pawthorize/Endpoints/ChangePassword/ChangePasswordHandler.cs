@@ -38,8 +38,11 @@ public class ChangePasswordHandler<TUser> where TUser : IAuthenticatedUser
     }
 
     /// <summary>
-    /// Handle change password request.
+    /// Verifies the current password, updates to the new password, and revokes all active sessions.
     /// </summary>
+    /// <exception cref="NotAuthenticatedError">User is not authenticated.</exception>
+    /// <exception cref="UserNotFoundError">User record not found.</exception>
+    /// <exception cref="IncorrectPasswordError">Current password does not match.</exception>
     public async Task<IResult> HandleAsync(
         ChangePasswordRequest request,
         HttpContext httpContext,
@@ -54,7 +57,7 @@ public class ChangePasswordHandler<TUser> where TUser : IAuthenticatedUser
             if (string.IsNullOrEmpty(userId))
             {
                 _logger.LogWarning("Change password failed: User not authenticated");
-                throw new InvalidCredentialsError("User not authenticated");
+                throw new NotAuthenticatedError();
             }
 
             _logger.LogDebug("Change password request for UserId: {UserId}", userId);

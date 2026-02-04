@@ -24,10 +24,11 @@ public class ListLinkedProvidersHandler<TUser> where TUser : class, IAuthenticat
     }
 
     /// <summary>
-    /// Handle list linked providers request.
+    /// Returns all OAuth providers currently linked to the authenticated user's account.
     /// </summary>
-    /// <param name="context">HTTP context</param>
-    /// <param name="cancellationToken">Cancellation token</param>
+    /// <param name="context">HTTP context.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <exception cref="NotAuthenticatedError">User is not authenticated.</exception>
     public async Task<IResult> HandleAsync(
         HttpContext context,
         CancellationToken cancellationToken)
@@ -38,7 +39,7 @@ public class ListLinkedProvidersHandler<TUser> where TUser : class, IAuthenticat
         if (string.IsNullOrEmpty(userId))
         {
             _logger.LogWarning("List providers attempt without authentication");
-            throw new InvalidCredentialsError("You must be logged in to view linked providers");
+            throw new NotAuthenticatedError();
         }
 
         var linkedProviders = await _externalAuthService.GetLinkedProvidersAsync(

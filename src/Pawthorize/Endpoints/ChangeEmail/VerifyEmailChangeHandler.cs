@@ -40,8 +40,10 @@ public class VerifyEmailChangeHandler<TUser> where TUser : IAuthenticatedUser
     }
 
     /// <summary>
-    /// Handle email change verification request.
+    /// Validates the email-change token, applies the new email, and redirects to the frontend callback.
+    /// Sends a security notification to the old email address if configured.
     /// </summary>
+    /// <exception cref="InvalidOperationException">FrontendCallbackUrl is not configured.</exception>
     public async Task<IResult> HandleAsync(
         string token,
         HttpContext httpContext,
@@ -78,7 +80,6 @@ public class VerifyEmailChangeHandler<TUser> where TUser : IAuthenticatedUser
 
             var oldEmail = user.Email;
 
-            // Update email
             user.Email = tokenInfo.NewEmail;
             user.IsEmailVerified = true; // New email was just verified
 
@@ -139,7 +140,8 @@ public class VerifyEmailChangeHandler<TUser> where TUser : IAuthenticatedUser
         if (string.IsNullOrEmpty(callbackUrl))
         {
             _logger.LogError("EmailChange.FrontendCallbackUrl is not configured");
-            return Results.BadRequest(new { error = "Configuration error: FrontendCallbackUrl not set" });
+            throw new InvalidOperationException(
+                "EmailChange.FrontendCallbackUrl is not configured. Set 'Pawthorize:EmailChange:FrontendCallbackUrl' in appsettings.json");
         }
 
         var queryParams = new Dictionary<string, string?> { [key] = value };

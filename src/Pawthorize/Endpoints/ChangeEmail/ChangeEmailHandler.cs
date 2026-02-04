@@ -49,8 +49,15 @@ public class ChangeEmailHandler<TUser> where TUser : IAuthenticatedUser
     }
 
     /// <summary>
-    /// Handle change email request.
+    /// Validates the new email, optionally confirms the current password, and either updates
+    /// immediately or sends a verification email depending on configuration.
     /// </summary>
+    /// <exception cref="NotAuthenticatedError">User is not authenticated.</exception>
+    /// <exception cref="UserNotFoundError">User record not found.</exception>
+    /// <exception cref="SameEmailError">New email matches the current email.</exception>
+    /// <exception cref="DuplicateEmailError">New email is already in use by another account.</exception>
+    /// <exception cref="PasswordNotSetError">Password confirmation required but account has no password (OAuth-only).</exception>
+    /// <exception cref="IncorrectPasswordError">Password confirmation did not match.</exception>
     public async Task<IResult> HandleAsync(
         ChangeEmailRequest request,
         HttpContext httpContext,
@@ -65,7 +72,7 @@ public class ChangeEmailHandler<TUser> where TUser : IAuthenticatedUser
             if (string.IsNullOrEmpty(userId))
             {
                 _logger.LogWarning("Change email failed: User not authenticated");
-                throw new InvalidCredentialsError("User not authenticated");
+                throw new NotAuthenticatedError();
             }
 
             _logger.LogDebug("Change email request for UserId: {UserId}", userId);
@@ -83,14 +90,12 @@ public class ChangeEmailHandler<TUser> where TUser : IAuthenticatedUser
 
             _logger.LogDebug("User found for UserId: {UserId}, Current Email: {Email}", user.Id, user.Email);
 
-            // Check if new email is the same as current email
             if (string.Equals(user.Email, request.NewEmail, StringComparison.OrdinalIgnoreCase))
             {
                 _logger.LogWarning("Change email failed: New email same as current email for UserId: {UserId}", user.Id);
                 throw new SameEmailError();
             }
 
-            // Check if new email is already in use
             var existingUser = await _userRepository.FindByEmailAsync(request.NewEmail, cancellationToken);
             if (existingUser != null && existingUser.Id != userId)
             {
@@ -104,7 +109,7 @@ public class ChangeEmailHandler<TUser> where TUser : IAuthenticatedUser
                 if (string.IsNullOrEmpty(user.PasswordHash))
                 {
                     _logger.LogWarning("Change email failed: User has no password set for UserId: {UserId}", user.Id);
-                    throw new InvalidCredentialsError("Password confirmation required but user has no password set");
+                    throw new PasswordNotSetError();
                 }
 
                 if (!_passwordHasher.VerifyPassword(request.Password, user.PasswordHash))
@@ -140,7 +145,6 @@ public class ChangeEmailHandler<TUser> where TUser : IAuthenticatedUser
             }
             else
             {
-                // Update email immediately
                 var oldEmail = user.Email;
                 user.Email = request.NewEmail;
                 user.IsEmailVerified = false; // New email not verified yet
@@ -187,22 +191,6 @@ public class ChangeEmailHandler<TUser> where TUser : IAuthenticatedUser
 
                 return response.Ok(httpContext);
             }
-        }
-        catch (SameEmailError)
-        {
-            throw;
-        }
-        catch (DuplicateEmailError)
-        {
-            throw;
-        }
-        catch (IncorrectPasswordError)
-        {
-            throw;
-        }
-        catch (UserNotFoundError)
-        {
-            throw;
         }
         catch (Exception ex)
         {

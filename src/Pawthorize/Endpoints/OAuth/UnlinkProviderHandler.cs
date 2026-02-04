@@ -24,11 +24,13 @@ public class UnlinkProviderHandler<TUser> where TUser : class, IAuthenticatedUse
     }
 
     /// <summary>
-    /// Handle unlink provider request.
+    /// Removes the specified OAuth provider link from the authenticated user's account.
     /// </summary>
-    /// <param name="provider">Provider name</param>
-    /// <param name="context">HTTP context</param>
-    /// <param name="cancellationToken">Cancellation token</param>
+    /// <param name="provider">OAuth provider name (e.g. "google", "discord").</param>
+    /// <param name="context">HTTP context.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <exception cref="NotAuthenticatedError">User is not authenticated.</exception>
+    /// <exception cref="OAuthAccountLinkingError">Cannot unlink the last authentication method.</exception>
     public async Task<IResult> HandleAsync(
         string provider,
         HttpContext context,
@@ -40,7 +42,7 @@ public class UnlinkProviderHandler<TUser> where TUser : class, IAuthenticatedUse
         if (string.IsNullOrEmpty(userId))
         {
             _logger.LogWarning("Unlink provider attempt without authentication");
-            throw new InvalidCredentialsError("You must be logged in to unlink a provider");
+            throw new NotAuthenticatedError();
         }
 
         await _externalAuthService.UnlinkProviderAsync(userId, provider, cancellationToken);

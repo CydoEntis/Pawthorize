@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Pawthorize.Abstractions;
+using Pawthorize.Errors;
 using Pawthorize.Internal;
 using SuccessHound.AspNetExtensions;
 
@@ -24,18 +25,19 @@ public class GetCurrentUserHandler<TUser> where TUser : IAuthenticatedUser
     }
 
     /// <summary>
-    /// Get current authenticated user's information.
+    /// Returns the authenticated user's profile including roles, verification status, and linked providers.
     /// </summary>
+    /// <exception cref="NotAuthenticatedError">User is not authenticated or UserId claim is missing.</exception>
+    /// <exception cref="UserNotFoundError">User record no longer exists in the database.</exception>
     public async Task<IResult> HandleAsync(
         HttpContext httpContext,
         CancellationToken cancellationToken = default)
     {
-        // Check if user is authenticated first
         if (!httpContext.User.Identity?.IsAuthenticated ?? true)
         {
             _logger.LogWarning("Get current user failed: User is not authenticated. " +
                 "This usually means JWT Bearer authentication middleware is not configured or the token is invalid.");
-            return Results.Unauthorized();
+            throw new NotAuthenticatedError();
         }
 
         var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -47,7 +49,7 @@ public class GetCurrentUserHandler<TUser> where TUser : IAuthenticatedUser
                 "Available claims: {Claims}. " +
                 "Make sure your JWT token includes a '{ClaimType}' claim with the user's ID.",
                 ClaimTypes.NameIdentifier, allClaims, ClaimTypes.NameIdentifier);
-            return Results.Unauthorized();
+            throw new NotAuthenticatedError();
         }
 
         _logger.LogInformation("Retrieving current user information for UserId: {UserId}", userId);
@@ -59,7 +61,7 @@ public class GetCurrentUserHandler<TUser> where TUser : IAuthenticatedUser
             if (user == null)
             {
                 _logger.LogWarning("Get current user failed: User not found for UserId: {UserId}", userId);
-                return Results.Unauthorized();
+                throw new UserNotFoundError();
             }
 
             _logger.LogInformation("Current user information retrieved successfully for UserId: {UserId}", userId);

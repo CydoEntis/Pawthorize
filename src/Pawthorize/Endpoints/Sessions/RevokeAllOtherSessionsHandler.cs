@@ -35,8 +35,10 @@ public class RevokeAllOtherSessionsHandler<TUser> where TUser : IAuthenticatedUs
     }
 
     /// <summary>
-    /// Revoke all refresh tokens (sessions) except the current one for the authenticated user.
+    /// Revokes all sessions except the current one, identified by the refresh token in the request.
     /// </summary>
+    /// <exception cref="NotAuthenticatedError">UserId claim is missing from the token.</exception>
+    /// <exception cref="InvalidRefreshTokenError">Current refresh token could not be extracted.</exception>
     public async Task<IResult> HandleAsync(
         RevokeAllOtherSessionsRequest request,
         HttpContext httpContext,
@@ -47,7 +49,7 @@ public class RevokeAllOtherSessionsHandler<TUser> where TUser : IAuthenticatedUs
         if (string.IsNullOrEmpty(userId))
         {
             _logger.LogWarning("Revoke all other sessions failed: UserId claim not found in token");
-            return Results.Unauthorized();
+            throw new NotAuthenticatedError();
         }
 
         _logger.LogInformation("Revoking all other sessions for UserId: {UserId}", userId);

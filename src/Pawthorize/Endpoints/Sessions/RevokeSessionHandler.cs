@@ -3,6 +3,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Pawthorize.Abstractions;
+using Pawthorize.Errors;
 using Pawthorize.Internal;
 using SuccessHound.AspNetExtensions;
 
@@ -29,18 +30,20 @@ public class RevokeSessionHandler<TUser> where TUser : IAuthenticatedUser
     }
 
     /// <summary>
-    /// Revoke a specific session (refresh token) by its session ID for the authenticated user.
+    /// Revokes a specific session by ID after verifying it belongs to the authenticated user.
     /// </summary>
+    /// <exception cref="NotAuthenticatedError">User is not authenticated or UserId claim is missing.</exception>
+    /// <exception cref="SessionNotFoundError">No session exists for the given ID.</exception>
+    /// <exception cref="SessionForbiddenError">Session belongs to a different user.</exception>
     public async Task<IResult> HandleAsync(
         RevokeSessionRequest request,
         HttpContext httpContext,
         CancellationToken cancellationToken = default)
     {
-        // Check if user is authenticated first
         if (!httpContext.User.Identity?.IsAuthenticated ?? true)
         {
             _logger.LogWarning("Revoke session failed: User is not authenticated");
-            return Results.Unauthorized();
+            throw new NotAuthenticatedError();
         }
 
         var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -48,7 +51,7 @@ public class RevokeSessionHandler<TUser> where TUser : IAuthenticatedUser
         if (string.IsNullOrEmpty(userId))
         {
             _logger.LogWarning("Revoke session failed: UserId claim not found in token");
-            return Results.Unauthorized();
+            throw new NotAuthenticatedError();
         }
 
         _logger.LogInformation("Revoking session {SessionId} for UserId: {UserId}", request.SessionId, userId);
@@ -58,20 +61,19 @@ public class RevokeSessionHandler<TUser> where TUser : IAuthenticatedUser
             await ValidationHelper.ValidateAndThrowAsync(request, _validator, cancellationToken, _logger);
             _logger.LogDebug("Revoke session request validation passed");
 
-            // Verify that the session belongs to the current user before revoking
             var tokenInfo = await _refreshTokenRepository.ValidateAsync(request.SessionId, cancellationToken);
 
             if (tokenInfo == null)
             {
                 _logger.LogWarning("Revoke session failed: Session {SessionId} not found", request.SessionId);
-                return Results.NotFound(new { message = "Session not found." });
+                throw new SessionNotFoundError();
             }
 
             if (tokenInfo.UserId != userId)
             {
                 _logger.LogWarning("Revoke session failed: Session {SessionId} does not belong to UserId: {UserId}",
                     request.SessionId, userId);
-                return Results.Forbid();
+                throw new SessionForbiddenError();
             }
 
             await _refreshTokenRepository.RevokeAsync(request.SessionId, cancellationToken);

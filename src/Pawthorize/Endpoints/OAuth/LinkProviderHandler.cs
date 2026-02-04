@@ -33,13 +33,13 @@ public class LinkProviderHandler<TUser> where TUser : class, IAuthenticatedUser
     }
 
     /// <summary>
-    /// Handle link provider initiation request.
-    /// Returns an authorization URL for the frontend to redirect to.
+    /// Generates an OAuth authorization URL for linking a provider to the authenticated user's account.
     /// </summary>
-    /// <param name="provider">Provider name</param>
-    /// <param name="returnUrl">Optional URL to redirect to after OAuth</param>
-    /// <param name="context">HTTP context</param>
-    /// <param name="cancellationToken">Cancellation token</param>
+    /// <param name="provider">OAuth provider name (e.g. "google", "discord").</param>
+    /// <param name="returnUrl">Optional URL to redirect to after the OAuth flow completes.</param>
+    /// <param name="context">HTTP context.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <exception cref="NotAuthenticatedError">User is not authenticated.</exception>
     public async Task<IResult> HandleAsync(
         string provider,
         string? returnUrl,
@@ -52,7 +52,7 @@ public class LinkProviderHandler<TUser> where TUser : class, IAuthenticatedUser
         if (string.IsNullOrEmpty(userId))
         {
             _logger.LogWarning("Link provider attempt without authentication");
-            throw new InvalidCredentialsError("You must be logged in to link a provider");
+            throw new NotAuthenticatedError();
         }
 
         var oauthProvider = _providerFactory.GetProvider(provider);

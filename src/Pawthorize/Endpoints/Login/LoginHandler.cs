@@ -48,8 +48,11 @@ public class LoginHandler<TUser> where TUser : IAuthenticatedUser
     }
 
     /// <summary>
-    /// Handle login request.
+    /// Authenticates the user, enforces account lockout, and returns tokens via the configured delivery strategy.
     /// </summary>
+    /// <exception cref="InvalidCredentialsError">Email not found or password is incorrect.</exception>
+    /// <exception cref="AccountLockedError">Account is locked due to exceeded failed login attempts.</exception>
+    /// <exception cref="EmailNotVerifiedError">Email verification is required but not completed.</exception>
     public async Task<IResult> HandleAsync(
         LoginRequest request,
         HttpContext httpContext,
@@ -72,13 +75,11 @@ public class LoginHandler<TUser> where TUser : IAuthenticatedUser
 
             _logger.LogDebug("User found for email: {Email}, UserId: {UserId}", request.Email, user.Id);
 
-            // Check if account is locked
             if (_lockoutOptions.Enabled && user.LockoutEnd.HasValue && user.LockoutEnd.Value > DateTime.UtcNow)
             {
-                var remainingMinutes = (int)(user.LockoutEnd.Value - DateTime.UtcNow).TotalMinutes + 1;
-                _logger.LogWarning("Login failed: Account locked for email: {Email}, UserId: {UserId}, Lockout ends in {Minutes} minutes",
-                    request.Email, user.Id, remainingMinutes);
-                throw new AccountLockedError($"Account is locked. Please try again in {remainingMinutes} minute(s).");
+                _logger.LogWarning("Login failed: Account locked for email: {Email}, UserId: {UserId}, Lockout ends at {LockoutEnd}",
+                    request.Email, user.Id, user.LockoutEnd.Value);
+                throw new AccountLockedError(user.LockoutEnd.Value);
             }
 
             if (!_passwordHasher.VerifyPassword(request.Password, user.PasswordHash))
@@ -86,14 +87,12 @@ public class LoginHandler<TUser> where TUser : IAuthenticatedUser
                 _logger.LogWarning("Login failed: Invalid password for email: {Email}, UserId: {UserId}",
                     request.Email, user.Id);
 
-                // Increment failed login attempts
                 if (_lockoutOptions.Enabled)
                 {
                     user.FailedLoginAttempts++;
                     _logger.LogDebug("Failed login attempts incremented to {Count} for UserId: {UserId}",
                         user.FailedLoginAttempts, user.Id);
 
-                    // Lock account if max attempts exceeded
                     if (user.FailedLoginAttempts >= _lockoutOptions.MaxFailedAttempts)
                     {
                         user.LockoutEnd = DateTime.UtcNow.AddMinutes(_lockoutOptions.LockoutMinutes);
@@ -109,7 +108,6 @@ public class LoginHandler<TUser> where TUser : IAuthenticatedUser
 
             _logger.LogDebug("Password verification successful for UserId: {UserId}", user.Id);
 
-            // Reset failed login attempts on successful login
             if (_lockoutOptions.Enabled && _lockoutOptions.ResetOnSuccessfulLogin && user.FailedLoginAttempts > 0)
             {
                 _logger.LogDebug("Resetting failed login attempts from {Count} to 0 for UserId: {UserId}",

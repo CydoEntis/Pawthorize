@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Pawthorize.Abstractions;
+using Pawthorize.Errors;
 using Pawthorize.Internal;
 using SuccessHound.AspNetExtensions;
 
@@ -24,18 +25,18 @@ public class GetActiveSessionsHandler<TUser> where TUser : IAuthenticatedUser
     }
 
     /// <summary>
-    /// Get all active refresh tokens (sessions) for the current user.
+    /// Retrieves all active sessions for the authenticated user, marking which session is current.
     /// </summary>
+    /// <exception cref="NotAuthenticatedError">User is not authenticated or UserId claim is missing.</exception>
     public async Task<IResult> HandleAsync(
         HttpContext httpContext,
         CancellationToken cancellationToken = default)
     {
-        // Check if user is authenticated first
         if (!httpContext.User.Identity?.IsAuthenticated ?? true)
         {
             _logger.LogWarning("Get active sessions failed: User is not authenticated. " +
                 "This usually means JWT Bearer authentication middleware is not configured or the token is invalid.");
-            return Results.Unauthorized();
+            throw new NotAuthenticatedError();
         }
 
         var userId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -47,7 +48,7 @@ public class GetActiveSessionsHandler<TUser> where TUser : IAuthenticatedUser
                 "Available claims: {Claims}. " +
                 "Make sure your JWT token includes a '{ClaimType}' claim with the user's ID.",
                 ClaimTypes.NameIdentifier, allClaims, ClaimTypes.NameIdentifier);
-            return Results.Unauthorized();
+            throw new NotAuthenticatedError();
         }
 
         _logger.LogInformation("Retrieving active sessions for UserId: {UserId}", userId);
