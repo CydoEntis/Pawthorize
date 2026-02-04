@@ -9,7 +9,7 @@
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
   [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
 
-  **Latest:** v0.9.0 - Production-ready release with structured name support (FirstName/LastName)
+  **Latest:** v0.9.1 - Consistent error responses across all endpoints
 
   [Quick Start](#quick-start) • [Features](#features) • [Documentation](#documentation) • [Examples](#examples) • [Troubleshooting](#troubleshooting)
 </div>
@@ -576,6 +576,7 @@ Response:
 ```
 
 **Error responses:**
+- `401 NOT_AUTHENTICATED` - Request is missing a valid auth token
 - `400 PASSWORD_ALREADY_SET` - User already has a password (use `/change-password` instead)
 - `400 VALIDATION` - Password doesn't meet policy or passwords don't match
 
@@ -670,10 +671,12 @@ Response:
 - Notification email sent to the old email address (security alert)
 
 **Error responses:**
+- `401 NOT_AUTHENTICATED` - Request is missing a valid auth token
 - `400 SAME_EMAIL` - New email is the same as current email
-- `400 EMAIL_EXISTS` - New email is already in use by another account
+- `409 DUPLICATE_EMAIL` - New email is already in use by another account
+- `400 PASSWORD_NOT_SET` - Password confirmation required but account has no password (OAuth-only users)
 - `400 VALIDATION` - Invalid email format
-- `400 INVALID_TOKEN` - Verification token is invalid or expired
+- `400 INVALID_VERIFICATION_TOKEN` - Verification token is invalid or expired
 
 **Frontend integration:**
 ```javascript
@@ -769,6 +772,11 @@ Response:
 }
 ```
 
+**Session endpoint error codes (v0.9.1+):**
+- `401 NOT_AUTHENTICATED` — Request is missing a valid auth token
+- `404 SESSION_NOT_FOUND` — Session ID doesn't exist or was already revoked
+- `403 SESSION_FORBIDDEN` — Session belongs to a different user
+
 ### Password Policy
 
 Pawthorize includes configurable password policy enforcement to protect against weak passwords:
@@ -823,6 +831,24 @@ Protect against brute force attacks with automatic account lockout after failed 
 4. Reset failed attempts counter on successful login
 
 **Default configuration**: 5 failed attempts triggers a 30-minute lockout.
+
+**Error response when locked:**
+```json
+{
+  "success": false,
+  "error": {
+    "code": "ACCOUNT_LOCKED",
+    "message": "Account is temporarily locked due to multiple failed login attempts",
+    "details": {
+      "unlockAt": "2026-02-04T15:30:00Z",
+      "reason": "Too many failed login attempts",
+      "action": "Please wait before trying again"
+    }
+  }
+}
+```
+
+Use `details.unlockAt` to build a countdown timer on the frontend.
 
 ### Rate Limiting
 
@@ -1381,6 +1407,82 @@ Pawthorize uses ErrorHound for consistent error responses with detailed field-le
   }
 }
 ```
+
+**Not Authenticated (v0.9.1+):**
+```json
+{
+  "success": false,
+  "error": {
+    "code": "NOT_AUTHENTICATED",
+    "message": "Authentication required. Please log in.",
+    "details": null
+  },
+  "meta": {
+    "timestamp": "2024-01-15T10:30:00Z",
+    "version": "v1.0"
+  }
+}
+```
+
+**Account Locked (v0.9.1+ — structured details):**
+```json
+{
+  "success": false,
+  "error": {
+    "code": "ACCOUNT_LOCKED",
+    "message": "Account is temporarily locked due to multiple failed login attempts",
+    "details": {
+      "unlockAt": "2026-02-04T15:30:00Z",
+      "reason": "Too many failed login attempts",
+      "action": "Please wait before trying again"
+    }
+  },
+  "meta": {
+    "timestamp": "2024-01-15T10:30:00Z",
+    "version": "v1.0"
+  }
+}
+```
+
+**Password Not Set (v0.9.1+ — OAuth-only accounts requiring password confirmation):**
+```json
+{
+  "success": false,
+  "error": {
+    "code": "PASSWORD_NOT_SET",
+    "message": "Your account does not have a password set. Please set a password first.",
+    "details": {
+      "action": "Use the set-password endpoint to set a password"
+    }
+  },
+  "meta": {
+    "timestamp": "2024-01-15T10:30:00Z",
+    "version": "v1.0"
+  }
+}
+```
+
+**Full error code reference:**
+
+| Code | Status | When It Fires |
+|------|--------|---------------|
+| `NOT_AUTHENTICATED` | 401 | Endpoint requires auth but token is missing or invalid |
+| `INVALID_CREDENTIALS` | 401 | Wrong email or password on login |
+| `ACCOUNT_LOCKED` | 403 | Too many failed login attempts — use `details.unlockAt` for countdown |
+| `EMAIL_NOT_VERIFIED` | 403 | Login attempted before email verification |
+| `DUPLICATE_EMAIL` | 409 | Registration or email change with an email already in use |
+| `SAME_EMAIL` | 400 | Email change requested to the current email |
+| `INCORRECT_PASSWORD` | 401 | Current password wrong on change-password or change-email |
+| `PASSWORD_ALREADY_SET` | 400 | set-password called but user already has a password |
+| `PASSWORD_NOT_SET` | 400 | Password confirmation required but account is OAuth-only |
+| `USER_NOT_FOUND` | 404 | Valid token but user record was deleted |
+| `SESSION_NOT_FOUND` | 404 | Session revoke with an ID that doesn't exist |
+| `SESSION_FORBIDDEN` | 403 | Session revoke attempted on another user's session |
+| `INVALID_REFRESH_TOKEN` | 401 | Refresh token missing, expired, or revoked |
+| `INVALID_RESET_TOKEN` | 400 | Password reset token invalid or expired |
+| `INVALID_VERIFICATION_TOKEN` | 400 | Email verification token invalid or expired |
+| `VALIDATION` | 400 | FluentValidation failed — field errors in `details` |
+| `CSRF_VALIDATION_FAILED` | 403 | Missing or mismatched CSRF token |
 
 ### Debug Logging
 
