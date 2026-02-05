@@ -29,17 +29,18 @@ internal static class ValidationHelper
 
             if (!validationResult.IsValid)
             {
-                var errorCount = validationResult.Errors.Count;
-                logger?.LogWarning("Validation failed for {RequestType} with {ErrorCount} error(s)",
-                    requestType, errorCount);
-
                 var validationError = new ValidationError();
+                var errorDetails = new List<string>();
+
                 foreach (var error in validationResult.Errors)
                 {
-                    validationError.AddFieldError(error.PropertyName, error.ErrorMessage);
-                    logger?.LogDebug("Validation error - Field: {PropertyName}, Message: {ErrorMessage}",
-                        error.PropertyName, error.ErrorMessage);
+                    var fieldName = ToCamelCase(error.PropertyName);
+                    validationError.AddFieldError(fieldName, error.ErrorMessage);
+                    errorDetails.Add($"[{fieldName}] {error.ErrorMessage}");
                 }
+
+                logger?.LogWarning("Validation failed for {RequestType} with {ErrorCount} error(s): {ValidationErrors}",
+                    requestType, errorDetails.Count, string.Join("; ", errorDetails));
 
                 throw validationError;
             }
@@ -55,5 +56,11 @@ internal static class ValidationHelper
             logger?.LogError(ex, "Unexpected error during validation of {RequestType}", requestType);
             throw;
         }
+    }
+
+    private static string ToCamelCase(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return name;
+        return char.ToLower(name[0]) + name[1..];
     }
 }
