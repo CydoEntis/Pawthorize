@@ -121,28 +121,50 @@ public class RateLimitingService
             rateLimiterOptions.GlobalLimiter = null; // We use per-policy limiters
             rateLimiterOptions.OnRejected = async (context, cancellationToken) =>
             {
+                var retryAfterSeconds = 60;
+                if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+                {
+                    retryAfterSeconds = (int)retryAfter.TotalSeconds;
+                }
+
                 context.HttpContext.Response.StatusCode = options.RateLimitStatusCode;
+                context.HttpContext.Response.ContentType = "application/json";
 
                 if (options.IncludeRetryAfterHeader)
                 {
-                    if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
-                    {
-                        context.HttpContext.Response.Headers.RetryAfter = ((int)retryAfter.TotalSeconds).ToString();
-                    }
-                    else
-                    {
-                        context.HttpContext.Response.Headers.RetryAfter = "60";
-                    }
+                    context.HttpContext.Response.Headers.RetryAfter = retryAfterSeconds.ToString();
                 }
 
-                await context.HttpContext.Response.WriteAsync(
-                    "Rate limit exceeded. Please try again later.",
-                    cancellationToken);
+                var response = BuildRateLimitedResponse(retryAfterSeconds);
+                await context.HttpContext.Response.WriteAsJsonAsync(response, cancellationToken);
             };
         });
 
         _logger?.LogInformation("Rate limiting configured with {PolicyCount} policies.",
             6 + options.CustomPolicies.Count);
+    }
+
+    /// <summary>
+    /// Build the rate-limited response body in ErrorHound format.
+    /// Extracted for testability — the OnRejected callback cannot be unit-tested directly.
+    /// </summary>
+    internal static object BuildRateLimitedResponse(int retryAfterSeconds)
+    {
+        return new
+        {
+            success = false,
+            error = new
+            {
+                code = "RATE_LIMITED",
+                message = "Too many requests. Please try again later.",
+                details = new { retryAfter = retryAfterSeconds }
+            },
+            meta = new
+            {
+                timestamp = DateTime.UtcNow.ToString("O"),
+                version = "v1.0"
+            }
+        };
     }
 
     private Func<HttpContext, RateLimitPartition<string>> CreatePartitioner(
