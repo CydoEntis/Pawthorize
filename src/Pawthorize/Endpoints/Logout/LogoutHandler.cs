@@ -1,3 +1,4 @@
+using ErrorHound.Core;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
@@ -67,7 +68,7 @@ public class LogoutHandler<TUser> where TUser : IAuthenticatedUser
             _logger.LogWarning("Logout failed: Invalid refresh token");
             throw;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not ApiError)
         {
             _logger.LogError(ex, "Unexpected error during logout");
             throw;

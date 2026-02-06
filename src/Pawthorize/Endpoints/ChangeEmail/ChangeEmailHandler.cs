@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Pawthorize.Abstractions;
 using Pawthorize.Configuration;
+using ErrorHound.Core;
 using Pawthorize.Errors;
 using Pawthorize.Services;
 using Pawthorize.Internal;
@@ -192,7 +193,7 @@ public class ChangeEmailHandler<TUser> where TUser : IAuthenticatedUser
                 return response.Ok(httpContext);
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not ApiError)
         {
             _logger.LogError(ex, "Unexpected error during change email");
             throw;

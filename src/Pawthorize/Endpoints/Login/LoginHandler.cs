@@ -1,3 +1,4 @@
+using ErrorHound.Core;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
@@ -149,7 +150,7 @@ public class LoginHandler<TUser> where TUser : IAuthenticatedUser
             _logger.LogWarning("Login failed: Account locked for email: {Email}", request.Email);
             throw;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not ApiError)
         {
             _logger.LogError(ex, "Unexpected error during login for email: {Email}", request.Email);
             throw;

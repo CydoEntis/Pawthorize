@@ -1,3 +1,4 @@
+using ErrorHound.Core;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
@@ -136,7 +137,7 @@ public class RefreshHandler<TUser> where TUser : IAuthenticatedUser
             _logger.LogWarning("Token refresh failed: Account locked");
             throw;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not ApiError)
         {
             _logger.LogError(ex, "Unexpected error during token refresh");
             throw;

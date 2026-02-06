@@ -1,3 +1,4 @@
+using ErrorHound.Core;
 using System.Security.Claims;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
@@ -88,7 +89,7 @@ public class RevokeSessionHandler<TUser> where TUser : IAuthenticatedUser
 
             return response.Ok(httpContext);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not ApiError)
         {
             _logger.LogError(ex, "Unexpected error revoking session {SessionId} for UserId: {UserId}",
                 request.SessionId, userId);

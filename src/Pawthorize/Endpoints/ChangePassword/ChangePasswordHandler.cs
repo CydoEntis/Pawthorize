@@ -1,3 +1,4 @@
+using ErrorHound.Core;
 using System.Security.Claims;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
@@ -111,7 +112,7 @@ public class ChangePasswordHandler<TUser> where TUser : IAuthenticatedUser
             _logger.LogError("Change password failed: User not found");
             throw;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not ApiError)
         {
             _logger.LogError(ex, "Unexpected error during change password");
             throw;

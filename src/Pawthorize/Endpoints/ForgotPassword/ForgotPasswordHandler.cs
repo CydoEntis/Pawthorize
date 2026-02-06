@@ -1,3 +1,4 @@
+using ErrorHound.Core;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
@@ -77,7 +78,7 @@ public class ForgotPasswordHandler<TUser> where TUser : IAuthenticatedUser
 
             return response.Ok(httpContext);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not ApiError)
         {
             _logger.LogError(ex, "Unexpected error during forgot password request for email: {Email}", request.Email);
             throw;

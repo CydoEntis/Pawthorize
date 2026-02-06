@@ -1,3 +1,4 @@
+using ErrorHound.Core;
 using System.Security.Claims;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
@@ -79,7 +80,7 @@ public class RevokeAllOtherSessionsHandler<TUser> where TUser : IAuthenticatedUs
             _logger.LogWarning("Revoke all other sessions failed: Invalid or missing refresh token for UserId: {UserId}", userId);
             throw;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not ApiError)
         {
             _logger.LogError(ex, "Unexpected error revoking other sessions for UserId: {UserId}", userId);
             throw;

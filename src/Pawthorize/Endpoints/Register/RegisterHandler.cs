@@ -1,3 +1,4 @@
+using ErrorHound.Core;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
@@ -116,7 +117,7 @@ public class RegisterHandler<TUser, TRegisterRequest>
             _logger.LogError("Registration failed: Duplicate email for {Email}", request.Email);
             throw;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not ApiError)
         {
             _logger.LogError(ex, "Unexpected error during registration for email: {Email}", request.Email);
             throw;
@@ -151,7 +152,7 @@ public class RegisterHandler<TUser, TRegisterRequest>
             _logger.LogInformation("Email verification email sent successfully to {Email}, UserId: {UserId}",
                 user.Email, user.Id);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not ApiError)
         {
             _logger.LogError(ex, "Failed to send email verification email to {Email}, UserId: {UserId}",
                 user.Email, user.Id);

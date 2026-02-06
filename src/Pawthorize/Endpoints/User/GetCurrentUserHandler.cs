@@ -1,3 +1,4 @@
+using ErrorHound.Core;
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
@@ -78,7 +79,7 @@ public class GetCurrentUserHandler<TUser> where TUser : IAuthenticatedUser
 
             return response.Ok(httpContext);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not ApiError)
         {
             _logger.LogError(ex, "Unexpected error retrieving current user for UserId: {UserId}", userId);
             throw;

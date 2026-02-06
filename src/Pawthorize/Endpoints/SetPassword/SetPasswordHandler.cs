@@ -1,3 +1,4 @@
+using ErrorHound.Core;
 using System.Security.Claims;
 using FluentValidation;
 using Microsoft.AspNetCore.Http;
@@ -104,7 +105,7 @@ public class SetPasswordHandler<TUser> where TUser : IAuthenticatedUser
             _logger.LogError("Set password failed: User not found");
             throw;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not ApiError)
         {
             _logger.LogError(ex, "Unexpected error during set password");
             throw;
