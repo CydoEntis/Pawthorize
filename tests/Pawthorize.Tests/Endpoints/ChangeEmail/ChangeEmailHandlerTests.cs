@@ -179,25 +179,78 @@ public class ChangeEmailHandlerTests
     }
 
     [Fact]
-    public async Task HandleAsync_WithDuplicateEmail_ShouldThrowDuplicateEmailError()
+    public async Task HandleAsync_WithDuplicateEmail_ShouldReturnSuccessWithoutChangingEmail()
     {
         var userId = "user123";
         var newEmail = "taken@test.com";
+        var currentEmail = "current@test.com";
         var request = new ChangeEmailRequest { NewEmail = newEmail, Password = "Password123!" };
         SetupAuthentication(userId);
         SetupValidation(request);
 
+        var user = new TestUser { Id = userId, Email = currentEmail, PasswordHash = "hash" };
         _mockUserRepository
             .Setup(r => r.FindByIdAsync(userId, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new TestUser { Id = userId, Email = "current@test.com", PasswordHash = "hash" });
+            .ReturnsAsync(user);
 
         _mockUserRepository
             .Setup(r => r.FindByEmailAsync(newEmail, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new TestUser { Id = "other-user", Email = newEmail });
 
-        Func<Task> act = async () => await _handler.HandleAsync(request, _httpContext);
+        _mockPasswordHasher
+            .Setup(h => h.VerifyPassword(request.Password, user.PasswordHash))
+            .Returns(true);
 
-        await act.Should().ThrowAsync<DuplicateEmailError>();
+        _options.RequireEmailVerification = false;
+
+        var result = await _handler.HandleAsync(request, _httpContext);
+
+        // Should return success to prevent email enumeration
+        result.Should().NotBeNull();
+
+        // Email should NOT be changed
+        user.Email.Should().Be(currentEmail);
+
+        // UpdateAsync should NOT be called
+        _mockUserRepository.Verify(
+            r => r.UpdateAsync(It.IsAny<TestUser>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task HandleAsync_WithDuplicateEmail_AndVerificationRequired_ShouldReturnSuccessWithoutSendingEmail()
+    {
+        var userId = "user123";
+        var newEmail = "taken@test.com";
+        var currentEmail = "current@test.com";
+        var request = new ChangeEmailRequest { NewEmail = newEmail, Password = "Password123!" };
+        SetupAuthentication(userId);
+        SetupValidation(request);
+
+        var user = new TestUser { Id = userId, Email = currentEmail, PasswordHash = "hash" };
+        _mockUserRepository
+            .Setup(r => r.FindByIdAsync(userId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(user);
+
+        _mockUserRepository
+            .Setup(r => r.FindByEmailAsync(newEmail, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new TestUser { Id = "other-user", Email = newEmail });
+
+        _mockPasswordHasher
+            .Setup(h => h.VerifyPassword(request.Password, user.PasswordHash))
+            .Returns(true);
+
+        _options.RequireEmailVerification = true;
+
+        var result = await _handler.HandleAsync(request, _httpContext);
+
+        // Should return success to prevent email enumeration
+        result.Should().NotBeNull();
+
+        // Verification email should NOT be sent
+        _mockEmailChangeService.Verify(
+            s => s.InitiateEmailChangeAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]

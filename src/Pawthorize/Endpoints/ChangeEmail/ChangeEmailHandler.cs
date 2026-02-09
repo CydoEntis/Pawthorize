@@ -56,9 +56,13 @@ public class ChangeEmailHandler<TUser> where TUser : IAuthenticatedUser
     /// <exception cref="NotAuthenticatedError">User is not authenticated.</exception>
     /// <exception cref="UserNotFoundError">User record not found.</exception>
     /// <exception cref="SameEmailError">New email matches the current email.</exception>
-    /// <exception cref="DuplicateEmailError">New email is already in use by another account.</exception>
     /// <exception cref="PasswordNotSetError">Password confirmation required but account has no password (OAuth-only).</exception>
     /// <exception cref="IncorrectPasswordError">Password confirmation did not match.</exception>
+    /// <remarks>
+    /// To prevent email enumeration attacks, if the new email is already in use by another account,
+    /// the handler returns a generic success response without actually changing the email or sending
+    /// a verification email.
+    /// </remarks>
     public async Task<IResult> HandleAsync(
         ChangeEmailRequest request,
         HttpContext httpContext,
@@ -97,14 +101,7 @@ public class ChangeEmailHandler<TUser> where TUser : IAuthenticatedUser
                 throw new SameEmailError();
             }
 
-            var existingUser = await _userRepository.FindByEmailAsync(request.NewEmail, cancellationToken);
-            if (existingUser != null && existingUser.Id != userId)
-            {
-                _logger.LogWarning("Change email failed: Email already in use for UserId: {UserId}", user.Id);
-                throw new DuplicateEmailError();
-            }
-
-            // Verify password if required
+            // Verify password if required (do this before checking duplicate email to prevent enumeration)
             if (_options.Value.EmailChange.RequirePasswordConfirmation)
             {
                 if (string.IsNullOrEmpty(user.PasswordHash))
@@ -122,20 +119,36 @@ public class ChangeEmailHandler<TUser> where TUser : IAuthenticatedUser
                 _logger.LogDebug("Password verified successfully for UserId: {UserId}", user.Id);
             }
 
+            // Check if email is already in use by another account
+            // To prevent email enumeration, we return a generic success response instead of an error
+            var existingUser = await _userRepository.FindByEmailAsync(request.NewEmail, cancellationToken);
+            bool emailIsAlreadyInUse = existingUser != null && existingUser.Id != userId;
+
             var emailChangeOptions = _options.Value.EmailChange;
 
             // If email verification is required, send verification email
             if (_options.Value.RequireEmailVerification)
             {
-                await _emailChangeService.InitiateEmailChangeAsync(
-                    userId,
-                    user.Email,
-                    request.NewEmail,
-                    cancellationToken);
+                // Only initiate email change if the email is not already in use
+                // Return same message either way to prevent enumeration
+                if (!emailIsAlreadyInUse)
+                {
+                    await _emailChangeService.InitiateEmailChangeAsync(
+                        userId,
+                        user.Email,
+                        request.NewEmail,
+                        cancellationToken);
 
-                _logger.LogInformation(
-                    "Email change verification email sent to {NewEmail} for UserId: {UserId}",
-                    request.NewEmail, user.Id);
+                    _logger.LogInformation(
+                        "Email change verification email sent to {NewEmail} for UserId: {UserId}",
+                        request.NewEmail, user.Id);
+                }
+                else
+                {
+                    _logger.LogWarning(
+                        "Change email silently skipped: Email {NewEmail} already in use (enumeration prevention) for UserId: {UserId}",
+                        request.NewEmail, user.Id);
+                }
 
                 var response = new
                 {
@@ -146,43 +159,54 @@ public class ChangeEmailHandler<TUser> where TUser : IAuthenticatedUser
             }
             else
             {
-                var oldEmail = user.Email;
-                user.Email = request.NewEmail;
-                user.IsEmailVerified = false; // New email not verified yet
-
-                await _userRepository.UpdateAsync(user, cancellationToken);
-
-                _logger.LogInformation(
-                    "Email updated from {OldEmail} to {NewEmail} for UserId: {UserId}",
-                    oldEmail, request.NewEmail, user.Id);
-
-                // Send security notification to old email if enabled
-                if (emailChangeOptions.SendNotificationToOldEmail && !string.IsNullOrEmpty(oldEmail))
+                // Only update email if it's not already in use
+                // Return same message either way to prevent enumeration
+                if (!emailIsAlreadyInUse)
                 {
-                    try
-                    {
-                        var notificationBody = _templateProvider.GetEmailChangeNotificationTemplate(
-                            oldEmail,
-                            request.NewEmail,
-                            emailChangeOptions.ApplicationName);
+                    var oldEmail = user.Email;
+                    user.Email = request.NewEmail;
+                    user.IsEmailVerified = false; // New email not verified yet
 
-                        await _emailSender.SendEmailAsync(
-                            to: oldEmail,
-                            subject: $"Your email address was changed - {emailChangeOptions.ApplicationName}",
-                            htmlBody: notificationBody,
-                            cancellationToken: cancellationToken);
+                    await _userRepository.UpdateAsync(user, cancellationToken);
 
-                        _logger.LogInformation(
-                            "Security notification sent to old email {OldEmail} for UserId: {UserId}",
-                            oldEmail, user.Id);
-                    }
-                    catch (Exception ex)
+                    _logger.LogInformation(
+                        "Email updated from {OldEmail} to {NewEmail} for UserId: {UserId}",
+                        oldEmail, request.NewEmail, user.Id);
+
+                    // Send security notification to old email if enabled
+                    if (emailChangeOptions.SendNotificationToOldEmail && !string.IsNullOrEmpty(oldEmail))
                     {
-                        // Log but don't fail the request if notification fails
-                        _logger.LogWarning(ex,
-                            "Failed to send security notification to old email {OldEmail} for UserId: {UserId}",
-                            oldEmail, user.Id);
+                        try
+                        {
+                            var notificationBody = _templateProvider.GetEmailChangeNotificationTemplate(
+                                oldEmail,
+                                request.NewEmail,
+                                emailChangeOptions.ApplicationName);
+
+                            await _emailSender.SendEmailAsync(
+                                to: oldEmail,
+                                subject: $"Your email address was changed - {emailChangeOptions.ApplicationName}",
+                                htmlBody: notificationBody,
+                                cancellationToken: cancellationToken);
+
+                            _logger.LogInformation(
+                                "Security notification sent to old email {OldEmail} for UserId: {UserId}",
+                                oldEmail, user.Id);
+                        }
+                        catch (Exception ex)
+                        {
+                            // Log but don't fail the request if notification fails
+                            _logger.LogWarning(ex,
+                                "Failed to send security notification to old email {OldEmail} for UserId: {UserId}",
+                                oldEmail, user.Id);
+                        }
                     }
+                }
+                else
+                {
+                    _logger.LogWarning(
+                        "Change email silently skipped: Email {NewEmail} already in use (enumeration prevention) for UserId: {UserId}",
+                        request.NewEmail, user.Id);
                 }
 
                 var response = new
