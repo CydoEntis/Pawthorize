@@ -124,6 +124,11 @@ public class ExternalAuthenticationServiceTests
             .Setup(r => r.CreateAsync(It.IsAny<TestUser>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(createdUser);
 
+        // Since provider has EmailVerified = true, user should be auto-verified
+        _mockUserRepository
+            .Setup(r => r.UpdateAsync(It.Is<TestUser>(u => u.IsEmailVerified), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(createdUser);
+
         _mockAuthenticationService
             .Setup(s => s.GenerateTokensAsync(createdUser, false, null, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(authResult);
@@ -139,6 +144,12 @@ public class ExternalAuthenticationServiceTests
                     r.LastName == "Doe"),
                 string.Empty
             ),
+            Times.Once
+        );
+
+        // Verify that UpdateAsync was called to set IsEmailVerified = true
+        _mockUserRepository.Verify(
+            r => r.UpdateAsync(It.Is<TestUser>(u => u.IsEmailVerified), It.IsAny<CancellationToken>()),
             Times.Once
         );
     }
@@ -195,6 +206,11 @@ public class ExternalAuthenticationServiceTests
             .Setup(r => r.CreateAsync(It.IsAny<TestUser>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(createdUser);
 
+        // Since provider has EmailVerified = true, user should be auto-verified
+        _mockUserRepository
+            .Setup(r => r.UpdateAsync(It.Is<TestUser>(u => u.IsEmailVerified), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(createdUser);
+
         _mockAuthenticationService
             .Setup(s => s.GenerateTokensAsync(createdUser, false, null, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(authResult);
@@ -210,6 +226,12 @@ public class ExternalAuthenticationServiceTests
                     r.LastName == "Smith"),
                 string.Empty
             ),
+            Times.Once
+        );
+
+        // Verify that UpdateAsync was called to set IsEmailVerified = true
+        _mockUserRepository.Verify(
+            r => r.UpdateAsync(It.Is<TestUser>(u => u.IsEmailVerified), It.IsAny<CancellationToken>()),
             Times.Once
         );
     }
@@ -266,6 +288,11 @@ public class ExternalAuthenticationServiceTests
             .Setup(r => r.CreateAsync(It.IsAny<TestUser>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(createdUser);
 
+        // Since provider has EmailVerified = true, user should be auto-verified
+        _mockUserRepository
+            .Setup(r => r.UpdateAsync(It.Is<TestUser>(u => u.IsEmailVerified), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(createdUser);
+
         _mockAuthenticationService
             .Setup(s => s.GenerateTokensAsync(createdUser, false, null, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(authResult);
@@ -281,6 +308,12 @@ public class ExternalAuthenticationServiceTests
                     r.LastName == string.Empty),
                 string.Empty
             ),
+            Times.Once
+        );
+
+        // Verify that UpdateAsync was called to set IsEmailVerified = true
+        _mockUserRepository.Verify(
+            r => r.UpdateAsync(It.Is<TestUser>(u => u.IsEmailVerified), It.IsAny<CancellationToken>()),
             Times.Once
         );
     }
@@ -337,6 +370,11 @@ public class ExternalAuthenticationServiceTests
             .Setup(r => r.CreateAsync(It.IsAny<TestUser>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(createdUser);
 
+        // Since provider has EmailVerified = true, user should be auto-verified
+        _mockUserRepository
+            .Setup(r => r.UpdateAsync(It.Is<TestUser>(u => u.IsEmailVerified), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(createdUser);
+
         _mockAuthenticationService
             .Setup(s => s.GenerateTokensAsync(createdUser, false, null, null, It.IsAny<CancellationToken>()))
             .ReturnsAsync(authResult);
@@ -353,6 +391,77 @@ public class ExternalAuthenticationServiceTests
                 string.Empty
             ),
             Times.Once
+        );
+
+        // Verify that UpdateAsync was called to set IsEmailVerified = true
+        _mockUserRepository.Verify(
+            r => r.UpdateAsync(It.Is<TestUser>(u => u.IsEmailVerified), It.IsAny<CancellationToken>()),
+            Times.Once
+        );
+    }
+
+    [Fact]
+    public async Task AuthenticateWithProviderAsync_WithUnverifiedEmail_ShouldNotAutoVerify()
+    {
+        var userInfo = new ExternalUserInfo
+        {
+            ProviderId = "unverified-123",
+            Email = "unverified@example.com",
+            EmailVerified = false,  // Provider did NOT verify email
+            Name = "Unverified User",
+            GivenName = "Unverified",
+            FamilyName = "User"
+        };
+
+        var createdUser = new TestUser
+        {
+            Id = "user-unverified",
+            Email = "unverified@example.com",
+            FirstName = "Unverified",
+            LastName = "User",
+            IsEmailVerified = false
+        };
+
+        var authResult = new AuthResult
+        {
+            AccessToken = "access_token",
+            RefreshToken = "refresh_token",
+            AccessTokenExpiresAt = DateTime.UtcNow.AddMinutes(15),
+            RefreshTokenExpiresAt = DateTime.UtcNow.AddDays(7)
+        };
+
+        _mockExternalAuthRepository
+            .Setup(r => r.FindByExternalProviderAsync("someprovider", userInfo.ProviderId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((TestUser?)null);
+
+        _mockUserRepository
+            .Setup(r => r.FindByEmailAsync(userInfo.Email!, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((TestUser?)null);
+
+        _mockServiceProvider
+            .Setup(sp => sp.GetService(It.IsAny<Type>()))
+            .Returns(_mockUserFactory.Object);
+
+        _mockUserFactory
+            .Setup(f => f.CreateUser(It.IsAny<RegisterRequest>(), string.Empty))
+            .Returns(createdUser);
+
+        _mockUserRepository
+            .Setup(r => r.CreateAsync(It.IsAny<TestUser>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(createdUser);
+
+        _mockAuthenticationService
+            .Setup(s => s.GenerateTokensAsync(createdUser, false, null, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(authResult);
+
+        var result = await _service.AuthenticateWithProviderAsync("someprovider", userInfo);
+
+        result.Should().NotBeNull();
+
+        // Verify that UpdateAsync was NOT called since email was not verified by provider
+        _mockUserRepository.Verify(
+            r => r.UpdateAsync(It.IsAny<TestUser>(), It.IsAny<CancellationToken>()),
+            Times.Never
         );
     }
 

@@ -148,6 +148,11 @@ public class OAuthCallbackHandler<TUser> where TUser : class, IAuthenticatedUser
             _logger.LogWarning(ex, "OAuth state validation failed for provider {Provider}", provider);
             return RedirectWithError("oauth_failed", "Authentication session expired. Please try again.");
         }
+        catch (EmailNotVerifiedError ex)
+        {
+            _logger.LogWarning(ex, "OAuth authentication blocked: email not verified for provider {Provider}", provider);
+            return RedirectWithError("email_not_verified", "Please verify your email address before logging in.");
+        }
         catch (OAuthError ex)
         {
             _logger.LogWarning(ex, "OAuth error for provider {Provider}: {Message}", provider, ex.Message);

@@ -15,6 +15,11 @@ public class UserFactory : IUserFactory<User, RegisterRequest>
     /// <param name="request">The registration request containing user information.</param>
     /// <param name="passwordHash">The hashed password for the user.</param>
     /// <returns>A newly created User entity.</returns>
+    /// <remarks>
+    /// Note: IsEmailVerified is initially set to false. For OAuth users, Pawthorize will automatically
+    /// set it to true after creation if the OAuth provider has verified the email (Google, Discord, GitHub).
+    /// For email/password registrations, users must verify their email through the verification flow.
+    /// </remarks>
     public User CreateUser(RegisterRequest request, string passwordHash)
     {
         return new User
@@ -25,7 +30,7 @@ public class UserFactory : IUserFactory<User, RegisterRequest>
             FirstName = request.FirstName,
             LastName = request.LastName,
             Roles = new List<string> { "User" },
-            IsEmailVerified = false,
+            IsEmailVerified = false,  // Auto-verified for OAuth users by Pawthorize
             IsLocked = false,
             CreatedAt = DateTime.UtcNow
         };

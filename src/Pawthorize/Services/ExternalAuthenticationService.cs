@@ -249,6 +249,16 @@ public class ExternalAuthenticationService<TUser> where TUser : class, IAuthenti
         _logger.LogInformation("Created new user {UserId} from external provider info with FirstName={FirstName}, LastName={LastName}",
             user.Id, firstName, lastName);
 
+        // Auto-verify email for OAuth users since the provider has already verified it
+        // OAuth providers (Google, Discord, GitHub) only return verified emails
+        if (userInfo.EmailVerified)
+        {
+            user.IsEmailVerified = true;
+            await _userRepository.UpdateAsync(user, cancellationToken);
+
+            _logger.LogInformation("Auto-verified email for OAuth user {UserId} (provider verified email)", user.Id);
+        }
+
         return user;
     }
 
