@@ -83,6 +83,17 @@ public class LoginHandler<TUser> where TUser : IAuthenticatedUser
                 throw new AccountLockedError(user.LockoutEnd.Value);
             }
 
+            // Check admin-initiated lockout (IsLocked/LockedUntil) before password verification
+            if (user.IsLocked)
+            {
+                if (user.LockedUntil == null || user.LockedUntil > DateTime.UtcNow)
+                {
+                    _logger.LogWarning("Login failed: Account locked by admin for email: {Email}, UserId: {UserId}",
+                        request.Email, user.Id);
+                    throw new AccountLockedError("Account has been locked", user.LockedUntil);
+                }
+            }
+
             if (!_passwordHasher.VerifyPassword(request.Password, user.PasswordHash))
             {
                 _logger.LogWarning("Login failed: Invalid password for email: {Email}, UserId: {UserId}",
