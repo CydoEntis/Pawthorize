@@ -46,9 +46,7 @@ public sealed class AccountLockedError : ApiError
             code: "ACCOUNT_LOCKED",
             message: "Account is locked",
             status: (int)HttpStatusCode.Forbidden,
-            details: unlockAt.HasValue
-                ? new { reason, unlockAt = unlockAt.Value }
-                : new { reason })
+            details: new { reason, unlockAt })
     {
     }
 }
