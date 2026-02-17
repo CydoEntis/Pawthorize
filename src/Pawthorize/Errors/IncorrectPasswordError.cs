@@ -5,7 +5,7 @@ namespace Pawthorize.Errors;
 
 /// <summary>
 /// Error thrown when the current password is incorrect (used in change password flow).
-/// Returns 401 Unauthorized.
+/// Returns 400 Bad Request.
 /// </summary>
 public sealed class IncorrectPasswordError : ApiError
 {
@@ -16,7 +16,7 @@ public sealed class IncorrectPasswordError : ApiError
         : base(
             code: "INCORRECT_PASSWORD",
             message: "Current password is incorrect",
-            status: (int)HttpStatusCode.Unauthorized,
+            status: (int)HttpStatusCode.BadRequest,
             details: null)
     {
     }
@@ -28,7 +28,7 @@ public sealed class IncorrectPasswordError : ApiError
         : base(
             code: "INCORRECT_PASSWORD",
             message: "Current password is incorrect",
-            status: (int)HttpStatusCode.Unauthorized,
+            status: (int)HttpStatusCode.BadRequest,
             details: details)
     {
     }
