@@ -137,6 +137,11 @@ public class OAuthCallbackHandler<TUser> where TUser : class, IAuthenticatedUser
 
             return Results.Redirect(redirectUrl);
         }
+        catch (AccountLockedError ex)
+        {
+            _logger.LogWarning(ex, "OAuth authentication blocked: account locked for provider {Provider}", provider);
+            return RedirectWithError("account_locked", "This account has been locked. Please contact support for assistance.");
+        }
         catch (DuplicateEmailError ex)
         {
             // Don't expose that the email exists - use generic message
