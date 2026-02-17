@@ -15,7 +15,7 @@ public sealed class SessionNotFoundError : ApiError
     public SessionNotFoundError()
         : base(
             code: "SESSION_NOT_FOUND",
-            message: "Session not found or has already been revoked.",
+            message: "Session not found or has already been revoked",
             status: (int)HttpStatusCode.NotFound,
             details: null)
     {

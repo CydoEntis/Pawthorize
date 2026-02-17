@@ -15,7 +15,7 @@ public sealed class NotAuthenticatedError : ApiError
     public NotAuthenticatedError()
         : base(
             code: "NOT_AUTHENTICATED",
-            message: "Authentication required. Please log in.",
+            message: "Authentication required. Please log in",
             status: (int)HttpStatusCode.Unauthorized,
             details: null)
     {

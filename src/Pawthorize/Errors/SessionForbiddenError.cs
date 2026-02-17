@@ -15,7 +15,7 @@ public sealed class SessionForbiddenError : ApiError
     public SessionForbiddenError()
         : base(
             code: "SESSION_FORBIDDEN",
-            message: "You do not have permission to revoke this session.",
+            message: "You do not have permission to revoke this session",
             status: (int)HttpStatusCode.Forbidden,
             details: null)
     {

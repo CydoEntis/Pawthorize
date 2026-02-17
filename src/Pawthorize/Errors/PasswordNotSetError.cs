@@ -15,7 +15,7 @@ public sealed class PasswordNotSetError : ApiError
     public PasswordNotSetError()
         : base(
             code: "PASSWORD_NOT_SET",
-            message: "Your account does not have a password set. Please set a password first.",
+            message: "Your account does not have a password set. Please set a password first",
             status: (int)HttpStatusCode.BadRequest,
             details: new { action = "Use the set-password endpoint to set a password" })
     {

@@ -15,7 +15,7 @@ public sealed class PasswordAlreadySetError : ApiError
     public PasswordAlreadySetError()
         : base(
             code: "PASSWORD_ALREADY_SET",
-            message: "Password is already set. Use change-password endpoint instead.",
+            message: "Password is already set. Use change-password endpoint instead",
             status: (int)HttpStatusCode.BadRequest,
             details: null)
     {
