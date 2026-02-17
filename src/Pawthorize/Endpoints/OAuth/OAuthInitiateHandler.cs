@@ -1,8 +1,10 @@
+using ErrorHound.Core;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Pawthorize.Abstractions;
 using Pawthorize.Configuration;
+using Pawthorize.Errors;
 using Pawthorize.Internal;
 using Pawthorize.Services;
 
@@ -44,30 +46,43 @@ public class OAuthInitiateHandler
     {
         _logger.LogInformation("Initiating OAuth flow for provider: {Provider}", provider);
 
-        var oauthProvider = _providerFactory.GetProvider(provider);
-
-        var config = _oauthOptions.Providers[provider.ToLowerInvariant()];
-        var redirectUri = config.RedirectUri;
-
-        string? codeVerifier = null;
-        string? codeChallenge = null;
-
-        if (_oauthOptions.UsePkce)
+        try
         {
-            codeVerifier = PkceHelper.GenerateCodeVerifier();
-            codeChallenge = PkceHelper.GenerateCodeChallenge(codeVerifier);
-            _logger.LogDebug("Generated PKCE code verifier and challenge for OAuth flow");
+            var oauthProvider = _providerFactory.GetProvider(provider);
+
+            var config = _oauthOptions.Providers[provider.ToLowerInvariant()];
+            var redirectUri = config.RedirectUri;
+
+            string? codeVerifier = null;
+            string? codeChallenge = null;
+
+            if (_oauthOptions.UsePkce)
+            {
+                codeVerifier = PkceHelper.GenerateCodeVerifier();
+                codeChallenge = PkceHelper.GenerateCodeChallenge(codeVerifier);
+                _logger.LogDebug("Generated PKCE code verifier and challenge for OAuth flow");
+            }
+
+            var stateToken = await _stateTokenService.GenerateStateTokenAsync(
+                returnUrl, codeVerifier, cancellationToken: cancellationToken);
+
+            var authorizationUrl = await oauthProvider.GetAuthorizationUrlAsync(
+                stateToken, redirectUri, codeChallenge, cancellationToken);
+
+            _logger.LogInformation("Redirecting to OAuth provider: {Provider}, URL: {Url}",
+                provider, authorizationUrl);
+
+            return Results.Redirect(authorizationUrl);
         }
-
-        var stateToken = await _stateTokenService.GenerateStateTokenAsync(
-            returnUrl, codeVerifier, cancellationToken: cancellationToken);
-
-        var authorizationUrl = await oauthProvider.GetAuthorizationUrlAsync(
-            stateToken, redirectUri, codeChallenge, cancellationToken);
-
-        _logger.LogInformation("Redirecting to OAuth provider: {Provider}, URL: {Url}",
-            provider, authorizationUrl);
-
-        return Results.Redirect(authorizationUrl);
+        catch (OAuthConfigurationError)
+        {
+            _logger.LogError("OAuth initiation failed: provider {Provider} is not configured", provider);
+            throw;
+        }
+        catch (Exception ex) when (ex is not ApiError)
+        {
+            _logger.LogError(ex, "Unexpected error during OAuth initiation for provider: {Provider}", provider);
+            throw;
+        }
     }
 }

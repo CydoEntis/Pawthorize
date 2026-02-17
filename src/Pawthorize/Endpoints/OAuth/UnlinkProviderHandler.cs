@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using ErrorHound.Core;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Pawthorize.Abstractions;
@@ -38,22 +39,35 @@ public class UnlinkProviderHandler<TUser> where TUser : class, IAuthenticatedUse
     {
         _logger.LogInformation("Unlinking provider {Provider} from authenticated user", provider);
 
-        var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (string.IsNullOrEmpty(userId))
+        try
         {
-            _logger.LogWarning("Unlink provider attempt without authentication");
-            throw new NotAuthenticatedError();
+            var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId))
+            {
+                _logger.LogWarning("Unlink provider attempt without authentication");
+                throw new NotAuthenticatedError();
+            }
+
+            await _externalAuthService.UnlinkProviderAsync(userId, provider, cancellationToken);
+
+            _logger.LogInformation("Successfully unlinked provider {Provider} from user {UserId}",
+                provider, userId);
+
+            return Results.Ok(new
+            {
+                success = true,
+                provider
+            });
         }
-
-        await _externalAuthService.UnlinkProviderAsync(userId, provider, cancellationToken);
-
-        _logger.LogInformation("Successfully unlinked provider {Provider} from user {UserId}",
-            provider, userId);
-
-        return Results.Ok(new
+        catch (OAuthAccountLinkingError)
         {
-            success = true,
-            provider
-        });
+            _logger.LogWarning("Unlink provider failed for provider {Provider}: linking constraint violation", provider);
+            throw;
+        }
+        catch (Exception ex) when (ex is not ApiError)
+        {
+            _logger.LogError(ex, "Unexpected error during unlink provider {Provider}", provider);
+            throw;
+        }
     }
 }

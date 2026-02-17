@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using ErrorHound.Core;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Pawthorize.Abstractions;
@@ -35,30 +36,38 @@ public class ListLinkedProvidersHandler<TUser> where TUser : class, IAuthenticat
     {
         _logger.LogDebug("Fetching linked providers for authenticated user");
 
-        var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (string.IsNullOrEmpty(userId))
+        try
         {
-            _logger.LogWarning("List providers attempt without authentication");
-            throw new NotAuthenticatedError();
+            var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId))
+            {
+                _logger.LogWarning("List providers attempt without authentication");
+                throw new NotAuthenticatedError();
+            }
+
+            var linkedProviders = await _externalAuthService.GetLinkedProvidersAsync(
+                userId, cancellationToken);
+
+            var providerList = linkedProviders.Select(p => new
+            {
+                provider = p.Provider,
+                email = p.ProviderEmail,
+                username = p.ProviderUsername,
+                linkedAt = p.LinkedAt
+            });
+
+            _logger.LogInformation("Retrieved {Count} linked providers for user {UserId}",
+                providerList.Count(), userId);
+
+            return Results.Ok(new
+            {
+                providers = providerList
+            });
         }
-
-        var linkedProviders = await _externalAuthService.GetLinkedProvidersAsync(
-            userId, cancellationToken);
-
-        var providerList = linkedProviders.Select(p => new
+        catch (Exception ex) when (ex is not ApiError)
         {
-            provider = p.Provider,
-            email = p.ProviderEmail,
-            username = p.ProviderUsername,
-            linkedAt = p.LinkedAt
-        });
-
-        _logger.LogInformation("Retrieved {Count} linked providers for user {UserId}",
-            providerList.Count(), userId);
-
-        return Results.Ok(new
-        {
-            providers = providerList
-        });
+            _logger.LogError(ex, "Unexpected error while listing linked providers");
+            throw;
+        }
     }
 }

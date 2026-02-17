@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using ErrorHound.Core;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -48,45 +49,58 @@ public class LinkProviderHandler<TUser> where TUser : class, IAuthenticatedUser
     {
         _logger.LogInformation("Initiating OAuth link flow for provider: {Provider}", provider);
 
-        var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
-        if (string.IsNullOrEmpty(userId))
+        try
         {
-            _logger.LogWarning("Link provider attempt without authentication");
-            throw new NotAuthenticatedError();
+            var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userId))
+            {
+                _logger.LogWarning("Link provider attempt without authentication");
+                throw new NotAuthenticatedError();
+            }
+
+            var oauthProvider = _providerFactory.GetProvider(provider);
+
+            var config = _oauthOptions.Providers[provider.ToLowerInvariant()];
+            var redirectUri = config.RedirectUri;
+
+            string? codeVerifier = null;
+            string? codeChallenge = null;
+
+            if (_oauthOptions.UsePkce)
+            {
+                codeVerifier = PkceHelper.GenerateCodeVerifier();
+                codeChallenge = PkceHelper.GenerateCodeChallenge(codeVerifier);
+                _logger.LogDebug("Generated PKCE code verifier and challenge for link flow");
+            }
+
+            // Generate state token with "link" action and user ID
+            var stateToken = await _stateTokenService.GenerateStateTokenAsync(
+                returnUrl,
+                codeVerifier,
+                action: "link",
+                userId: userId,
+                cancellationToken);
+
+            var authorizationUrl = await oauthProvider.GetAuthorizationUrlAsync(
+                stateToken, redirectUri, codeChallenge, cancellationToken);
+
+            _logger.LogInformation("Generated link authorization URL for provider: {Provider}, UserId: {UserId}",
+                provider, userId);
+
+            return Results.Ok(new
+            {
+                AuthUrl = authorizationUrl
+            });
         }
-
-        var oauthProvider = _providerFactory.GetProvider(provider);
-
-        var config = _oauthOptions.Providers[provider.ToLowerInvariant()];
-        var redirectUri = config.RedirectUri;
-
-        string? codeVerifier = null;
-        string? codeChallenge = null;
-
-        if (_oauthOptions.UsePkce)
+        catch (OAuthConfigurationError)
         {
-            codeVerifier = PkceHelper.GenerateCodeVerifier();
-            codeChallenge = PkceHelper.GenerateCodeChallenge(codeVerifier);
-            _logger.LogDebug("Generated PKCE code verifier and challenge for link flow");
+            _logger.LogError("Link provider failed: provider {Provider} is not configured", provider);
+            throw;
         }
-
-        // Generate state token with "link" action and user ID
-        var stateToken = await _stateTokenService.GenerateStateTokenAsync(
-            returnUrl,
-            codeVerifier,
-            action: "link",
-            userId: userId,
-            cancellationToken);
-
-        var authorizationUrl = await oauthProvider.GetAuthorizationUrlAsync(
-            stateToken, redirectUri, codeChallenge, cancellationToken);
-
-        _logger.LogInformation("Generated link authorization URL for provider: {Provider}, UserId: {UserId}",
-            provider, userId);
-
-        return Results.Ok(new
+        catch (Exception ex) when (ex is not ApiError)
         {
-            AuthUrl = authorizationUrl
-        });
+            _logger.LogError(ex, "Unexpected error during link provider initiation for provider: {Provider}", provider);
+            throw;
+        }
     }
 }
