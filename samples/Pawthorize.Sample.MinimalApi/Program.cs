@@ -87,7 +87,7 @@ customAuthGroup.MapPost("/send-verification", (string phone) => new
 app.MapGet("/", () => new
 {
     Message = "Pawthorize Sample API - Authentication with OAuth 2.0",
-    Version = "0.9.1",
+    Version = "1.0.0",
     Documentation = "/swagger",
     Endpoints = new
     {

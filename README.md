@@ -9,7 +9,7 @@
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
   [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
 
-  **Latest:** v0.9.1 - Consistent error responses across all endpoints
+  **Latest:** v1.0.0 - Consistent error responses across all endpoints
 
   [Quick Start](#quick-start) • [Features](#features) • [Documentation](#documentation) • [Examples](#examples) • [Troubleshooting](#troubleshooting)
 </div>
@@ -772,7 +772,7 @@ Response:
 }
 ```
 
-**Session endpoint error codes (v0.9.1+):**
+**Session endpoint error codes (v1.0.0+):**
 - `401 NOT_AUTHENTICATED` — Request is missing a valid auth token
 - `404 SESSION_NOT_FOUND` — Session ID doesn't exist or was already revoked
 - `403 SESSION_FORBIDDEN` — Session belongs to a different user
@@ -1408,7 +1408,7 @@ Pawthorize uses ErrorHound for consistent error responses with detailed field-le
 }
 ```
 
-**Not Authenticated (v0.9.1+):**
+**Not Authenticated (v1.0.0+):**
 ```json
 {
   "success": false,
@@ -1424,7 +1424,7 @@ Pawthorize uses ErrorHound for consistent error responses with detailed field-le
 }
 ```
 
-**Account Locked (v0.9.1+ — structured details):**
+**Account Locked (v1.0.0+ — structured details):**
 ```json
 {
   "success": false,
@@ -1444,7 +1444,7 @@ Pawthorize uses ErrorHound for consistent error responses with detailed field-le
 }
 ```
 
-**Password Not Set (v0.9.1+ — OAuth-only accounts requiring password confirmation):**
+**Password Not Set (v1.0.0+ — OAuth-only accounts requiring password confirmation):**
 ```json
 {
   "success": false,
